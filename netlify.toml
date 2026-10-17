@@ -1,6 +1,6 @@
 [build]
   publish = "public"
-  command = ""
+  command = "echo 'Josh Brett Studio Board: no build required'"
 
 [functions]
   directory = "netlify/functions"

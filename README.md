@@ -7,10 +7,10 @@ The design takes inspiration from punchy editorial / sticker-style portfolios, a
 ## Quick start — replace your current GitHub files
 
 1. **Back up the old app first** (download the current repository ZIP if you have saved data only in the old app's browser localStorage). The new local demo uses a different storage key and **does not import your old local-only tasks**.
-2. Extract `Josh_Brett_Studio_Board_v2_GitHub.zip`.
+2. Extract `Josh_Brett_Studio_Board_v2_BUILD_FIX_GitHub.zip`. This ZIP has **no enclosing project folder**, so all extracted files are already at the correct level.
 3. Open your existing GitHub repository. Delete the **old app files** in the repository (keep the repo itself, `.git` history and Netlify connection).
 4. Upload **the contents of this folder** into the **repository root**. You should see `netlify.toml`, `README.md`, `public/`, and `netlify/` directly in the repo root — **no extra enclosing folder**.
-5. Commit. If your Netlify project is linked to GitHub, it should rebuild automatically. Under **Netlify → Project configuration → Build & deploy**, ensure the published directory resolves to **`public`** and functions directory to **`netlify/functions`**, as specified in `netlify.toml`.
+5. Commit. If your Netlify project is linked to GitHub, it should redeploy automatically. Under **Netlify → Project configuration → Build & deploy**, make sure **Base directory is empty**, **Publish directory is `public`**, and **Functions directory is `netlify/functions`**. This version sets an explicit safe build command in the root `netlify.toml`; no compiler or npm install is required.
 6. Visit your existing `*.netlify.app` URL. The board should display in **Local demo** mode immediately. Browser changes in local demo mode do **not** sync with Notion.
 
 **Do not upload a ZIP file as a single file inside GitHub.** Unzip and upload the folder *contents*.
