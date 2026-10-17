@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#f8f5ec" />
+  <meta name="description" content="Josh Brett Studio — a lightweight creative operations board." />
+  <title>Josh Brett Studio — Creative Board</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="page-wrap">
+    <header class="topbar">
+      <div class="brand" aria-label="Josh Brett Studio">
+        <span class="brand-mark">JB<span class="brand-dot">.</span></span>
+        <span class="brand-label">JOSH BRETT<br><strong>STUDIO</strong></span>
+      </div>
+      <div class="topbar-center"><span class="tiny-star">✳</span> THE CREATIVE WORKSPACE <span class="tiny-star">✳</span></div>
+      <div class="topbar-right">
+        <button class="connection-btn" id="connectionBtn" type="button"><span class="connection-dot" id="connectionDot"></span><span id="connectionText">Local demo</span><span class="chevron">⌄</span></button>
+        <span class="avatar" title="Studio workspace">JB</span>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <section class="hero" aria-label="Workspace introduction">
+        <div class="hero-sticker sticker-one">✳ less faffing</div>
+        <div class="hero-sticker sticker-two">↗ more bangers</div>
+        <div class="hero-sticker sticker-three">✦ ship the work</div>
+        <div class="hero-eyebrow">THE JOSH BRETT STUDIO BOARD <span class="eyebrow-line"></span> 2026</div>
+        <h1>Make the work<br><span class="highlight-word">better<span class="period">.</span></span></h1>
+        <p>Better documentaries. A real transformation product.<br class="desktop-break"> Less production friction. <strong>One board to keep it moving.</strong></p>
+      </section>
+
+      <section class="workspace" aria-label="Project task board">
+        <div class="workspace-heading">
+          <div>
+            <div class="overline">/ YOUR WORKSPACE</div>
+            <h2>What's moving <span class="scribble">this week?</span></h2>
+          </div>
+          <div class="workspace-actions">
+            <button class="quiet-btn" id="refreshBtn" type="button" title="Refresh Notion tasks">↻ <span>Refresh</span></button>
+            <button class="primary-btn" id="newTaskBtn" type="button"><span>＋</span> New task</button>
+          </div>
+        </div>
+
+        <div class="compact-summary" aria-label="Board summary">
+          <span class="summary-item"><span class="summary-num" id="totalCount">0</span> tasks</span>
+          <span class="summary-sep">✳</span>
+          <span class="summary-item"><span class="summary-num" id="doingCount">0</span> in progress</span>
+          <span class="summary-sep">✳</span>
+          <span class="summary-item"><span class="summary-num" id="waitingCount">0</span> need a decision</span>
+          <span class="summary-sep">✳</span>
+          <span class="summary-item"><span class="summary-num" id="doneCount">0</span> shipped</span>
+        </div>
+
+        <div class="board-tools">
+          <div class="project-tabs" id="projectTabs" role="group" aria-label="Filter by project"></div>
+          <label class="search-box" aria-label="Search tasks"><span>⌕</span><input id="searchInput" type="search" placeholder="Find a task..." autocomplete="off"></label>
+        </div>
+
+        <div id="notice" class="notice" hidden role="status"></div>
+        <div id="board" class="kanban" aria-label="Kanban board"></div>
+
+        <div class="footer-line"><span>GOOD IDEAS ARE CHEAP. FINISHING IS THE WORK.</span><span>JOSH BRETT STUDIO <span class="footer-star">✳</span></span></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="overlay" id="taskOverlay" hidden>
+    <div class="overlay-backdrop" data-close-task></div>
+    <aside class="task-drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+      <div class="drawer-top"><span class="overline">/ THE DETAILS</span><button class="icon-close" id="closeTaskBtn" type="button" aria-label="Close task">✕</button></div>
+      <h2 id="drawerTitle">Task details<span class="period">.</span></h2>
+      <form id="taskForm" class="task-form">
+        <input type="hidden" id="taskId" />
+        <label>Task name <input id="taskTitle" type="text" required maxlength="180" placeholder="What needs doing?" /></label>
+        <div class="form-row">
+          <label>Status <select id="taskStatus"><option value="todo">To do</option><option value="doing">In progress</option><option value="waiting">Waiting</option><option value="done">Done</option></select></label>
+          <label>Project <input id="taskProject" type="text" list="projectOptions" placeholder="e.g. Documentary" maxlength="80" /></label>
+          <datalist id="projectOptions"><option value="Documentaries"></option><option value="Skinny Fat Escape"></option><option value="AI systems"></option><option value="Sponsors"></option></datalist>
+        </div>
+        <div class="form-row">
+          <label>Priority <select id="taskPriority"><option value="normal">Normal</option><option value="high">High</option><option value="critical">Urgent</option></select></label>
+          <label>Due date <input id="taskDue" type="date" /></label>
+        </div>
+        <label>Notes <textarea id="taskDescription" rows="4" placeholder="Keep it short. What does done look like?"></textarea></label>
+        <div class="form-actions"><a id="notionPageLink" class="notion-link" target="_blank" rel="noopener noreferrer" hidden>↗ Open in Notion</a><button class="primary-btn" id="saveTaskBtn" type="submit">Save task ↗</button></div>
+      </form>
+      <div id="commentsSection" class="comments-section">
+        <div class="comments-title"><h3>Comments <span id="commentCount">0</span></h3><span class="overline">/ THE CONVERSATION</span></div>
+        <div id="commentsList" class="comments-list"></div>
+        <form id="commentForm" class="comment-form"><label for="commentText" class="sr-only">Write a comment</label><textarea id="commentText" rows="2" maxlength="1000" placeholder="Add context, ask Josh, share an update..."></textarea><button class="secondary-btn" type="submit">Post comment ↗</button></form>
+      </div>
+    </aside>
+  </div>
+
+  <div class="overlay centered-overlay" id="connectionOverlay" hidden>
+    <div class="overlay-backdrop" data-close-connection></div>
+    <section class="connection-dialog" role="dialog" aria-modal="true" aria-labelledby="connectTitle">
+      <div class="drawer-top"><span class="overline">/ DATA SOURCE</span><button class="icon-close" id="closeConnectionBtn" type="button" aria-label="Close connection settings">✕</button></div>
+      <span class="connect-sticker">✳ KEEP IT SIMPLE</span>
+      <h2 id="connectTitle">Your board.<br><span class="highlight-inline">Your Notion.</span></h2>
+      <p>Work in local demo mode, or connect your existing Notion task database so Daisy's comments and status changes sync across computers.</p>
+      <div id="connectionStatus" class="connection-status">Local demo: changes stay in this browser.</div>
+      <form id="connectForm" class="connection-form">
+        <label>Workspace access code <input id="accessPassword" type="password" autocomplete="off" placeholder="Enter the code configured in Netlify" /></label>
+        <button class="primary-btn" type="submit">Connect to Notion ↗</button>
+      </form>
+      <button class="text-btn" id="demoModeBtn" type="button">Continue in local demo mode</button>
+      <div class="helper-copy">Setup first: Notion integration + database access + three Netlify environment variables. Full instructions are in the included README. <strong>Never paste a Notion API token into this screen.</strong></div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="./app.js" defer></script>
+</body>
+</html>
