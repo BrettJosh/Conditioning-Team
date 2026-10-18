@@ -25,8 +25,8 @@ async function notion(path,method='GET',body){
   return data;
 }
 async function source(){
-  const db=process.env.NOTION_VIDEO_DATABASE_ID;
-  if(!validId(db))throw error('Add NOTION_VIDEO_DATABASE_ID in Netlify using your existing Video Projects database ID.',503);
+  const db=process.env.NOTION_VIDEO_DATABASE_ID||'d2b3f2a1-20d5-48c7-b0e9-16ddb9480b60';
+  if(!validId(db))throw error('The Video Projects database identifier is invalid.',503);
   const database=await notion('/databases/'+clean(db));
   const id=database.data_sources?.[0]?.id;
   if(!validId(id))throw error('Could not access the Video Projects data source. Share the Video Projects database with your Notion integration.',503);
@@ -90,7 +90,7 @@ function date(value){
 }
 export default async function handler(request){
   if(request.method!=='POST')return fail('POST only.',405);
-  if(!process.env.NOTION_TOKEN||!process.env.NOTION_VIDEO_DATABASE_ID||!process.env.BOARD_ACCESS_CODE)return fail('Production integration not configured yet. See setup instructions.',503);
+  if(!process.env.NOTION_TOKEN||!process.env.BOARD_ACCESS_CODE)return fail('Notion token or workspace access code not configured.',503);
   if(!equals(request.headers.get('x-board-key'),process.env.BOARD_ACCESS_CODE))return fail('Invalid workspace access code.',401);
   if(Number(request.headers.get('content-length'))>12000)return fail('Request too large.',413);
   let input;try{input=await request.json();}catch{return fail('Invalid JSON.');}
