@@ -50,3 +50,62 @@ async function refresh(){
   catch(e){notice('Production not connected: '+e.message,true);}
   finally{s.loading=false;$('productionRefresh').disabled=false;}
 }
+
+function openProject(id){
+  const p=s.projects.find(x=>x.id===id);if(!p)return;
+  s.selected=id;
+  $('productionDrawerTitle').textContent=p.title;
+  $('productionStage').value=p.stage;
+  $('productionOwner').value=p.currentlyWith||'';
+  $('productionNext').value=p.nextDeliverable||'';
+  $('productionDue').value=p.nextDue||'';
+  $('productionBlocker').value=p.blocker||'';
+  $('productionThumbnail').value=p.thumbnailStatus||'';
+  $('productionConfirmed').textContent=p.lastConfirmed?'Last confirmed '+date(p.lastConfirmed):'Never confirmed — saving marks it current.';
+  const l=$('productionNotionLink');l.href=/^https:\/\//.test(p.url)?p.url:'#';
+  $('productionDrawer').hidden=false;document.body.style.overflow='hidden';
+}
+function closeProject(){$('productionDrawer').hidden=true;s.selected=null;document.body.style.overflow='';}
+async function save(e){
+  e.preventDefault();if(s.saving||!s.selected)return;
+  const patch={
+    stage:$('productionStage').value,currentlyWith:$('productionOwner').value,
+    nextDeliverable:$('productionNext').value.trim(),nextDue:$('productionDue').value,
+    blocker:$('productionBlocker').value.trim(),thumbnailStatus:$('productionThumbnail').value
+  };
+  if(patch.stage==='Published'&&!confirm('Publish this video? It will leave the active view but remain in Notion.'))return;
+  s.saving=true;$('productionSave').disabled=true;
+  try{
+    const result=await api('update',{id:s.selected,patch});
+    s.projects=s.projects.filter(p=>p.id!==s.selected);
+    if(result.project?.stage!=='Published')s.projects.push(result.project);
+    closeProject();render();notice('');
+  }catch(err){notice('Could not save: '+err.message,true);}
+  finally{s.saving=false;$('productionSave').disabled=false;}
+}
+function show(tab){
+  const prod=tab==='production';
+  $('weeklyWorkspace').hidden=prod;
+  $('productionWorkspace').hidden=!prod;
+  document.querySelectorAll('[data-view-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.viewTab===tab)));
+  try{sessionStorage.setItem('studio-active-tab',tab);}catch{}
+  if(prod&&!s.loaded)refresh();
+}
+function boot(){
+  $('productionStage').innerHTML=stages.map(n=>'<option>'+esc(n)+'</option>').join('');
+  $('productionOwner').innerHTML='<option value="">Not set</option>'+owners.map(n=>'<option>'+esc(n)+'</option>').join('');
+  $('productionThumbnail').innerHTML='<option value="">Not set</option>'+thumbs.map(n=>'<option>'+esc(n)+'</option>').join('');
+  document.querySelectorAll('[data-view-tab]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.viewTab)));
+  document.querySelectorAll('[data-production-filter]').forEach(b=>b.addEventListener('click',()=>{s.filter=b.dataset.productionFilter;render();}));
+  $('productionSearch').addEventListener('input',e=>{s.search=e.target.value.trim();render();});
+  $('productionRefresh').addEventListener('click',refresh);
+  $('productionGrid').addEventListener('click',e=>{const card=e.target.closest('[data-video]');if(card)openProject(card.dataset.video);});
+  $('productionClose').addEventListener('click',closeProject);
+  $('productionDrawer').addEventListener('click',e=>{if(e.target.hasAttribute('data-close-production'))closeProject();});
+  $('productionForm').addEventListener('submit',save);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('productionDrawer').hidden)closeProject();});
+  let tab='weekly';try{tab=sessionStorage.getItem('studio-active-tab')||'weekly';}catch{}
+  show(tab==='production'?'production':'weekly');
+}
+boot();
+})();
