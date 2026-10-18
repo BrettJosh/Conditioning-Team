@@ -91,3 +91,30 @@ netlify/
 ```
 
 No `npm install` required, no third-party UI frameworks or asset CDNs. JavaScript and CSS are plain, easy to maintain, and Netlify functions run with Node's built-in `fetch`.
+
+
+## Production tab (Video Projects)
+
+The **Weekly board** remains the original Notion-powered Kanban. The new **Production** tab is a simple overview of active documentaries and quick handoffs; it does not replace your existing Video Projects database.
+
+The production view uses your existing Notion database **🎥 Video Projects** under **YouTube System 2.0**. It reads the original `Status`, `Video Title`, `Research Doc`, and `Script Doc` fields and adds:
+
+- `Currently With` — Josh, Tristan, Daisy, Rachit, Thumbnail designer, Unassigned
+- `Next Deliverable` — plain-text handoff
+- `Next Due` — target date
+- `Blocker` — optional note
+- `Thumbnail Status` — Not started, Concepts, Revising, Approved
+- `Last Confirmed` — date the project status was last saved from the app
+
+**One-time connection setup:**
+
+1. In Notion, open **Video Projects** as a full page (not just a linked view).
+2. Select **••• → Connections / Add connections** and grant the existing **Josh Brett Studio Board** integration access to this database. Your existing LiftKeeper access remains untouched.
+3. In Netlify, ensure `NOTION_TOKEN` and `BOARD_ACCESS_CODE` are configured as before; **no additional variable is required** for this specific database. The server function already knows which database to request. (An optional `NOTION_VIDEO_DATABASE_ID` setting can override it if needed.)
+4. Redeploy after merging the pull request, open your studio site, connect Notion if not already connected, then select **Production**.
+
+**Daily use:** Daisy checks stage, owner, next step, due date and blockers for each active documentary; saving sets `Last Confirmed` to today. A video with no confirmation, or one not confirmed in the past seven days, shows **Needs update**. A filled blocker shows **Blocked**. Published videos are hidden, not deleted.
+
+**Important:** The existing Video Projects database contains some historical entries with stale status; check and correct them in Notion before treating the dashboard as a live production plan. The app does not fabricate handoff owners or deadlines.
+
+**Security:** Notion credentials remain inside server-side Netlify environment variables. The existing shared workspace code is lightweight access protection, not separate user authentication. Protect the deployed site if only Josh and Daisy should see internal planning. Do not give untrusted people the workspace code.
