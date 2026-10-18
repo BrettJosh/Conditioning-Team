@@ -63,7 +63,7 @@
     state.selected=id;
     const task=id?state.tasks.find(t=>t.id===id):null;
     if(id&&!task){toast('Task not found. Try refreshing.');return;}
-    byId('taskId').value=id||'';byId('taskTitle').value=task?.title||'';byId('taskStatus').value=task?.status||status;byId('taskProject').value=task?.project||'';byId('taskPriority').value=task?.priority||'normal';byId('taskOwner').value=task?.owner||window.StudioWeekly?.currentOwner()||'Daisy';byId('taskDue').value=task?.due||'';byId('taskDescription').value=task?.description||'';
+    byId('taskId').value=id||'';byId('taskTitle').value=task?.title||'';byId('taskStatus').value=task?.status||status;byId('taskProject').value=task?.project||'';byId('taskPriority').value=task?.priority||'normal';byId('taskOwner').value=task?.owner||window.StudioWeekly?.currentOwner()||'Daisy';byId('taskDue').value=task?.due||(!task?window.StudioWeekly?.selectedWeek()||'':'');byId('taskDescription').value=task?.description||'';
     byId('drawerTitle').textContent=task?'Edit task.':'New task.';
     byId('notionPageLink').hidden=!(task?.url&&state.mode==='notion');
     if(task?.url)byId('notionPageLink').href=task.url;
