@@ -12,7 +12,7 @@
   <div class="page-wrap">
     <header class="topbar">
       <div class="brand" aria-label="Josh Brett Studio">
-        <span class="brand-mark"><img class="brand-logo" src="./assets/josh-logo.svg" alt="" width="54" height="54"></span>
+        <span class="brand-mark"><img class="brand-logo" id="originalLogo" alt="Josh Brett logo" width="54" height="54"></span>
         <span class="brand-label">JOSH BRETT<br><strong>STUDIO</strong></span>
       </div>
       <div class="topbar-center"><span class="tiny-star">✳</span> THE CREATIVE WORKSPACE <span class="tiny-star">✳</span></div>
@@ -38,6 +38,7 @@
   <button class="studio-tab" data-view-tab="josh" role="tab" aria-selected="false">✳ Josh</button>
   <button class="studio-tab" data-view-tab="archive" role="tab" aria-selected="false">◷ Archives</button>
   <button class="studio-tab" data-view-tab="production" role="tab" aria-selected="false">▣ Production</button>
+  <button class="studio-tab" data-view-tab="calendar" role="tab" aria-selected="false">▦ Content calendar</button>
 </nav>
 <section class="workspace" id="weeklyWorkspace" aria-label="Project task board">
         <div class="workspace-heading">
@@ -100,6 +101,15 @@
   <p id="productionResults" class="production-results"></p>
   <div class="production-grid" id="productionGrid"></div>
 </section>
+<section class="workspace calendar-workspace" id="calendarWorkspace" aria-label="2026 content calendar" hidden>
+  <div class="workspace-heading"><div><div class="overline">/ PUBLISHING ROADMAP</div><h2>CONTENT <span class="scribble">CALENDAR</span></h2></div>
+  <div class="workspace-actions"><button class="quiet-btn" id="calendarRefresh">↻ Refresh</button><a class="quiet-btn calendar-sheet-link" href="https://docs.google.com/spreadsheets/d/1zvaFJCApnz6YFzJCXUtC9BSLW40pR58vyPM7pgSWfB4/edit" target="_blank" rel="noopener">↗ Source sheet</a></div></div>
+  <p class="calendar-intro">Your publishing plan for the rest of 2026. Drag a video onto a new day, or click it to adjust the date and add key metrics. The Google Sheet stays the source of truth.</p>
+  <div id="calendarNotice" class="notice" role="status" hidden></div>
+  <div class="calendar-toolbar"><div class="calendar-nav"><button id="calendarPrevious" class="quiet-btn" type="button">← Earlier</button><strong id="calendarRange">October–December 2026</strong><button id="calendarNext" class="quiet-btn" type="button">Later →</button></div><button id="calendarNew" class="primary-btn" type="button">＋ Plan a video</button></div>
+  <div class="calendar-summary" id="calendarSummary"></div>
+  <div class="calendar-grid" id="calendarGrid"></div>
+</section>
     </main>
   </div>
 
@@ -148,6 +158,16 @@
     </aside>
   </div>
 
+  <div class="overlay" id="calendarOverlay" hidden><div class="overlay-backdrop" data-calendar-close></div>
+<aside class="task-drawer" role="dialog" aria-modal="true" aria-labelledby="calendarEditorTitle"><div class="drawer-top"><span class="overline">/ PUBLISHING SLOT</span><button class="icon-close" data-calendar-close type="button">✕</button></div>
+<h2 id="calendarEditorTitle">Plan a video.</h2><form id="calendarForm" class="task-form">
+<label>Video or publishing note <textarea id="calendarText" rows="3" maxlength="1500" required placeholder="Publish video: Rich Piana"></textarea></label>
+<label>Scheduled publish date <input type="date" id="calendarDate" min="2026-01-01" max="2026-12-31" required></label>
+<p class="calendar-field-hint">Moving an existing video removes the old date entry. Dates already containing another entry cannot be overwritten.</p>
+<div class="form-row"><label>Views (7 days) <input id="calendarViews" type="number" min="0" step="1" placeholder="Optional"></label><label>CTR (%) <input id="calendarCtr" type="number" min="0" max="100" step="0.1" placeholder="Optional"></label></div>
+<label>Average view duration <input id="calendarAvd" type="text" maxlength="30" placeholder="e.g. 7:30"></label>
+<div class="form-actions"><button class="secondary-btn" id="calendarDelete" type="button" hidden>Remove slot</button><button class="primary-btn" id="calendarSave" type="submit">Save to Google Sheets ↗</button></div>
+</form></aside></div>
   <div class="overlay centered-overlay" id="connectionOverlay" hidden>
     <div class="overlay-backdrop" data-close-connection></div>
     <section class="connection-dialog" role="dialog" aria-modal="true" aria-labelledby="connectTitle">
@@ -166,6 +186,6 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="./app.js" defer></script><script src="./weekly.js" defer></script><script src="./production.js" defer></script>
+  <script src="./app.js" defer></script><script src="./weekly.js" defer></script><script src="./production.js" defer></script><script src="./calendar.js" defer></script>
 </body>
 </html>
