@@ -41,3 +41,33 @@
 .production-confirmed{font-size:12px;color:var(--muted);font-weight:800;margin:-11px 0 26px}
 @media(max-width:900px){.production-grid{grid-template-columns:1fr}.studio-tabs{margin:-23px auto 36px}}
 @media(max-width:680px){.studio-tabs{margin:-26px auto 35px}.studio-tab{font-size:12px;padding:11px 13px}.production-card{padding:15px}.production-pair{grid-template-columns:1fr 1fr}.production-card>strong{font-size:19px;min-height:0}.production-metrics{gap:12px}}
+
+/* Weekly focus: high signal, compact board, and a genuinely usable personal plan. */
+.weekly-planning{background:var(--white);border:2.5px solid var(--ink);border-radius:18px;box-shadow:4px 5px 0 var(--ink);padding:23px;margin:23px 0 20px}
+.planning-top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:19px}
+.planning-top h3{font-size:clamp(23px,3vw,34px);letter-spacing:-1.1px;margin:6px 0 0}
+.planning-navigation{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.planning-navigation .quiet-btn{padding:8px 12px;border-radius:10px;box-shadow:2px 2px 0 var(--ink)}
+#weekLabel{font-size:13px;font-weight:900;white-space:nowrap}
+.weekly-plan-form{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(260px,1fr);gap:16px}
+.goal-inputs{display:grid;gap:8px}
+.goal-inputs label{display:flex;align-items:center;gap:11px;border:1.5px solid var(--ink);background:var(--paper);padding:8px 12px;border-radius:11px}
+.goal-inputs label span{font-weight:1000;font-size:16px;color:#a87700}
+.goal-inputs input{border:0;outline:0;background:transparent;width:100%;min-width:0;padding:8px 0;font-weight:750;font-size:13px}
+.planning-notes{display:flex;flex-direction:column;gap:8px}
+.planning-notes label{font-size:12px;font-weight:950}
+.planning-notes textarea{resize:vertical;min-height:122px;padding:12px;border:1.5px solid var(--ink);border-radius:11px;background:var(--paper);font-size:13px;line-height:1.6}
+.plan-actions{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+#planSaveStatus{font-size:11px;color:var(--muted);font-weight:750}
+.scope-toolbar{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:8px 0 14px;color:var(--muted);font-size:12px;font-weight:750}
+.scope-check{display:flex;gap:8px;align-items:center;cursor:pointer}
+.scope-check input{accent-color:#228a6b;width:15px;height:15px}
+.kanban-column{min-height:400px!important;align-self:start}
+.column-body{max-height:490px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#c8bdaa transparent}
+.show-column-more{display:block;width:100%;background:var(--yellow);border:1.5px solid var(--ink);border-radius:9px;padding:11px 8px;font-size:11px;font-weight:900;margin:9px 0}
+.show-column-more:hover{filter:brightness(.96)}
+.archive-board{grid-template-columns:repeat(2,minmax(270px,1fr))}
+.column-heading.onhold{background:#e6cbb6}.column-heading.background{background:#d3d7e9}
+.archive-help{font-size:12px;color:var(--muted);margin:14px 0}
+@media(max-width:850px){.weekly-plan-form{grid-template-columns:1fr}.archive-board{grid-template-columns:repeat(2,minmax(250px,1fr))}}
+@media(max-width:600px){.weekly-planning{padding:14px}.planning-navigation{gap:6px}.studio-tabs{flex-wrap:wrap}.studio-tab{font-size:11px;padding:9px 11px}}
