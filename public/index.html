@@ -31,7 +31,11 @@
         <p>Better documentaries. An excellent transformation product.<br class="desktop-break"> Less production friction.</p>
       </section>
 
-      <section class="workspace" aria-label="Project task board">
+      <nav class="studio-tabs" role="tablist" aria-label="Studio workspace views">
+  <button class="studio-tab" data-view-tab="weekly" role="tab" aria-selected="true">✓ Weekly board</button>
+  <button class="studio-tab" data-view-tab="production" role="tab" aria-selected="false">▣ Production</button>
+</nav>
+<section class="workspace" id="weeklyWorkspace" aria-label="Project task board">
         <div class="workspace-heading">
           <div>
             <div class="overline">/ YOUR WORKSPACE</div>
@@ -61,9 +65,42 @@
         <div id="notice" class="notice" hidden role="status"></div>
         <div id="board" class="kanban" aria-label="Kanban board"></div>
 </section>
+
+<section class="workspace production-workspace" id="productionWorkspace" aria-label="Video production" hidden>
+  <div class="workspace-heading"><div><div class="overline">/ DOCUMENTARY PIPELINE</div><h2>IN <span class="scribble">PRODUCTION</span></h2></div>
+    <div class="workspace-actions"><button class="quiet-btn" id="productionRefresh" type="button">↻ Refresh</button>
+    <a class="primary-btn production-notion-anchor" href="https://www.notion.so/d2b3f2a120d548c7b0e916ddb9480b60" target="_blank" rel="noopener">↗ Notion</a></div></div>
+  <p class="production-subheading">Where every documentary stands. Daisy keeps the next handoff current.</p>
+  <div class="production-metrics"><span><b id="productionTotal">0</b> active videos</span><span><b id="productionNeeds">0</b> need an update</span><span><b id="productionBlocked">0</b> blocked</span></div>
+  <div class="board-tools production-tools"><div class="project-tabs" role="group" aria-label="Production filters">
+    <button class="tab" data-production-filter="all" aria-pressed="true">All active</button>
+    <button class="tab" data-production-filter="stale" aria-pressed="false">Needs update</button>
+    <button class="tab" data-production-filter="blocked" aria-pressed="false">Blocked</button></div>
+    <label class="search-box"><span>⌕</span><input id="productionSearch" type="search" placeholder="Find a video..." autocomplete="off"></label></div>
+  <div id="productionNotice" class="notice" hidden role="status"></div>
+  <p id="productionResults" class="production-results"></p>
+  <div class="production-grid" id="productionGrid"></div>
+</section>
     </main>
   </div>
 
+
+  <div class="overlay" id="productionDrawer" hidden>
+    <div class="overlay-backdrop" data-close-production></div>
+    <aside class="task-drawer" role="dialog" aria-modal="true" aria-labelledby="productionDrawerTitle">
+      <div class="drawer-top"><span class="overline">/ VIDEO HANDOFF</span><button class="icon-close" type="button" id="productionClose" aria-label="Close production editor">✕</button></div>
+      <h2 id="productionDrawerTitle">Video project</h2>
+      <p id="productionConfirmed" class="production-confirmed"></p>
+      <form class="task-form" id="productionForm">
+        <div class="form-row"><label>Production stage<select id="productionStage"></select></label><label>Currently with<select id="productionOwner"></select></label></div>
+        <label>Next deliverable<input id="productionNext" type="text" maxlength="1900" placeholder="What happens next?"></label>
+        <label>Next due<input id="productionDue" type="date"></label>
+        <label>Blocker / waiting on<textarea id="productionBlocker" rows="3" maxlength="1900" placeholder="Leave empty when unblocked"></textarea></label>
+        <label>Thumbnail status<select id="productionThumbnail"></select></label>
+        <div class="form-actions"><a id="productionNotionLink" class="notion-link" target="_blank" rel="noopener noreferrer">↗ Open in Notion</a><button class="primary-btn" id="productionSave" type="submit">Save update ↗</button></div>
+      </form>
+    </aside>
+  </div>
   <div class="overlay" id="taskOverlay" hidden>
     <div class="overlay-backdrop" data-close-task></div>
     <aside class="task-drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
@@ -110,6 +147,6 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="./app.js" defer></script>
+  <script src="./app.js" defer></script><script src="./production.js" defer></script>
 </body>
 </html>
