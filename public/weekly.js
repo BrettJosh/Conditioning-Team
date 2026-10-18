@@ -26,7 +26,8 @@ return tasks.filter(t=>{
 function cacheKey(){return stage.owner+'|'+stage.week;}
 function readCache(){try{return JSON.parse(localStorage.getItem(key)||'{}');}catch{return {};}}
 function fromCache(){const saved=readCache()[cacheKey()];return saved||{goals:['','',''],notes:''};}
-function applyPlan(plan){for(let i=0;i<3;i++)$('weeklyGoal'+(i+1)).value=plan.goals?.[i]||'';$('weeklyNotes').value=plan.notes||'';}
+function resizeNotes(){const el=$('weeklyNotes');if(!el||el.offsetParent===null)return;el.style.height='auto';el.style.height=Math.max(160,el.scrollHeight+4)+'px';}
+function applyPlan(plan){for(let i=0;i<3;i++)$('weeklyGoal'+(i+1)).value=plan.goals?.[i]||'';$('weeklyNotes').value=plan.notes||'';resizeNotes();}
 function inputs(){return{goals:[1,2,3].map(i=>$('weeklyGoal'+i).value.trim()),notes:$('weeklyNotes').value.trim()};}
 function saveCache(plan){const c=readCache();c[cacheKey()]=plan;try{localStorage.setItem(key,JSON.stringify(c));}catch{}}
 function updateView(){
@@ -58,7 +59,7 @@ async function savePlan(e){
 function handleTab(tab){
  if(tab==='production')return;
  stage.archive=tab==='archive';stage.owner=tab==='josh'?'Josh':'Daisy';stage.expanded={};
- updateView();if(!stage.archive)loadPlan();
+ updateView();if(!stage.archive){loadPlan();resizeNotes();}
 }
 function toggleExpanded(status){stage.expanded[status]=!stage.expanded[status];B().renderBoard();}
 function onSynced(){loadPlan();updateView();}
@@ -69,6 +70,7 @@ function boot(){
  $('weekCurrent').addEventListener('click',()=>{stage.week=currentWeek();updateView();loadPlan();});
  $('showAllActive').addEventListener('change',e=>{stage.showAll=e.target.checked;stage.expanded={};updateView();});
  $('weeklyPlanForm').addEventListener('submit',savePlan);
+ $('weeklyNotes').addEventListener('input',resizeNotes);
  updateView();loadPlan();
 }
 window.StudioWeekly={filterTasks,isArchive,selectedWeek,isExpanded:status=>!!stage.expanded[status],toggleExpanded,currentOwner,onSynced};
