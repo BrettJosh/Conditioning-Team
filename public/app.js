@@ -59,6 +59,7 @@
       return `<section class="kanban-column" aria-label="${c.label} tasks"><div class="column-heading ${c.id}"><div class="column-label"><span class="mini-icon">${c.icon}</span>${c.label}</div><span class="column-count">${items.length}</span></div><div class="column-body" data-status="${c.id}">${shown.map(renderCard).join('')}${!items.length?'<p class="empty-hint">Nothing here (yet).</p>':''}${controls}<button type="button" class="add-column-task" data-new-status="${c.id}">＋ Add task</button></div></section>`;
     }).join('');
   }
+  function resizeNoteField(el){if(!el||el.offsetParent===null)return;el.style.height='auto';el.style.height=Math.max(el.id==='taskDescription'?210:160,el.scrollHeight+4)+'px';}
   function openTask(id=null,status='todo') {
     state.selected=id;
     const task=id?state.tasks.find(t=>t.id===id):null;
@@ -68,7 +69,7 @@
     byId('notionPageLink').hidden=!(task?.url&&state.mode==='notion');
     if(task?.url)byId('notionPageLink').href=task.url;
     byId('commentsSection').hidden=!task;
-    byId('taskOverlay').hidden=false; document.body.style.overflow='hidden';
+    byId('taskOverlay').hidden=false; document.body.style.overflow='hidden';resizeNoteField(byId('taskDescription'));
     if(task)loadComments(task);setTimeout(()=>byId('taskTitle').focus(),30);
   }
   function closeTask() {byId('taskOverlay').hidden=true;state.selected=null;document.body.style.overflow='';}
@@ -146,6 +147,7 @@
     }catch(err){toast(`Comment failed: ${err.message}`);}finally{btn.disabled=false;}
   }
   function attachEvents(){
+    byId('taskDescription').addEventListener('input',()=>resizeNoteField(byId('taskDescription')));
     byId('projectTabs').addEventListener('click',e=>{const btn=e.target.closest('[data-filter]');if(!btn)return;state.filter=btn.dataset.filter;renderBoard();});
     byId('searchInput').addEventListener('input',e=>{state.search=e.target.value.trim().toLowerCase();renderBoard();});
     byId('board').addEventListener('click',e=>{const card=e.target.closest('[data-id]');if(card){openTask(card.dataset.id);return;}const expand=e.target.closest('[data-expand]');if(expand){window.StudioWeekly?.toggleExpanded(expand.dataset.expand);return;}const add=e.target.closest('[data-new-status]');if(add)openTask(null,add.dataset.newStatus);});
