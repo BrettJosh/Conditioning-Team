@@ -131,3 +131,25 @@ The weekly board now has **Daisy**, **Josh**, **Archives**, and the original **P
 - Kanban columns show up to six active tasks and three Done cards initially; click **Browse more** when needed. Each column has independent scrolling, so the page stays manageable.
 
 No production database or existing Notion credentials need changing. The server-side bridge still uses the current `NOTION_TOKEN`, `NOTION_DATABASE_ID`, and `BOARD_ACCESS_CODE` Netlify variables.
+
+
+## 2026 publishing calendar: Google Sheet stays the source of truth
+
+The app now includes a **Content calendar** tab displaying three months at a time (October–December initially). It reads the existing Google Sheet [2026-content-plan](https://docs.google.com/spreadsheets/d/1zvaFJCApnz6YFzJCXUtC9BSLW40pR58vyPM7pgSWfB4/edit), tab **2026 Content Plan** (month columns B–M, day rows 2–32). Click an entry to edit it, or drag the entry to an empty day to reschedule. Moving clears the original date cell. Clicking an empty day plans a new video. Existing populated target dates are protected from accidental overwrite.
+
+**One-time setup:**
+
+1. Open the Google Sheet. Select **Extensions → Apps Script**. In the editor, replace the starter script with the contents of [google-apps-script/Code.gs](google-apps-script/Code.gs) in this repository. Save the project.
+2. In **Apps Script → Project Settings → Script properties**, add `STUDIO_CALENDAR_SECRET` with a long, random secret that you make. Never commit it to GitHub or send it through chat.
+3. Select **Deploy → New deployment → Web app**. Use **Execute as: Me** and **Who has access: Anyone**. Authorise the script, copy the **Web app URL** ending in `/exec`. Anyone can call the web app URL, but the script refuses all requests without the secret. Keep both the URL and secret private. Do **not** share the full credential publicly or in the browser code.
+4. In your **Netlify site → Project configuration → Environment variables**, add:
+   - `STUDIO_CALENDAR_SCRIPT_URL` = Web app URL from step 3.
+   - `STUDIO_CALENDAR_SCRIPT_SECRET` = exactly the Script property from step 2.
+   Both should be set for **production functions**, with the secret marked sensitive. Keep your existing `BOARD_ACCESS_CODE`, `NOTION_TOKEN`, and `NOTION_DATABASE_ID` unchanged.
+5. Redeploy Netlify and open **Content calendar**. You must already have connected using your normal board access code in the upper-right Notion connection box. Click **Refresh**. Your scheduled entries should appear. Try moving a test entry to a free day and verify the **Google Sheet** reflects the new position. If you modify the Apps Script later, deploy a **new version** for the existing deployment.
+
+**Metrics:** Views at 7 days, click-through rate, and average view duration are stored in a second tab automatically created in the *same spreadsheet* called **Studio Metrics**. This does not change the 2026 Content Plan grid. Moving a video moves its metrics as well. The original cell contents and spreadsheet remain authoritative.
+
+**Limitations:** The existing sheet holds one text value per date. The app treats that cell as one scheduled entry and won't merge two occupied days. For multiple planned uploads on one day, edit the source sheet text manually or extend the schema later. No calendar data is copied into Notion. If the Google bridge is not configured, the app shows an error and cannot edit or reschedule entries. Dates are limited to 2026.
+
+**Logo:** The header loads your actual uploaded channel logo from `public/assets/josh-logo-original.webp`, converted losslessly from the original PNG; shape and transparency are preserved. The earlier hand-drawn SVG is no longer used.
