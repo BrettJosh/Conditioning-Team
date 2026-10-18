@@ -21,7 +21,7 @@
   const sessionGet = key => { try { return sessionStorage.getItem(key); } catch { return null; } };
   const sessionSet = (key,value) => { try { sessionStorage.setItem(key,value); } catch {} };
   const sessionRemove = key => { try { sessionStorage.removeItem(key); } catch {} };
-  const state = {mode:'demo',code:'',tasks:[],filter:'All',search:'',selected:null,saving:false,loading:false};
+  const state = {mode:'demo',code:'',tasks:[],projectOptions:['YouTube','Skinny-Fat Escape','Business','Cookbook','Fast Recipes'],filter:'All',search:'',selected:null,saving:false,loading:false};
   const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function loadDemo() { try { const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)); return Array.isArray(stored) ? stored : structuredClone(demoTasks); } catch { return structuredClone(demoTasks); } }
   function saveDemo() { try {localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tasks));} catch {toast('Browser storage unavailable. Changes may not persist.');} }
@@ -36,6 +36,13 @@
     const projects=['All',...new Set(state.tasks.map(t=>t.project||'General'))].sort((a,b)=>a==='All'?-1:b==='All'?1:a.localeCompare(b));
     if(!projects.includes(state.filter))state.filter='All';
     byId('projectTabs').innerHTML=projects.map(p=>`<button type="button" class="tab" aria-pressed="${p===state.filter}" data-filter="${escapeHtml(p)}">${escapeHtml(p)} <span class="tab-count">${p==='All'?state.tasks.length:state.tasks.filter(t=>(t.project||'General')===p).length}</span></button>`).join('');
+  }
+  function updateProjectOptions(options=state.projectOptions) {
+    const choices=Array.from(new Set(options.filter(Boolean)));
+    state.projectOptions=choices;
+    const select=byId('taskProject'),previous=select.value;
+    select.innerHTML='<option value="">Choose a project…</option>'+choices.map(p=>`<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+    if(previous&&choices.includes(previous))select.value=previous;
   }
   function renderCard(t) {
     const due=t.due?`<span class="task-date ${dueOverdue(t.due)&&t.status!=='done'?'overdue':''}">◷ ${escapeHtml(formatDate(t.due))}</span>`:'';
@@ -63,7 +70,12 @@
     state.selected=id;
     const task=id?state.tasks.find(t=>t.id===id):null;
     if(id&&!task){toast('Task not found. Try refreshing.');return;}
-    byId('taskId').value=id||'';byId('taskTitle').value=task?.title||'';byId('taskStatus').value=task?.status||status;byId('taskProject').value=task?.project||'';byId('taskPriority').value=task?.priority||'normal';byId('taskOwner').value=task?.owner||window.StudioWeekly?.currentOwner()||'Daisy';byId('taskDue').value=task?.due||(!task?window.StudioWeekly?.selectedWeek()||'':'');byId('taskDescription').value=task?.description||'';
+    byId('taskId').value=id||'';byId('taskTitle').value=task?.title||'';byId('taskStatus').value=task?.status||status;updateProjectOptions();
+    const existingProject=task?.project && task.project!=='Uncategorised' && task.project!=='General' ? task.project : '';
+    if(existingProject && !state.projectOptions.includes(existingProject)){
+      const option=document.createElement('option');option.value=existingProject;option.textContent=existingProject;byId('taskProject').append(option);
+    }
+    byId('taskProject').value=existingProject||(state.filter!=='All'&&state.projectOptions.includes(state.filter)?state.filter:'');byId('taskPriority').value=task?.priority||'normal';byId('taskOwner').value=task?.owner||window.StudioWeekly?.currentOwner()||'Daisy';byId('taskDue').value=task?.due||(!task?window.StudioWeekly?.selectedWeek()||'':'');byId('taskDescription').value=task?.description||'';
     byId('drawerTitle').textContent=task?'Edit task.':'New task.';
     byId('notionPageLink').hidden=!(task?.url&&state.mode==='notion');
     if(task?.url)byId('notionPageLink').href=task.url;
@@ -92,7 +104,7 @@
   async function refreshNotion() {
     if(state.mode!=='notion')return;
     byId('refreshBtn').disabled=true;
-    try{const result=await api('list');state.tasks=result.tasks;renderBoard();window.StudioWeekly?.onSynced();notice(result.limited?'Notion currently returned a limited number of tasks.': '');}
+    try{const result=await api('list');state.tasks=result.tasks;updateProjectOptions(result.projectOptions||state.projectOptions);renderBoard();window.StudioWeekly?.onSynced();notice(result.limited?'Notion currently returned a limited number of tasks.': '');}
     catch(err){notice(`Notion sync failed: ${err.message}`,true);toast('Could not refresh.');}
     finally{byId('refreshBtn').disabled=false;}
   }
@@ -101,7 +113,7 @@
     state.code=code.trim();
     byId('connectForm').querySelector('button').disabled=true;
     try{
-      const result=await api('list');state.mode='notion';state.tasks=result.tasks;state.filter='All';sessionSet(SESSION_CODE_KEY,state.code);renderBoard();updateConnection();closeConnection();notice('');window.StudioWeekly?.onSynced();toast('Notion connected. Your board is now shared.');
+      const result=await api('list');state.mode='notion';state.tasks=result.tasks;updateProjectOptions(result.projectOptions||state.projectOptions);state.filter='All';sessionSet(SESSION_CODE_KEY,state.code);renderBoard();updateConnection();closeConnection();notice('');window.StudioWeekly?.onSynced();toast('Notion connected. Your board is now shared.');
     }catch(err){state.mode='demo';state.code='';sessionRemove(SESSION_CODE_KEY);byId('connectionStatus').textContent=err.message;toast('Connection failed. Check the setup and access code.');}
     finally{byId('connectForm').querySelector('button').disabled=false;}
   }
@@ -113,6 +125,7 @@
     const id=byId('taskId').value;
     const patch={title:byId('taskTitle').value.trim(),status:byId('taskStatus').value,project:byId('taskProject').value.trim()||'General',priority:byId('taskPriority').value,owner:byId('taskOwner').value,due:byId('taskDue').value,description:byId('taskDescription').value.trim()};
     if(!patch.title){toast('Give the task a name.');return;}
+    if(!patch.project||!state.projectOptions.includes(patch.project)){toast('Choose a project from your Notion project list.');byId('taskProject').focus();return;}
     state.saving=true;byId('saveTaskBtn').disabled=true;
     try{
       if(state.mode==='notion'){
@@ -163,9 +176,9 @@
     document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!byId('taskOverlay').hidden)closeTask();else if(!byId('connectionOverlay').hidden)closeConnection();}});
   }
   window.StudioBoard={getState:()=>state,renderBoard,toast,api,changeStatus,openTask,saveDemo,refreshNotion,updateConnection};
-  async function boot(){state.tasks=loadDemo();attachEvents();renderBoard();updateConnection();
+  async function boot(){state.tasks=loadDemo();attachEvents();updateProjectOptions();renderBoard();updateConnection();
     const saved=sessionGet(SESSION_CODE_KEY);
-    if(saved){state.code=saved;try{const result=await api('list');state.mode='notion';state.tasks=result.tasks;renderBoard();updateConnection();window.StudioWeekly?.onSynced();}
+    if(saved){state.code=saved;try{const result=await api('list');state.mode='notion';state.tasks=result.tasks;updateProjectOptions(result.projectOptions||state.projectOptions);renderBoard();updateConnection();window.StudioWeekly?.onSynced();}
       catch{state.code='';sessionRemove(SESSION_CODE_KEY);notice('Notion session expired. Reconnect using the button at the top.',true);}}
   }
   boot();
