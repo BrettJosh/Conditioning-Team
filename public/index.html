@@ -28,18 +28,20 @@
         <div class="hero-sticker sticker-two">↗ more bangers</div>
         <div class="hero-sticker sticker-three">✦ 1 million subs</div>
 <h1>Make the work<br><span class="highlight-word">better<span class="period">.</span></span></h1>
-        <p>Better documentaries. An excellent transformation product.<br class="desktop-break"> Less production friction.</p>
+        <p>Earn trust through remarkable documentaries. Help people look, feel and perform their best—<br class="desktop-break">without letting fitness take over their lives. <strong>Less noise. Real progress.</strong></p>
       </section>
 
       <nav class="studio-tabs" role="tablist" aria-label="Studio workspace views">
-  <button class="studio-tab" data-view-tab="weekly" role="tab" aria-selected="true">✓ Weekly board</button>
+  <button class="studio-tab" data-view-tab="weekly" role="tab" aria-selected="true">✳ Daisy</button>
+  <button class="studio-tab" data-view-tab="josh" role="tab" aria-selected="false">✳ Josh</button>
+  <button class="studio-tab" data-view-tab="archive" role="tab" aria-selected="false">◷ Archives</button>
   <button class="studio-tab" data-view-tab="production" role="tab" aria-selected="false">▣ Production</button>
 </nav>
 <section class="workspace" id="weeklyWorkspace" aria-label="Project task board">
         <div class="workspace-heading">
           <div>
             <div class="overline">/ YOUR WORKSPACE</div>
-            <h2>MISSION <span class="scribble">THIS WEEK</span></h2>
+            <h2 id="weeklyHeading">MISSION <span class="scribble">THIS WEEK</span></h2>
           </div>
           <div class="workspace-actions">
             <button class="quiet-btn" id="refreshBtn" type="button" title="Refresh Notion tasks">↻ <span>Refresh</span></button>
@@ -47,6 +49,20 @@
           </div>
         </div>
 
+        <section id="weeklyPlanning" class="weekly-planning" aria-label="Weekly goals and notes">
+          <div class="planning-top"><div><div class="overline">/ YOUR FOCUS</div><h3 id="planningTitle">Daisy's week</h3></div>
+          <div class="planning-navigation"><button id="weekPrev" type="button" class="quiet-btn" aria-label="Previous week">←</button><span id="weekLabel"></span><button id="weekNext" type="button" class="quiet-btn" aria-label="Next week">→</button><button id="weekCurrent" type="button" class="quiet-btn">Today</button></div></div>
+          <form id="weeklyPlanForm" class="weekly-plan-form">
+            <div class="goal-inputs">
+              <label><span>01</span><input id="weeklyGoal1" type="text" maxlength="140" placeholder="Most important outcome" aria-label="First weekly goal"></label>
+              <label><span>02</span><input id="weeklyGoal2" type="text" maxlength="140" placeholder="Second meaningful outcome" aria-label="Second weekly goal"></label>
+              <label><span>03</span><input id="weeklyGoal3" type="text" maxlength="140" placeholder="Third meaningful outcome" aria-label="Third weekly goal"></label>
+            </div>
+            <div class="planning-notes"><label for="weeklyNotes">Notes, bullets and next steps</label><textarea id="weeklyNotes" rows="3" maxlength="1000" placeholder="• What matters this week?&#10;• Decisions, ideas or things to follow up on"></textarea></div>
+            <div class="plan-actions"><span id="planSaveStatus" role="status"></span><button class="primary-btn" id="weeklySaveBtn" type="submit">Save this week's plan ↗</button></div>
+          </form>
+        </section>
+        <div class="scope-toolbar"><label class="scope-check"><input type="checkbox" id="showAllActive"> Show all active tasks, not just this week</label><span id="boardScopeHint"></span></div>
         <div class="compact-summary" aria-label="Board summary">
           <span class="summary-item"><span class="summary-num" id="totalCount">0</span> tasks</span>
           <span class="summary-sep">✳</span>
@@ -64,6 +80,7 @@
 
         <div id="notice" class="notice" hidden role="status"></div>
         <div id="board" class="kanban" aria-label="Kanban board"></div>
+        <p class="archive-help" id="archiveHelp" hidden>Archives stay in Notion. To use them, add “On hold” and “Background” as options in your existing Notion Status property.</p>
 </section>
 
 <section class="workspace production-workspace" id="productionWorkspace" aria-label="Video production" hidden>
@@ -110,12 +127,12 @@
         <input type="hidden" id="taskId" />
         <label>Task name <input id="taskTitle" type="text" required maxlength="180" placeholder="What needs doing?" /></label>
         <div class="form-row">
-          <label>Status <select id="taskStatus"><option value="todo">To do</option><option value="doing">In progress</option><option value="waiting">Waiting</option><option value="done">Done</option></select></label>
+          <label>Status <select id="taskStatus"><option value="todo">To do</option><option value="doing">In progress</option><option value="waiting">Waiting</option><option value="done">Done</option><option value="onhold">On hold (archive)</option><option value="background">Background (archive)</option></select></label>
           <label>Project <input id="taskProject" type="text" list="projectOptions" placeholder="e.g. Documentary" maxlength="80" /></label>
           <datalist id="projectOptions"><option value="Documentaries"></option><option value="Skinny Fat Escape"></option><option value="AI systems"></option><option value="Sponsors"></option></datalist>
         </div>
         <div class="form-row">
-          <label>Priority <select id="taskPriority"><option value="normal">Normal</option><option value="high">High</option><option value="critical">Urgent</option></select></label>
+          <label>Assigned to <select id="taskOwner"><option value="Daisy">Daisy</option><option value="Josh">Josh</option><option value="">Shared / Unassigned</option></select></label></div><div class="form-row"><label>Priority <select id="taskPriority"><option value="normal">Normal</option><option value="high">High</option><option value="critical">Urgent</option></select></label>
           <label>Due date <input id="taskDue" type="date" /></label>
         </div>
         <label>Notes <textarea id="taskDescription" rows="4" placeholder="Keep it short. What does done look like?"></textarea></label>
@@ -147,6 +164,6 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="./app.js" defer></script><script src="./production.js" defer></script>
+  <script src="./app.js" defer></script><script src="./weekly.js" defer></script><script src="./production.js" defer></script>
 </body>
 </html>
