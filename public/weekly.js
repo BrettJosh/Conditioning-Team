@@ -11,12 +11,14 @@ function labelWeek(){const p=stage.week.split('-').map(Number);const a=new Date(
 function until(){const parts=stage.week.split('-').map(Number),d=new Date(parts[0],parts[1]-1,parts[2],12);d.setDate(d.getDate()+7);return monday(d);}
 function isArchive(){return stage.archive;}
 function currentOwner(){return stage.owner;}
+function selectedWeek(){return stage.week;}
 function filterTasks(tasks){
 return tasks.filter(t=>{
  const isArchived=['onhold','background'].includes(t.status);
  if(stage.archive!==isArchived)return false;
  const owner=String(t.owner||'').toLowerCase().trim();
  if(owner && owner!==stage.owner.toLowerCase())return false;
+ if(!owner && stage.owner==='Josh')return false;
  if(stage.archive||stage.showAll)return true;
  if(!t.due)return true;
  return t.due>=stage.week && t.due<until();
@@ -69,6 +71,6 @@ function boot(){
  $('weeklyPlanForm').addEventListener('submit',savePlan);
  updateView();loadPlan();
 }
-window.StudioWeekly={filterTasks,isArchive,isExpanded:status=>!!stage.expanded[status],toggleExpanded,currentOwner,onSynced};
+window.StudioWeekly={filterTasks,isArchive,selectedWeek,isExpanded:status=>!!stage.expanded[status],toggleExpanded,currentOwner,onSynced};
 boot();
 })();
