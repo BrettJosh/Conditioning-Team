@@ -118,3 +118,16 @@ The production view uses your existing Notion database **🎥 Video Projects** u
 **Important:** The existing Video Projects database contains some historical entries with stale status; check and correct them in Notion before treating the dashboard as a live production plan. The app does not fabricate handoff owners or deadlines.
 
 **Security:** Notion credentials remain inside server-side Netlify environment variables. The existing shared workspace code is lightweight access protection, not separate user authentication. Protect the deployed site if only Josh and Daisy should see internal planning. Do not give untrusted people the workspace code.
+
+
+## Weekly Josh & Daisy workspace (new)
+
+The weekly board now has **Daisy**, **Josh**, **Archives**, and the original **Production** tabs.
+
+- Each personal view includes three editable weekly goals and a bullet-note area. Choose a week with the arrow controls, then click **Save this week's plan**. These notes are saved in the **existing Notion task database** as specially named rows beginning `[STUDIO WEEKLY PLAN]`; the app excludes them from the Kanban board. There is no separate database or extra environment variable. Your Notion task database **must have a rich-text property named `Description`, `Notes`, or `Details`**. Without one, the app tells you that shared weekly planning cannot save.
+- Tasks are filtered to each person's assignment and to the selected week's due dates (undated tasks are visible). **Show all active tasks** lets you find overdue or future work. New tasks default to the selected week's Monday; change the due date in task details if required.
+- The personal views rely on an optional Notion **Select** property called **`Owner`** (choices `Josh`, `Daisy`) for reliable cross-device assignment. The app can read an existing People property of this name, but editing a People assignment in the app is not currently supported. If `Owner` is missing, Josh's personal task list will remain empty and unassigned tasks will appear in Daisy's view; create the Select property in Notion to enable correct assignment.
+- The archive has **On hold** and **Background** categories; add these choices to the existing Notion **Status** field (alternatively `Parked`/`Paused` and `Someday` are recognised). Switching a task into either category through the task drawer removes it from weekly columns but keeps it in Notion. Move it back to `To do` to restore it. The app will show a clear error if the Notion status options don't exist yet.
+- Kanban columns show up to six active tasks and three Done cards initially; click **Browse more** when needed. Each column has independent scrolling, so the page stays manageable.
+
+No production database or existing Notion credentials need changing. The server-side bridge still uses the current `NOTION_TOKEN`, `NOTION_DATABASE_ID`, and `BOARD_ACCESS_CODE` Netlify variables.
