@@ -130,8 +130,7 @@
         <label>Task name <input id="taskTitle" type="text" required maxlength="180" placeholder="What needs doing?" /></label>
         <div class="form-row">
           <label>Status <select id="taskStatus"><option value="todo">To do</option><option value="doing">In progress</option><option value="waiting">Waiting</option><option value="done">Done</option><option value="onhold">On hold (archive)</option><option value="background">Background (archive)</option></select></label>
-          <label>Project <input id="taskProject" type="text" list="projectOptions" placeholder="e.g. Documentary" maxlength="80" /></label>
-          <datalist id="projectOptions"><option value="Documentaries"></option><option value="Skinny Fat Escape"></option><option value="AI systems"></option><option value="Sponsors"></option></datalist>
+          <label>Project <select id="taskProject" required aria-describedby="projectHelper"><option value="">Choose a project…</option></select><small id="projectHelper" class="project-helper">Projects sync with your Notion database.</small></label>
         </div>
         <div class="form-row">
           <label>Assigned to <select id="taskOwner"><option value="Daisy">Daisy</option><option value="Josh">Josh</option><option value="">Shared / Unassigned</option></select></label></div><div class="form-row"><label>Priority <select id="taskPriority"><option value="normal">Normal</option><option value="high">High</option><option value="critical">Urgent</option></select></label>

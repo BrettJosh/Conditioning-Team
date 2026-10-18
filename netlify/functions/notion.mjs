@@ -80,7 +80,7 @@ function notionTask(page,m){
   const due=val(m.due);
   const desc=val(m.desc);
   const owner=val(m.owner);
-  return {id:page.id,title:plain(val(m.title)?.title)||'Untitled task',status:columnFromNotion(status?.status?.name||status?.select?.name),project:project?.select?.name||project?.multi_select?.map(x=>x.name).join(', ')||'General',priority:/(urgent|critical)/i.test(priority?.select?.name||'')?'critical':/(high)/i.test(priority?.select?.name||'')?'high':'normal',due:due?.date?.start?.slice(0,10)||'',description:plain(desc?.rich_text)||'',owner:owner?.select?.name||owner?.people?.[0]?.name||'',updatedAt:page.last_edited_time||'',url:page.url,comments:[]};
+  return {id:page.id,title:plain(val(m.title)?.title)||'Untitled task',status:columnFromNotion(status?.status?.name||status?.select?.name),project:project?.select?.name||project?.multi_select?.map(x=>x.name).join(', ')||'Uncategorised',priority:/(urgent|critical)/i.test(priority?.select?.name||'')?'critical':/(high)/i.test(priority?.select?.name||'')?'high':'normal',due:due?.date?.start?.slice(0,10)||'',description:plain(desc?.rich_text)||'',owner:owner?.select?.name||owner?.people?.[0]?.name||'',updatedAt:page.last_edited_time||'',url:page.url,comments:[]};
 }
 function writable(f,value,required=false){
   if(!f)return null;
@@ -97,6 +97,7 @@ function writable(f,value,required=false){
     }
     case 'multi_select':{
       const found=matchName(String(value||''),(schema.multi_select?.options||[]));
+      if(!found&&required)throw Object.assign(new Error(`"${value}" is not an available option for Notion ${name}.`),{status:400});
       return found?[name,{multi_select:[{name:found}]}]:null;
     }
   }
@@ -106,7 +107,12 @@ function buildProperties(changes,m){
   const out={};const add=pair=>{if(pair)out[pair[0]]=pair[1];};
   if(Object.hasOwn(changes,'title')){if(!String(changes.title||'').trim())throw Object.assign(new Error('Task name required.'),{status:400});add(writable(m.title,safeText(changes.title)));}
   if(Object.hasOwn(changes,'status')){const name=statusNameFor(changes.status,m.status);const [key,schema]=m.status;out[key]=schema.type==='status'?{status:{name}}:{select:{name}};}
-  if(Object.hasOwn(changes,'project'))add(writable(m.project,String(changes.project||'').slice(0,80)));
+  if(Object.hasOwn(changes,'project')){
+    if(!m.project)throw Object.assign(new Error('Your Notion database needs a Project property of type Select or Multi-select.'),{status:400});
+    const project=String(changes.project||'').trim().slice(0,80);
+    if(!project)throw Object.assign(new Error('Please choose a project before saving.'),{status:400});
+    add(writable(m.project,project,true));
+  }
   if(Object.hasOwn(changes,'priority')){const key=changes.priority==='critical'?'Urgent':changes.priority==='high'?'High':'Normal';add(writable(m.priority,key));}
   if(Object.hasOwn(changes,'owner')&&m.owner?.[1]?.type==='select')add(writable(m.owner,String(changes.owner||'')));
   if(Object.hasOwn(changes,'due')){if(changes.due&&!/^\d{4}-\d{2}-\d{2}$/.test(changes.due))throw Object.assign(new Error('Invalid due date.'),{status:400});add(writable(m.due,changes.due));}
@@ -129,7 +135,8 @@ async function listTasks(source,m){
     all.push(...(data.results||[]).filter(x=>!plain(x.properties?.[m.title[0]]?.title).startsWith('[STUDIO WEEKLY PLAN]')).map(x=>notionTask(x,m)));
     more=Boolean(data.has_more);cursor=data.next_cursor;
   }
-  return {tasks:all,limited:more};
+  const projectOptions=m.project?.[1]?.[m.project[1].type]?.options?.map(x=>x.name)||[];
+  return {tasks:all,projectOptions,limited:more};
 }
 export default async function handler(request){
   if(request.method!=='POST')return fail('POST only.',405);
