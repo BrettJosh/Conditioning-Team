@@ -52,11 +52,14 @@ function fieldMap(source){
   const priority=findProperty(source,'select',['Priority']);
   const due=findProperty(source,'date',['Due','Due date','Deadline']);
   const desc=findProperty(source,'rich_text',['Description','Notes','Details']);
+  const owner=findProperty(source,'select',['Owner','Assignee','Assigned to'])||findProperty(source,'people',['Owner','Assignee','Assigned to']);
   if(!title||!status)throw Object.assign(new Error('Your Notion database needs a title property (e.g. Name) and a Status property of type Status or Select.'),{status:400});
-  return {title,status,project,priority,due,desc};
+  return {title,status,project,priority,due,desc,owner};
 }
 function columnFromNotion(label){
   const text=String(label||'').toLowerCase().trim();
+  if(/on hold|paused|parked/.test(text))return 'onhold';
+  if(/background|someday|non urgent|non-urgent/.test(text))return 'background';
   if(/done|complete|shipped|finished|published/.test(text))return 'done';
   if(/wait|block|hold|review|approval|decision/.test(text))return 'waiting';
   if(/progress|doing|active|working|started|develop/.test(text))return 'doing';
@@ -64,7 +67,7 @@ function columnFromNotion(label){
 }
 function statusNameFor(value,field){
   const options=(field?.[1]?.[field[1].type]?.options || []);
-  const synonyms={todo:['To do','Not started','Not Started','Backlog','Todo','Planned','Open'],doing:['In progress','In Progress','Doing','Started','Active','Working on it'],waiting:['Waiting','Blocked','On hold','Waiting on Josh','For review','Review'],done:['Done','Complete','Completed','Finished','Shipped']};
+  const synonyms={todo:['To do','Not started','Not Started','Backlog','Todo','Planned','Open'],doing:['In progress','In Progress','Doing','Started','Active','Working on it'],waiting:['Waiting','Blocked','On hold','Waiting on Josh','For review','Review'],done:['Done','Complete','Completed','Finished','Shipped'],onhold:['On hold','Parked','Paused'],background:['Background','Someday','Non urgent']};
   for(const candidate of synonyms[value]||[]){const found=matchName(candidate,options);if(found)return found;}
   throw Object.assign(new Error(`Your Notion Status property needs an option for "${value}". Available options: ${options.map(o=>o.name).join(', ')}. Add a suitable status option in Notion.`),{status:400});
 }
@@ -76,7 +79,8 @@ function notionTask(page,m){
   const priority=val(m.priority);
   const due=val(m.due);
   const desc=val(m.desc);
-  return {id:page.id,title:plain(val(m.title)?.title)||'Untitled task',status:columnFromNotion(status?.status?.name||status?.select?.name),project:project?.select?.name||project?.multi_select?.map(x=>x.name).join(', ')||'General',priority:/(urgent|critical)/i.test(priority?.select?.name||'')?'critical':/(high)/i.test(priority?.select?.name||'')?'high':'normal',due:due?.date?.start?.slice(0,10)||'',description:plain(desc?.rich_text)||'',url:page.url,comments:[]};
+  const owner=val(m.owner);
+  return {id:page.id,title:plain(val(m.title)?.title)||'Untitled task',status:columnFromNotion(status?.status?.name||status?.select?.name),project:project?.select?.name||project?.multi_select?.map(x=>x.name).join(', ')||'General',priority:/(urgent|critical)/i.test(priority?.select?.name||'')?'critical':/(high)/i.test(priority?.select?.name||'')?'high':'normal',due:due?.date?.start?.slice(0,10)||'',description:plain(desc?.rich_text)||'',owner:owner?.select?.name||owner?.people?.[0]?.name||'',updatedAt:page.last_edited_time||'',url:page.url,comments:[]};
 }
 function writable(f,value,required=false){
   if(!f)return null;
@@ -104,6 +108,7 @@ function buildProperties(changes,m){
   if(Object.hasOwn(changes,'status')){const name=statusNameFor(changes.status,m.status);const [key,schema]=m.status;out[key]=schema.type==='status'?{status:{name}}:{select:{name}};}
   if(Object.hasOwn(changes,'project'))add(writable(m.project,String(changes.project||'').slice(0,80)));
   if(Object.hasOwn(changes,'priority')){const key=changes.priority==='critical'?'Urgent':changes.priority==='high'?'High':'Normal';add(writable(m.priority,key));}
+  if(Object.hasOwn(changes,'owner')&&m.owner?.[1]?.type==='select')add(writable(m.owner,String(changes.owner||'')));
   if(Object.hasOwn(changes,'due')){if(changes.due&&!/^\d{4}-\d{2}-\d{2}$/.test(changes.due))throw Object.assign(new Error('Invalid due date.'),{status:400});add(writable(m.due,changes.due));}
   if(Object.hasOwn(changes,'description'))add(writable(m.desc,safeText(changes.description)));
   return out;
@@ -121,7 +126,7 @@ async function listTasks(source,m){
   for(let page=0;page<5&&more;page++){
     const body={page_size:100,...(cursor?{start_cursor:cursor}:{})};
     const data=await notion(`/data_sources/${cleanId(source.id)}/query`,'POST',body);
-    all.push(...(data.results||[]).map(x=>notionTask(x,m)));
+    all.push(...(data.results||[]).filter(x=>!plain(x.properties?.[m.title[0]]?.title).startsWith('[STUDIO WEEKLY PLAN]')).map(x=>notionTask(x,m)));
     more=Boolean(data.has_more);cursor=data.next_cursor;
   }
   return {tasks:all,limited:more};
@@ -136,7 +141,29 @@ export default async function handler(request){
     const source=await getSource();const m=fieldMap(source);
     switch(input.action){
       case 'list':return response(await listTasks(source,m));
-      case 'create':{
+      case 'planLoad':{
+const who=input.owner==='Josh'?'Josh':'Daisy', week=String(input.week||'');
+if(!/^\d{4}-\d{2}-\d{2}$/.test(week))return fail('Invalid week.');
+if(!m.desc)return fail('Add a rich-text Description or Notes property to the Notion database.',400);
+const name='[STUDIO WEEKLY PLAN] '+who+' '+week;
+const data=await notion('/data_sources/'+cleanId(source.id)+'/query','POST',{filter:{property:m.title[0],title:{equals:name}},page_size:10});
+let plan={goals:['','',''],notes:''};
+if(data.results?.[0]){const raw=plain(data.results[0].properties?.[m.desc[0]]?.rich_text);try{const p=JSON.parse(raw);if(Array.isArray(p.goals))plan={goals:p.goals.slice(0,3).map(x=>String(x||'')),notes:String(p.notes||'')};}catch{}}
+return response({plan});
+}
+case 'planSave':{
+const who=input.owner==='Josh'?'Josh':'Daisy',week=String(input.week||'');
+if(!/^\d{4}-\d{2}-\d{2}$/.test(week))return fail('Invalid week.');
+if(!m.desc)return fail('Add a rich-text Description or Notes property to the Notion database.',400);
+const raw=input.plan||{}, goals=Array.isArray(raw.goals)?raw.goals.slice(0,3).map(x=>String(x||'').slice(0,140)):['','',''],notes=String(raw.notes||'').slice(0,1000);
+const name='[STUDIO WEEKLY PLAN] '+who+' '+week;
+const data=await notion('/data_sources/'+cleanId(source.id)+'/query','POST',{filter:{property:m.title[0],title:{equals:name}},page_size:10});
+const props=buildProperties({title:name,description:JSON.stringify({goals,notes})},m);
+if(data.results?.[0])await notion('/pages/'+cleanId(data.results[0].id),'PATCH',{properties:props});
+else{const status=statusNameFor('todo',m.status),[key,schema]=m.status;props[key]=schema.type==='status'?{status:{name:status}}:{select:{name:status}};await notion('/pages','POST',{parent:{type:'data_source_id',data_source_id:source.id},properties:props});}
+return response({ok:true});
+}
+case 'create':{
         const task=input.task||{};
         if(!String(task.title||'').trim())return fail('Task name required.');
         const props=buildProperties(task,m);
@@ -146,7 +173,7 @@ export default async function handler(request){
       case 'update':{
         await verifyPage(input.id,source);
         const patch=input.patch||{};
-        const allowed=['title','status','project','priority','due','description'];
+        const allowed=['title','status','project','priority','due','description','owner'];
         const changes=Object.fromEntries(Object.entries(patch).filter(([key])=>allowed.includes(key)));
         const props=buildProperties(changes,m);
         if(!Object.keys(props).length)return response({ok:true});
