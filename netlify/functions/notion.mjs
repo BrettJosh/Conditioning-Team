@@ -51,7 +51,7 @@ function fieldMap(source){
   const project=findProperty(source,'select',['Project','Area','Category'])||findProperty(source,'multi_select',['Project','Area','Category']);
   const priority=findProperty(source,'select',['Priority']);
   const due=findProperty(source,'date',['Due','Due date','Deadline']);
-  const desc=findProperty(source,'rich_text',['Description','Notes','Details']);
+  const desc=findProperty(source,'rich_text',['Description','Notes','Details','Blocker / Notes','Outcome']);
   const owner=findProperty(source,'select',['Owner','Assignee','Assigned to'])||findProperty(source,'people',['Owner','Assignee','Assigned to']);
   if(!title||!status)throw Object.assign(new Error('Your Notion database needs a title property (e.g. Name) and a Status property of type Status or Select.'),{status:400});
   return {title,status,project,priority,due,desc,owner};
