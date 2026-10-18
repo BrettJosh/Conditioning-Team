@@ -16,6 +16,7 @@
     {id:'demo-05',title:'Write the visual-script enhancement brief',status:'todo',project:'Documentaries',priority:'normal',due:'2026-10-26',description:'Propose practical sequences that elevate the documentary.',comments:[]},
     {id:'demo-06',title:'Agree the design direction',status:'done',project:'Skinny Fat Escape',priority:'normal',due:'2026-10-16',description:'A clear, lean customer-facing visual direction.',comments:[{id:'example-1',name:'Demo example',text:'The direction is approved. This is a local sample comment.',date:'2026-10-16T10:00:00Z'}]}
   ];
+  const archivedColumns=[{id:'onhold',label:'On hold',icon:'◷'},{id:'background',label:'Background',icon:'◌'}];
   const byId = id => document.getElementById(id);
   const sessionGet = key => { try { return sessionStorage.getItem(key); } catch { return null; } };
   const sessionSet = (key,value) => { try { sessionStorage.setItem(key,value); } catch {} };
@@ -28,7 +29,7 @@
   function notice(message,error=false) {const el=byId('notice');el.textContent=message;el.classList.toggle('error',error);el.hidden=!message;}
   function updateConnection() {byId('connectionText').textContent=state.mode==='notion'?'Notion connected':'Local demo';byId('connectionDot').className='connection-dot'+(state.mode==='notion'?' connected':'');byId('connectionStatus').textContent=state.mode==='notion'?'Connected to Notion. Task and comment changes sync with your existing database.':'Local demo only: changes are saved to this browser, not shared with Daisy.';}
   function projectClass(project) {const p=(project||'').toLowerCase();return p.includes('skinny')||p.includes('product')?'product':p.includes('doc')||p.includes('video')?'doc':p.includes('ai')||p.includes('system')?'ai':p.includes('sponsor')?'sponsor':'';}
-  function filteredTasks() {return state.tasks.filter(task=>(state.filter==='All'||(task.project||'General')===state.filter)&&(!state.search||`${task.title} ${task.project} ${task.description}`.toLowerCase().includes(state.search)));}
+  function filteredTasks() {const tasks=state.tasks.filter(task=>(state.filter==='All'||(task.project||'General')===state.filter)&&(!state.search||`${task.title} ${task.project} ${task.description}`.toLowerCase().includes(state.search)));return window.StudioWeekly?window.StudioWeekly.filterTasks(tasks):tasks;}
   function formatDate(value) {if(!value)return '';const date=new Date(value+'T12:00:00');return Number.isNaN(date.getTime())?value:date.toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
   function dueOverdue(v) {if(!v)return false;const today=new Date();const iso=new Date(today.getTime()-today.getTimezoneOffset()*60000).toISOString().slice(0,10);return v<iso;}
   function renderTabs() {
@@ -44,20 +45,25 @@
   function renderBoard() {
     renderTabs();
     const t=filteredTasks();
-    byId('totalCount').textContent=state.tasks.length;
-    byId('doingCount').textContent=state.tasks.filter(x=>x.status==='doing').length;
-    byId('waitingCount').textContent=state.tasks.filter(x=>x.status==='waiting').length;
-    byId('doneCount').textContent=state.tasks.filter(x=>x.status==='done').length;
-    byId('board').innerHTML=columns.map(c=>{
+    byId('totalCount').textContent=t.length;
+    byId('doingCount').textContent=t.filter(x=>x.status==='doing').length;
+    byId('waitingCount').textContent=t.filter(x=>x.status==='waiting').length;
+    byId('doneCount').textContent=t.filter(x=>x.status==='done').length;
+    const inArchive=Boolean(window.StudioWeekly?.isArchive());const visibleCols=inArchive?archivedColumns:columns;
+    byId('board').classList.toggle('archive-board',inArchive);
+    byId('board').innerHTML=visibleCols.map(c=>{
       const items=t.filter(x=>x.status===c.id);
-      return `<section class="kanban-column" aria-label="${c.label} tasks"><div class="column-heading ${c.id}"><div class="column-label"><span class="mini-icon">${c.icon}</span>${c.label}</div><span class="column-count">${items.length}</span></div><div class="column-body" data-status="${c.id}">${items.map(renderCard).join('')}${!items.length?'<p class="empty-hint">Nothing here (yet).</p>':''}<button type="button" class="add-column-task" data-new-status="${c.id}">＋ Add task</button></div></section>`;
+      const sorted=items.slice().sort((a,b)=>c.id==='done'?String(b.updatedAt||b.due||'').localeCompare(String(a.updatedAt||a.due||'')):String(a.due||'9999').localeCompare(String(b.due||'9999')));
+      const expanded=window.StudioWeekly?.isExpanded(c.id);const max=c.id==='done'?3:6;const shown=expanded?sorted:sorted.slice(0,max);const left=sorted.length-shown.length;
+      const controls=sorted.length>max?`<button class="show-column-more" type="button" data-expand="${c.id}">${expanded?'Show fewer':`Browse ${left} more ${c.id==='done'?'completed ':''}tasks`}</button>`:'';
+      return `<section class="kanban-column" aria-label="${c.label} tasks"><div class="column-heading ${c.id}"><div class="column-label"><span class="mini-icon">${c.icon}</span>${c.label}</div><span class="column-count">${items.length}</span></div><div class="column-body" data-status="${c.id}">${shown.map(renderCard).join('')}${!items.length?'<p class="empty-hint">Nothing here (yet).</p>':''}${controls}<button type="button" class="add-column-task" data-new-status="${c.id}">＋ Add task</button></div></section>`;
     }).join('');
   }
   function openTask(id=null,status='todo') {
     state.selected=id;
     const task=id?state.tasks.find(t=>t.id===id):null;
     if(id&&!task){toast('Task not found. Try refreshing.');return;}
-    byId('taskId').value=id||'';byId('taskTitle').value=task?.title||'';byId('taskStatus').value=task?.status||status;byId('taskProject').value=task?.project||'';byId('taskPriority').value=task?.priority||'normal';byId('taskDue').value=task?.due||'';byId('taskDescription').value=task?.description||'';
+    byId('taskId').value=id||'';byId('taskTitle').value=task?.title||'';byId('taskStatus').value=task?.status||status;byId('taskProject').value=task?.project||'';byId('taskPriority').value=task?.priority||'normal';byId('taskOwner').value=task?.owner||window.StudioWeekly?.currentOwner()||'Daisy';byId('taskDue').value=task?.due||'';byId('taskDescription').value=task?.description||'';
     byId('drawerTitle').textContent=task?'Edit task.':'New task.';
     byId('notionPageLink').hidden=!(task?.url&&state.mode==='notion');
     if(task?.url)byId('notionPageLink').href=task.url;
@@ -86,7 +92,7 @@
   async function refreshNotion() {
     if(state.mode!=='notion')return;
     byId('refreshBtn').disabled=true;
-    try{const result=await api('list');state.tasks=result.tasks;renderBoard();notice('');}
+    try{const result=await api('list');state.tasks=result.tasks;renderBoard();window.StudioWeekly?.onSynced();notice(result.limited?'Notion currently returned a limited number of tasks.': '');}
     catch(err){notice(`Notion sync failed: ${err.message}`,true);toast('Could not refresh.');}
     finally{byId('refreshBtn').disabled=false;}
   }
@@ -95,7 +101,7 @@
     state.code=code.trim();
     byId('connectForm').querySelector('button').disabled=true;
     try{
-      const result=await api('list');state.mode='notion';state.tasks=result.tasks;state.filter='All';sessionSet(SESSION_CODE_KEY,state.code);renderBoard();updateConnection();closeConnection();notice('');toast('Notion connected. Your board is now shared.');
+      const result=await api('list');state.mode='notion';state.tasks=result.tasks;state.filter='All';sessionSet(SESSION_CODE_KEY,state.code);renderBoard();updateConnection();closeConnection();notice('');window.StudioWeekly?.onSynced();toast('Notion connected. Your board is now shared.');
     }catch(err){state.mode='demo';state.code='';sessionRemove(SESSION_CODE_KEY);byId('connectionStatus').textContent=err.message;toast('Connection failed. Check the setup and access code.');}
     finally{byId('connectForm').querySelector('button').disabled=false;}
   }
@@ -105,7 +111,7 @@
   async function saveTask(ev){
     ev.preventDefault();if(state.saving)return;
     const id=byId('taskId').value;
-    const patch={title:byId('taskTitle').value.trim(),status:byId('taskStatus').value,project:byId('taskProject').value.trim()||'General',priority:byId('taskPriority').value,due:byId('taskDue').value,description:byId('taskDescription').value.trim()};
+    const patch={title:byId('taskTitle').value.trim(),status:byId('taskStatus').value,project:byId('taskProject').value.trim()||'General',priority:byId('taskPriority').value,owner:byId('taskOwner').value,due:byId('taskDue').value,description:byId('taskDescription').value.trim()};
     if(!patch.title){toast('Give the task a name.');return;}
     state.saving=true;byId('saveTaskBtn').disabled=true;
     try{
@@ -142,7 +148,7 @@
   function attachEvents(){
     byId('projectTabs').addEventListener('click',e=>{const btn=e.target.closest('[data-filter]');if(!btn)return;state.filter=btn.dataset.filter;renderBoard();});
     byId('searchInput').addEventListener('input',e=>{state.search=e.target.value.trim().toLowerCase();renderBoard();});
-    byId('board').addEventListener('click',e=>{const card=e.target.closest('[data-id]');if(card){openTask(card.dataset.id);return;}const add=e.target.closest('[data-new-status]');if(add)openTask(null,add.dataset.newStatus);});
+    byId('board').addEventListener('click',e=>{const card=e.target.closest('[data-id]');if(card){openTask(card.dataset.id);return;}const expand=e.target.closest('[data-expand]');if(expand){window.StudioWeekly?.toggleExpanded(expand.dataset.expand);return;}const add=e.target.closest('[data-new-status]');if(add)openTask(null,add.dataset.newStatus);});
     byId('board').addEventListener('dragstart',e=>{const card=e.target.closest('[data-id]');if(!card)return;e.dataTransfer.setData('text/plain',card.dataset.id);e.dataTransfer.effectAllowed='move';card.classList.add('dragging');});
     byId('board').addEventListener('dragend',e=>{document.querySelectorAll('.drag-over,.dragging').forEach(el=>el.classList.remove('drag-over','dragging'));});
     byId('board').addEventListener('dragover',e=>{const col=e.target.closest('[data-status]');if(col){e.preventDefault();e.dataTransfer.dropEffect='move';document.querySelectorAll('.drag-over').forEach(el=>{if(el!==col)el.classList.remove('drag-over');});col.classList.add('drag-over');}});
@@ -156,9 +162,10 @@
     byId('demoModeBtn').addEventListener('click',switchDemo);
     document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!byId('taskOverlay').hidden)closeTask();else if(!byId('connectionOverlay').hidden)closeConnection();}});
   }
+  window.StudioBoard={getState:()=>state,renderBoard,toast,api,changeStatus,openTask,saveDemo,refreshNotion,updateConnection};
   async function boot(){state.tasks=loadDemo();attachEvents();renderBoard();updateConnection();
     const saved=sessionGet(SESSION_CODE_KEY);
-    if(saved){state.code=saved;try{const result=await api('list');state.mode='notion';state.tasks=result.tasks;renderBoard();updateConnection();}
+    if(saved){state.code=saved;try{const result=await api('list');state.mode='notion';state.tasks=result.tasks;renderBoard();updateConnection();window.StudioWeekly?.onSynced();}
       catch{state.code='';sessionRemove(SESSION_CODE_KEY);notice('Notion session expired. Reconnect using the button at the top.',true);}}
   }
   boot();
