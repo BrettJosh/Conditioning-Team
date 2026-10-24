@@ -21,7 +21,9 @@ return tasks.filter(t=>{
  if(!owner && stage.owner==='Josh')return false;
  if(stage.archive||stage.showAll)return true;
  if(!t.due)return true;
- return t.due>=stage.week && t.due<until();
+ // Keep unfinished earlier-week tasks visible in the Overdue lane.
+ if(t.due<stage.week)return ['todo','doing','waiting'].includes(t.status);
+ return t.due<until();
 });}
 function cacheKey(){return stage.owner+'|'+stage.week;}
 function readCache(){try{return JSON.parse(localStorage.getItem(key)||'{}');}catch{return {};}}
@@ -35,7 +37,7 @@ function updateView(){
  $('weeklyPlanning').hidden=stage.archive;
  $('weekLabel').textContent=labelWeek();
  $('showAllActive').checked=stage.showAll;
- $('boardScopeHint').textContent=stage.archive?'Stored in Notion — not deleted':stage.showAll?'Showing all open tasks':'Showing tasks due this week and unscheduled tasks';
+ $('boardScopeHint').textContent=stage.archive?'Archived tasks':stage.showAll?'Showing all active tasks':'This week, unscheduled tasks and carried-forward overdue tasks';
  $('archiveHelp').hidden=!stage.archive;
  B()?.renderBoard();
 }
