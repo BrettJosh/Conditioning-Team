@@ -113,3 +113,21 @@
 #calendarDelete{margin-right:auto}
 @media(max-width:1150px){.calendar-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:780px){.calendar-grid{grid-template-columns:1fr}.calendar-day{min-height:90px}.calendar-event{font-size:11px}.calendar-empty-add{opacity:.8}.calendar-toolbar{align-items:flex-start}.calendar-nav{gap:7px}}
+
+/* Clear environment cue: red canvas means browser-only demo, never Notion. */
+body.local-demo-mode{background-color:#e65f62;background-image:radial-gradient(rgba(109,22,29,.28) .85px,transparent .85px)}
+
+/* Persistent cross-week carry-forward lane; avoids changing Notion Status options. */
+.overdue-lane{grid-column:1/-1;border:2.5px solid var(--ink);border-radius:18px;background:var(--white);overflow:hidden;box-shadow:var(--shadow);min-width:0}
+.overdue-heading{background:#f5b8b9;border-bottom:2px solid var(--ink);padding:15px 19px;display:flex;align-items:center;justify-content:space-between;gap:15px}
+.overdue-heading strong{font-size:17px;font-weight:950;letter-spacing:-.03em}
+.overdue-heading p{font-size:12px;line-height:1.5;margin:5px 0 0;color:#693a3d}
+.overdue-count{border:2px solid var(--ink);border-radius:50%;background:#fffefa;font-size:12px;font-weight:900;width:32px;height:32px;display:grid;place-items:center;flex:none}
+.overdue-dropzone{min-height:88px;padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:13px;align-items:start}
+.overdue-dropzone.drag-over{background:#ffe3e4;outline:3px dashed #c13b43;outline-offset:-7px}
+.overdue-dropzone .task-card{height:100%;min-width:0}
+.overdue-empty{grid-column:1/-1;text-align:center;color:#865f60;font-size:12px;font-weight:750;padding:12px}
+.overdue-expand{grid-column:1/-1}
+.carry-task-btn{border:2px solid #a73d42;background:#ffe3e4;color:#852b30;border-radius:10px;padding:11px 13px;font-size:12px;font-weight:850;text-align:center}
+.carry-task-btn:hover{background:#f9c8cb}
+.carry-task-btn:disabled{opacity:.55;cursor:wait}
