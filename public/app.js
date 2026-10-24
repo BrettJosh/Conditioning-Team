@@ -27,11 +27,20 @@
   function saveDemo() { try {localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tasks));} catch {toast('Browser storage unavailable. Changes may not persist.');} }
   function toast(message) {const el=byId('toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),3400);}
   function notice(message,error=false) {const el=byId('notice');el.textContent=message;el.classList.toggle('error',error);el.hidden=!message;}
-  function updateConnection() {byId('connectionText').textContent=state.mode==='notion'?'Notion connected':'Local demo';byId('connectionDot').className='connection-dot'+(state.mode==='notion'?' connected':'');byId('connectionStatus').textContent=state.mode==='notion'?'Connected to Notion. Task and comment changes sync with your existing database.':'Local demo only: changes are saved to this browser, not shared with Daisy.';}
+  function updateConnection() {document.body.classList.toggle('local-demo-mode',state.mode!=='notion');byId('connectionText').textContent=state.mode==='notion'?'Notion connected':'Local demo';byId('connectionDot').className='connection-dot'+(state.mode==='notion'?' connected':'');byId('connectionStatus').textContent=state.mode==='notion'?'Connected to Notion. Task and comment changes sync with your existing database.':'Local demo only: changes are saved to this browser, not shared with Daisy.';}
   function projectClass(project) {const p=(project||'').toLowerCase();return p.includes('skinny')||p.includes('product')?'product':p.includes('doc')||p.includes('video')?'doc':p.includes('ai')||p.includes('system')?'ai':p.includes('sponsor')?'sponsor':'';}
   function filteredTasks() {const tasks=state.tasks.filter(task=>(state.filter==='All'||(task.project||'General')===state.filter)&&(!state.search||`${task.title} ${task.project} ${task.description}`.toLowerCase().includes(state.search)));return window.StudioWeekly?window.StudioWeekly.filterTasks(tasks):tasks;}
   function formatDate(value) {if(!value)return '';const date=new Date(value+'T12:00:00');return Number.isNaN(date.getTime())?value:date.toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
   function dueOverdue(v) {if(!v)return false;const today=new Date();const iso=new Date(today.getTime()-today.getTimezoneOffset()*60000).toISOString().slice(0,10);return v<iso;}
+  // Overdue is a date-based lane, not a new Notion status. It therefore works
+  // with the existing Notion database and persists across selected weeks.
+  function selectedWeek(){return window.StudioWeekly?.selectedWeek()||new Date().toISOString().slice(0,10);}
+  function overdueTask(task){return ['todo','doing','waiting'].includes(task.status)&&Boolean(task.due)&&task.due<selectedWeek();}
+  function priorSunday(){
+    const [y,m,d]=selectedWeek().split('-').map(Number),date=new Date(y,m-1,d,12);
+    date.setDate(date.getDate()-1);
+    return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
+  }
   function renderTabs() {
     const projects=['All',...new Set(state.tasks.map(t=>t.project||'General'))].sort((a,b)=>a==='All'?-1:b==='All'?1:a.localeCompare(b));
     if(!projects.includes(state.filter))state.filter='All';
@@ -50,14 +59,27 @@
     byId('waitingCount').textContent=t.filter(x=>x.status==='waiting').length;
     byId('doneCount').textContent=t.filter(x=>x.status==='done').length;
     const inArchive=Boolean(window.StudioWeekly?.isArchive());const visibleCols=inArchive?archivedColumns:columns;
+    const carried=inArchive?[]:t.filter(overdueTask).sort((a,b)=>String(a.due).localeCompare(String(b.due)));
+    const regular=inArchive?t:t.filter(task=>!overdueTask(task));
     byId('board').classList.toggle('archive-board',inArchive);
     byId('board').innerHTML=visibleCols.map(c=>{
-      const items=t.filter(x=>x.status===c.id);
+      const items=regular.filter(x=>x.status===c.id);
       const sorted=items.slice().sort((a,b)=>c.id==='done'?String(b.updatedAt||b.due||'').localeCompare(String(a.updatedAt||a.due||'')):String(a.due||'9999').localeCompare(String(b.due||'9999')));
       const expanded=window.StudioWeekly?.isExpanded(c.id);const max=c.id==='done'?3:6;const shown=expanded?sorted:sorted.slice(0,max);const left=sorted.length-shown.length;
       const controls=sorted.length>max?`<button class="show-column-more" type="button" data-expand="${c.id}">${expanded?'Show fewer':`Browse ${left} more ${c.id==='done'?'completed ':''}tasks`}</button>`:'';
       return `<section class="kanban-column" aria-label="${c.label} tasks"><div class="column-heading ${c.id}"><div class="column-label"><span class="mini-icon">${c.icon}</span>${c.label}</div><span class="column-count">${items.length}</span></div><div class="column-body" data-status="${c.id}">${shown.map(renderCard).join('')}${!items.length?'<p class="empty-hint">Nothing here (yet).</p>':''}${controls}<button type="button" class="add-column-task" data-new-status="${c.id}">＋ Add task</button></div></section>`;
-    }).join('');
+    }).join('')+(inArchive?'':(()=>{
+      const expanded=window.StudioWeekly?.isExpanded('overdue');
+      const shown=expanded?carried:carried.slice(0,12);
+      const left=carried.length-shown.length;
+      return `<section class="overdue-lane" aria-label="Overdue tasks carried into this week">
+        <div class="overdue-heading"><div><strong>↶ Overdue / Carry forward</strong><p>Unfinished tasks from earlier weeks stay here until you reschedule or complete them. Drag a task here to carry it forward.</p></div><span class="overdue-count">${carried.length}</span></div>
+        <div class="overdue-dropzone" data-status="overdue" aria-label="Drop task to carry into future weeks">
+          ${shown.map(renderCard).join('')}${!carried.length?'<p class="overdue-empty">Drop a task here, or leave its earlier due date unchanged to carry it into next week.</p>':''}
+          ${carried.length>12?`<button type="button" class="show-column-more overdue-expand" data-expand="overdue">${expanded?'Show fewer':`Show ${left} more overdue tasks`}</button>`:''}
+        </div>
+      </section>`;
+    })());
   }
   function openTask(id=null,status='todo') {
     state.selected=id;
@@ -68,6 +90,9 @@
     byId('notionPageLink').hidden=!(task?.url&&state.mode==='notion');
     if(task?.url)byId('notionPageLink').href=task.url;
     byId('commentsSection').hidden=!task;
+    const carry=byId('taskOverdueBtn');
+    carry.hidden=!task||['done','onhold','background'].includes(task.status);
+    if(task)carry.textContent=overdueTask(task)?'↗ Bring into this week':'↶ Move to overdue';
     byId('taskOverlay').hidden=false; document.body.style.overflow='hidden';
     if(task)loadComments(task);setTimeout(()=>byId('taskTitle').focus(),30);
   }
@@ -102,7 +127,7 @@
     byId('connectForm').querySelector('button').disabled=true;
     try{
       const result=await api('list');state.mode='notion';state.tasks=result.tasks;state.filter='All';sessionSet(SESSION_CODE_KEY,state.code);renderBoard();updateConnection();closeConnection();notice('');window.StudioWeekly?.onSynced();toast('Notion connected. Your board is now shared.');
-    }catch(err){state.mode='demo';state.code='';sessionRemove(SESSION_CODE_KEY);byId('connectionStatus').textContent=err.message;toast('Connection failed. Check the setup and access code.');}
+    }catch(err){state.mode='demo';state.code='';sessionRemove(SESSION_CODE_KEY);updateConnection();byId('connectionStatus').textContent=err.message;toast('Connection failed. Check the setup and access code.');}
     finally{byId('connectForm').querySelector('button').disabled=false;}
   }
   function closeConnection(){byId('connectionOverlay').hidden=true;document.body.style.overflow='';}
@@ -126,12 +151,36 @@
     finally{state.saving=false;byId('saveTaskBtn').disabled=false;}
   }
   async function changeStatus(id,status){
-    const task=state.tasks.find(x=>x.id===id);if(!task||task.status===status)return;
-    if(state.mode==='notion'){
-      const old=task.status;task.status=status;renderBoard();
-      try{await api('update',{id,patch:{status}});toast('Status updated in Notion.');}
-      catch(err){task.status=old;renderBoard();toast(`Status not changed: ${err.message}`);}
-    }else{task.status=status;saveDemo();renderBoard();toast('Status updated locally.');}
+    const task=state.tasks.find(x=>x.id===id);if(!task)return false;
+    const old={status:task.status,due:task.due};
+    let patch;
+    if(status==='overdue'){
+      if(!['todo','doing','waiting'].includes(task.status)||overdueTask(task))return false;
+      patch={due:priorSunday()};
+    }else{
+      patch={status};
+      if(overdueTask(task)&&!['done','onhold','background'].includes(status))patch.due=selectedWeek();
+      if(task.status===status&&!Object.hasOwn(patch,'due'))return false;
+    }
+    Object.assign(task,patch);renderBoard();
+    try{
+      if(state.mode==='notion')await api('update',{id,patch});
+      else saveDemo();
+      toast(status==='overdue'?'Task carried forward.':status==='done'?'Task completed.':'Task updated.');
+      return true;
+    }catch(err){
+      Object.assign(task,old);renderBoard();toast('Task not changed: '+err.message);
+      return false;
+    }
+  }
+  async function toggleTaskOverdue(){
+    const task=state.tasks.find(t=>t.id===state.selected);if(!task)return;
+    const btn=byId('taskOverdueBtn');btn.disabled=true;
+    try{
+      const wasCarried=overdueTask(task);
+      const changed=await changeStatus(task.id,wasCarried?task.status:'overdue');
+      if(changed)closeTask();
+    }finally{btn.disabled=false;}
   }
   async function postComment(ev){
     ev.preventDefault();const text=byId('commentText').value.trim();const task=state.tasks.find(t=>t.id===state.selected);if(!text||!task)return;
@@ -154,7 +203,7 @@
     byId('board').addEventListener('dragover',e=>{const col=e.target.closest('[data-status]');if(col){e.preventDefault();e.dataTransfer.dropEffect='move';document.querySelectorAll('.drag-over').forEach(el=>{if(el!==col)el.classList.remove('drag-over');});col.classList.add('drag-over');}});
     byId('board').addEventListener('drop',e=>{const col=e.target.closest('[data-status]');if(!col)return;e.preventDefault();col.classList.remove('drag-over');const id=e.dataTransfer.getData('text/plain');changeStatus(id,col.dataset.status);});
     byId('newTaskBtn').addEventListener('click',()=>openTask());byId('closeTaskBtn').addEventListener('click',closeTask);
-    byId('taskOverlay').addEventListener('click',e=>{if(e.target.hasAttribute('data-close-task'))closeTask();});byId('taskForm').addEventListener('submit',saveTask);byId('commentForm').addEventListener('submit',postComment);
+    byId('taskOverlay').addEventListener('click',e=>{if(e.target.hasAttribute('data-close-task'))closeTask();});byId('taskForm').addEventListener('submit',saveTask);byId('taskOverdueBtn').addEventListener('click',toggleTaskOverdue);byId('commentForm').addEventListener('submit',postComment);
     byId('refreshBtn').addEventListener('click',()=>{if(state.mode==='notion')refreshNotion();else toast('Demo data is stored locally. Connect Notion to sync.');});
     byId('connectionBtn').addEventListener('click',openConnection);byId('closeConnectionBtn').addEventListener('click',closeConnection);
     byId('connectionOverlay').addEventListener('click',e=>{if(e.target.hasAttribute('data-close-connection'))closeConnection();});
@@ -166,7 +215,7 @@
   async function boot(){state.tasks=loadDemo();attachEvents();renderBoard();updateConnection();
     const saved=sessionGet(SESSION_CODE_KEY);
     if(saved){state.code=saved;try{const result=await api('list');state.mode='notion';state.tasks=result.tasks;renderBoard();updateConnection();window.StudioWeekly?.onSynced();}
-      catch{state.code='';sessionRemove(SESSION_CODE_KEY);notice('Notion session expired. Reconnect using the button at the top.',true);}}
+      catch{state.code='';sessionRemove(SESSION_CODE_KEY);updateConnection();notice('Notion session expired. Reconnect using the button at the top.',true);}}
   }
   boot();
 })();
