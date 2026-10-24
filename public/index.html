@@ -8,7 +8,7 @@
   <title>Josh Brett Studio — Creative Board</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
-<body>
+<body class="local-demo-mode">
   <div class="page-wrap">
     <header class="topbar">
       <div class="brand" aria-label="Josh Brett Studio">
@@ -148,6 +148,7 @@
           <label>Due date <input id="taskDue" type="date" /></label>
         </div>
         <label>Notes <textarea id="taskDescription" rows="4" placeholder="Keep it short. What does done look like?"></textarea></label>
+        <button class="carry-task-btn" id="taskOverdueBtn" type="button" hidden>↶ Move to overdue</button>
         <div class="form-actions"><a id="notionPageLink" class="notion-link" target="_blank" rel="noopener noreferrer" hidden>↗ Open in Notion</a><button class="primary-btn" id="saveTaskBtn" type="submit">Save task ↗</button></div>
       </form>
       <div id="commentsSection" class="comments-section">
