@@ -106,6 +106,12 @@
   <div class="workspace-actions"><button class="quiet-btn" id="calendarRefresh">↻ Refresh</button><a class="quiet-btn calendar-sheet-link" href="https://docs.google.com/spreadsheets/d/1zvaFJCApnz6YFzJCXUtC9BSLW40pR58vyPM7pgSWfB4/edit" target="_blank" rel="noopener">↗ Source sheet</a></div></div>
   <p class="calendar-intro">Your publishing plan for the rest of 2026. Drag a video onto a new day, or click it to adjust the date and add key metrics. The Google Sheet stays the source of truth.</p>
   <div id="calendarNotice" class="notice" role="status" hidden></div>
+  <div id="calendarSetupHelp" class="notice" hidden>
+    <strong>Connect your Google Sheet to activate this calendar.</strong>
+    The publishing calendar uses Google Apps Script and requires a one-time Netlify connection. Notion being connected doesn't connect Sheets.
+    <a href="https://github.com/BrettJosh/Conditioning-Team/blob/main/README.md#2026-publishing-calendar-google-sheet-stays-the-source-of-truth" target="_blank" rel="noopener noreferrer">Follow the setup steps in GitHub</a>.
+    <a href="https://app.netlify.com/" target="_blank" rel="noopener noreferrer">Open Netlify settings</a>.
+  </div>
   <div class="calendar-toolbar"><div class="calendar-nav"><button id="calendarPrevious" class="quiet-btn" type="button">← Earlier</button><strong id="calendarRange">October–December 2026</strong><button id="calendarNext" class="quiet-btn" type="button">Later →</button></div><button id="calendarNew" class="primary-btn" type="button">＋ Plan a video</button></div>
   <div class="calendar-summary" id="calendarSummary"></div>
   <div class="calendar-grid" id="calendarGrid"></div>
