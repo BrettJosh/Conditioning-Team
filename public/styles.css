@@ -131,3 +131,14 @@ body.local-demo-mode{background-color:#e65f62;background-image:radial-gradient(r
 .carry-task-btn{border:2px solid #a73d42;background:#ffe3e4;color:#852b30;border-radius:10px;padding:11px 13px;font-size:12px;font-weight:850;text-align:center}
 .carry-task-btn:hover{background:#f9c8cb}
 .carry-task-btn:disabled{opacity:.55;cursor:wait}
+
+/* Larger, readable task notes, with an optional wide focus view. */
+.task-notes-block{display:grid;gap:9px;min-width:0}
+.task-notes-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.task-notes-heading label{font-size:13px;font-weight:950}
+.notes-expand-btn{border:1.5px solid var(--ink);border-radius:9px;padding:7px 11px;background:var(--yellow);font-size:12px;font-weight:850;white-space:nowrap}
+.notes-expand-btn:hover{background:#ffe68d}
+.task-form .task-notes-block textarea{display:block;width:100%;min-height:260px;padding:15px 16px;font-size:15px;line-height:1.7;font-weight:500;resize:vertical;overflow-y:auto;overflow-wrap:anywhere;tab-size:4}
+#taskOverlay .task-drawer.notes-expanded{width:min(820px,100vw)}
+#taskOverlay .task-drawer.notes-expanded .task-notes-block textarea{min-height:min(68vh,720px)}
+@media(max-width:680px){.task-form .task-notes-block textarea{font-size:16px;padding:13px;min-height:240px}.notes-expand-btn{font-size:11px;padding:7px 9px}}
