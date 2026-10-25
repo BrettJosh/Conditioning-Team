@@ -147,7 +147,10 @@
           <label>Assigned to <select id="taskOwner"><option value="Daisy">Daisy</option><option value="Josh">Josh</option><option value="">Shared / Unassigned</option></select></label></div><div class="form-row"><label>Priority <select id="taskPriority"><option value="normal">Normal</option><option value="high">High</option><option value="critical">Urgent</option></select></label>
           <label>Due date <input id="taskDue" type="date" /></label>
         </div>
-        <label>Notes <textarea id="taskDescription" rows="4" placeholder="Keep it short. What does done look like?"></textarea></label>
+        <div class="task-notes-block">
+          <div class="task-notes-heading"><label for="taskDescription">Notes</label><button id="expandTaskNotes" class="notes-expand-btn" type="button" aria-expanded="false" aria-controls="taskDescription">↗ Expand notes</button></div>
+          <textarea id="taskDescription" rows="12" placeholder="Add details, steps, links and anything else needed to complete this task."></textarea>
+        </div>
         <button class="carry-task-btn" id="taskOverdueBtn" type="button" hidden>↶ Move to overdue</button>
         <div class="form-actions"><a id="notionPageLink" class="notion-link" target="_blank" rel="noopener noreferrer" hidden>↗ Open in Notion</a><button class="primary-btn" id="saveTaskBtn" type="submit">Save task ↗</button></div>
       </form>

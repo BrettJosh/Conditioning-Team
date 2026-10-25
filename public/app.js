@@ -81,6 +81,22 @@
       </section>`;
     })());
   }
+  function resizeTaskNotes(){
+    if(byId('taskOverlay').hidden)return;
+    const el=byId('taskDescription');
+    el.style.height='auto';
+    const maxHeight=Math.max(260,Math.floor(window.innerHeight*.58));
+    el.style.height=Math.min(Math.max(el.scrollHeight+4,260),maxHeight)+'px';
+  }
+  function toggleTaskNotes(){
+    const drawer=byId('taskOverlay').querySelector('.task-drawer');
+    const expanded=drawer.classList.toggle('notes-expanded');
+    const button=byId('expandTaskNotes');
+    button.setAttribute('aria-expanded',String(expanded));
+    button.textContent=expanded?'↙ Standard view':'↗ Expand notes';
+    resizeTaskNotes();
+    byId('taskDescription').focus();
+  }
   function openTask(id=null,status='todo') {
     state.selected=id;
     const task=id?state.tasks.find(t=>t.id===id):null;
@@ -93,7 +109,12 @@
     const carry=byId('taskOverdueBtn');
     carry.hidden=!task||['done','onhold','background'].includes(task.status);
     if(task)carry.textContent=overdueTask(task)?'↗ Bring into this week':'↶ Move to overdue';
+    const drawer=byId('taskOverlay').querySelector('.task-drawer');
+    drawer.classList.remove('notes-expanded');
+    byId('expandTaskNotes').setAttribute('aria-expanded','false');
+    byId('expandTaskNotes').textContent='↗ Expand notes';
     byId('taskOverlay').hidden=false; document.body.style.overflow='hidden';
+    resizeTaskNotes();
     if(task)loadComments(task);setTimeout(()=>byId('taskTitle').focus(),30);
   }
   function closeTask() {byId('taskOverlay').hidden=true;state.selected=null;document.body.style.overflow='';}
@@ -203,7 +224,7 @@
     byId('board').addEventListener('dragover',e=>{const col=e.target.closest('[data-status]');if(col){e.preventDefault();e.dataTransfer.dropEffect='move';document.querySelectorAll('.drag-over').forEach(el=>{if(el!==col)el.classList.remove('drag-over');});col.classList.add('drag-over');}});
     byId('board').addEventListener('drop',e=>{const col=e.target.closest('[data-status]');if(!col)return;e.preventDefault();col.classList.remove('drag-over');const id=e.dataTransfer.getData('text/plain');changeStatus(id,col.dataset.status);});
     byId('newTaskBtn').addEventListener('click',()=>openTask());byId('closeTaskBtn').addEventListener('click',closeTask);
-    byId('taskOverlay').addEventListener('click',e=>{if(e.target.hasAttribute('data-close-task'))closeTask();});byId('taskForm').addEventListener('submit',saveTask);byId('taskOverdueBtn').addEventListener('click',toggleTaskOverdue);byId('commentForm').addEventListener('submit',postComment);
+    byId('taskOverlay').addEventListener('click',e=>{if(e.target.hasAttribute('data-close-task'))closeTask();});byId('taskForm').addEventListener('submit',saveTask);byId('expandTaskNotes').addEventListener('click',toggleTaskNotes);byId('taskDescription').addEventListener('input',resizeTaskNotes);byId('taskOverdueBtn').addEventListener('click',toggleTaskOverdue);byId('commentForm').addEventListener('submit',postComment);
     byId('refreshBtn').addEventListener('click',()=>{if(state.mode==='notion')refreshNotion();else toast('Demo data is stored locally. Connect Notion to sync.');});
     byId('connectionBtn').addEventListener('click',openConnection);byId('closeConnectionBtn').addEventListener('click',closeConnection);
     byId('connectionOverlay').addEventListener('click',e=>{if(e.target.hasAttribute('data-close-connection'))closeConnection();});
