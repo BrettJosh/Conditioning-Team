@@ -65,7 +65,7 @@
     byId('board').innerHTML=visibleCols.map(c=>{
       const items=regular.filter(x=>x.status===c.id);
       const sorted=items.slice().sort((a,b)=>c.id==='done'?String(b.updatedAt||b.due||'').localeCompare(String(a.updatedAt||a.due||'')):String(a.due||'9999').localeCompare(String(b.due||'9999')));
-      const expanded=window.StudioWeekly?.isExpanded(c.id);const max=c.id==='done'?3:6;const shown=expanded?sorted:sorted.slice(0,max);const left=sorted.length-shown.length;
+      const expanded=window.StudioWeekly?.isExpanded(c.id);const max=20;const shown=expanded?sorted:sorted.slice(0,max);const left=sorted.length-shown.length;
       const controls=sorted.length>max?`<button class="show-column-more" type="button" data-expand="${c.id}">${expanded?'Show fewer':`Browse ${left} more ${c.id==='done'?'completed ':''}tasks`}</button>`:'';
       return `<section class="kanban-column" aria-label="${c.label} tasks"><div class="column-heading ${c.id}"><div class="column-label"><span class="mini-icon">${c.icon}</span>${c.label}</div><span class="column-count">${items.length}</span></div><div class="column-body" data-status="${c.id}">${shown.map(renderCard).join('')}${!items.length?'<p class="empty-hint">Nothing here (yet).</p>':''}${controls}<button type="button" class="add-column-task" data-new-status="${c.id}">＋ Add task</button></div></section>`;
     }).join('')+(inArchive?'':(()=>{
