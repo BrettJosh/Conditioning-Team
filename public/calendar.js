@@ -13,8 +13,8 @@ async function api(payload){
 }
 async function refresh(){
  if(state.busy)return;state.busy=true;$('calendarRefresh').disabled=true;notice('Loading the content plan from Google Sheets…');
- try{const r=await api({action:'list'});state.events=r.events||[];state.loaded=true;notice('');render();}
- catch(e){notice(e.message,true);if(!state.loaded){$('calendarGrid').innerHTML='<div class="calendar-empty">Connect Google Sheets to see your real publishing plan. Follow the calendar setup instructions in GitHub.</div>';}}
+ try{const r=await api({action:'list'});state.events=r.events||[];state.loaded=true;notice('');$('calendarSetupHelp').hidden=true;render();}
+ catch(e){notice(e.message,true);const needsSetup=/not configured|calendar readme|apps script url|connection is not configured/i.test(e.message);$('calendarSetupHelp').hidden=!needsSetup;if(!state.loaded){$('calendarGrid').innerHTML='<div class="calendar-empty">Your content plan is still safely stored in Google Sheets. Connect the calendar integration to view and edit it here.</div>';}}
  finally{state.busy=false;$('calendarRefresh').disabled=false}
 }
 function render(){
