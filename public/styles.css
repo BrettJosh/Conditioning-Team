@@ -63,7 +63,7 @@
 .scope-check{display:flex;gap:8px;align-items:center;cursor:pointer}
 .scope-check input{accent-color:#228a6b;width:15px;height:15px}
 .kanban-column{min-height:400px!important;align-self:start}
-.column-body{max-height:490px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#c8bdaa transparent}
+.column-body{max-height:1750px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#c8bdaa transparent}
 .show-column-more{display:block;width:100%;background:var(--yellow);border:1.5px solid var(--ink);border-radius:9px;padding:11px 8px;font-size:11px;font-weight:900;margin:9px 0}
 .show-column-more:hover{filter:brightness(.96)}
 .archive-board{grid-template-columns:repeat(2,minmax(270px,1fr))}
