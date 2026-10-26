@@ -27,7 +27,7 @@
   function saveDemo() { try {localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tasks));} catch {toast('Browser storage unavailable. Changes may not persist.');} }
   function toast(message) {const el=byId('toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),3400);}
   function notice(message,error=false) {const el=byId('notice');el.textContent=message;el.classList.toggle('error',error);el.hidden=!message;}
-  function updateConnection() {document.body.classList.toggle('local-demo-mode',state.mode!=='notion');byId('connectionText').textContent=state.mode==='notion'?'Notion connected':'Local demo';byId('connectionDot').className='connection-dot'+(state.mode==='notion'?' connected':'');byId('connectionStatus').textContent=state.mode==='notion'?'Connected to Notion. Task and comment changes sync with your existing database.':'Local demo only: changes are saved to this browser, not shared with Daisy.';}
+  function updateConnection() {document.body.classList.toggle('local-demo-mode',state.mode!=='notion');byId('demoWarning').hidden=state.mode==='notion';byId('connectionText').textContent=state.mode==='notion'?'Notion connected':'Local demo';byId('connectionDot').className='connection-dot'+(state.mode==='notion'?' connected':'');byId('connectionStatus').textContent=state.mode==='notion'?'Connected to Notion. Task and comment changes sync with your existing database.':'Local demo only: changes are saved to this browser, not shared with Daisy.';}
   function projectClass(project) {const p=(project||'').toLowerCase();return p.includes('skinny')||p.includes('product')?'product':p.includes('doc')||p.includes('video')?'doc':p.includes('ai')||p.includes('system')?'ai':p.includes('sponsor')?'sponsor':'';}
   function filteredTasks() {const tasks=state.tasks.filter(task=>(state.filter==='All'||(task.project||'General')===state.filter)&&(!state.search||`${task.title} ${task.project} ${task.description}`.toLowerCase().includes(state.search)));return window.StudioWeekly?window.StudioWeekly.filterTasks(tasks):tasks;}
   function formatDate(value) {if(!value)return '';const date=new Date(value+'T12:00:00');return Number.isNaN(date.getTime())?value:date.toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
@@ -226,7 +226,7 @@
     byId('newTaskBtn').addEventListener('click',()=>openTask());byId('closeTaskBtn').addEventListener('click',closeTask);
     byId('taskOverlay').addEventListener('click',e=>{if(e.target.hasAttribute('data-close-task'))closeTask();});byId('taskForm').addEventListener('submit',saveTask);byId('expandTaskNotes').addEventListener('click',toggleTaskNotes);byId('taskDescription').addEventListener('input',resizeTaskNotes);byId('taskOverdueBtn').addEventListener('click',toggleTaskOverdue);byId('commentForm').addEventListener('submit',postComment);
     byId('refreshBtn').addEventListener('click',()=>{if(state.mode==='notion')refreshNotion();else toast('Demo data is stored locally. Connect Notion to sync.');});
-    byId('connectionBtn').addEventListener('click',openConnection);byId('closeConnectionBtn').addEventListener('click',closeConnection);
+    byId('connectionBtn').addEventListener('click',openConnection);byId('demoConnectBtn').addEventListener('click',openConnection);byId('closeConnectionBtn').addEventListener('click',closeConnection);
     byId('connectionOverlay').addEventListener('click',e=>{if(e.target.hasAttribute('data-close-connection'))closeConnection();});
     byId('connectForm').addEventListener('submit',e=>{e.preventDefault();connectNotion(byId('accessPassword').value);});
     byId('demoModeBtn').addEventListener('click',switchDemo);
@@ -236,7 +236,8 @@
   async function boot(){state.tasks=loadDemo();attachEvents();renderBoard();updateConnection();
     const saved=sessionGet(SESSION_CODE_KEY);
     if(saved){state.code=saved;try{const result=await api('list');state.mode='notion';state.tasks=result.tasks;renderBoard();updateConnection();window.StudioWeekly?.onSynced();}
-      catch{state.code='';sessionRemove(SESSION_CODE_KEY);updateConnection();notice('Notion session expired. Reconnect using the button at the top.',true);}}
+      catch{state.code='';sessionRemove(SESSION_CODE_KEY);updateConnection();notice('Notion session expired. Reconnect using the button at the top.',true);openConnection();}}
+    else openConnection();
   }
   boot();
 })();
