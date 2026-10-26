@@ -22,6 +22,7 @@
       </div>
     </header>
 
+    <div id="demoWarning" class="demo-warning" role="status"><strong>NOT CONNECTED TO NOTION</strong><span>Local demo — changes are only saved on this device, not shared with Daisy.</span><button id="demoConnectBtn" type="button">Connect to Notion ↗</button></div>
     <main class="main-content">
       <section class="hero" aria-label="Workspace introduction">
         <div class="hero-stickers" aria-label="Studio reminders">
@@ -180,17 +181,17 @@
 </form></aside></div>
   <div class="overlay centered-overlay" id="connectionOverlay" hidden>
     <div class="overlay-backdrop" data-close-connection></div>
-    <section class="connection-dialog" role="dialog" aria-modal="true" aria-labelledby="connectTitle">
+    <section class="connection-dialog" role="dialog" aria-modal="true" aria-labelledby="connectTitle" aria-describedby="connectionStatus">
       <div class="drawer-top"><span class="overline">/ DATA SOURCE</span><button class="icon-close" id="closeConnectionBtn" type="button" aria-label="Close connection settings">✕</button></div>
-      <span class="connect-sticker">✳ KEEP IT SIMPLE</span>
-      <h2 id="connectTitle">Your board.<br><span class="highlight-inline">Your Notion.</span></h2>
-      <p>Work in local demo mode, or connect your existing Notion task database so Daisy's comments and status changes sync across computers.</p>
+      <span class="connect-sticker">● NOT CONNECTED — LOCAL DEMO</span>
+      <h2 id="connectTitle">Connect to<br><span class="highlight-inline">Notion.</span></h2>
+      <p><strong>You are not logged in.</strong> The tasks behind this window are local demo data. Enter your workspace access code to load your shared Notion tasks and collaborate with Daisy.</p>
       <div id="connectionStatus" class="connection-status">Local demo: changes stay in this browser.</div>
       <form id="connectForm" class="connection-form">
         <label>Workspace access code <input id="accessPassword" type="password" autocomplete="off" placeholder="Enter the code configured in Netlify" /></label>
         <button class="primary-btn" type="submit">Connect to Notion ↗</button>
       </form>
-      <button class="text-btn" id="demoModeBtn" type="button">Continue in local demo mode</button>
+      <button class="text-btn" id="demoModeBtn" type="button">Continue in local demo — not shared</button>
       <div class="helper-copy">Setup first: Notion integration + database access + three Netlify environment variables. Full instructions are in the included README. <strong>Never paste a Notion API token into this screen.</strong></div>
     </section>
   </div>
