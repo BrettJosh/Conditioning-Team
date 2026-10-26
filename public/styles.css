@@ -142,3 +142,21 @@ body.local-demo-mode{background-color:#e65f62;background-image:radial-gradient(r
 #taskOverlay .task-drawer.notes-expanded{width:min(820px,100vw)}
 #taskOverlay .task-drawer.notes-expanded .task-notes-block textarea{min-height:min(68vh,720px)}
 @media(max-width:680px){.task-form .task-notes-block textarea{font-size:16px;padding:13px;min-height:240px}.notes-expand-btn{font-size:11px;padding:7px 9px}}
+
+/* Obvious, accessible distinction between browser demo and connected Notion workspace. */
+.demo-warning{max-width:1450px;margin:18px auto 0;padding:13px 17px;border:3px solid #95252e;border-radius:14px;background:#ffe1df;display:flex;flex-wrap:wrap;align-items:center;gap:12px;color:#651b23;box-shadow:3px 4px 0 var(--ink);font-size:13px}
+.demo-warning strong{font-size:13px;letter-spacing:.05em}
+.demo-warning span{flex:1;min-width:220px}
+.demo-warning button{background:#fffefa;border:2px solid #95252e;border-radius:9px;padding:9px 12px;font-weight:900;color:#651b23}
+.demo-warning[hidden]{display:none!important}
+body.local-demo-mode .connection-btn{background:#ffe1df;border-color:#95252e;color:#7f2029}
+#connectionOverlay{z-index:200}
+#connectionOverlay .overlay-backdrop{background:rgba(11,11,11,.79);backdrop-filter:blur(5px)}
+#connectionOverlay .connection-dialog{width:min(570px,calc(100vw - 24px));border:4px solid #161616;box-shadow:10px 12px 0 rgba(0,0,0,.48);padding:30px 35px}
+#connectionOverlay .connection-dialog h2{font-size:clamp(40px,5vw,58px);margin:20px 0 18px}
+#connectionOverlay .connection-dialog p{font-size:15px;line-height:1.6;color:#35312d}
+#connectionOverlay .connect-sticker{background:#ffd7d7;color:#79222a;border-color:#a43b43;transform:none;font-size:11px}
+#connectionOverlay .connection-status{background:#ffe5e5;border:2px solid #b3474c;color:#7b2630;font-size:13px}
+#connectionOverlay .connection-form .primary-btn{font-size:16px;padding:15px}
+#connectionOverlay .text-btn{display:block;margin:17px auto;color:#6e3637}
+@media(max-width:600px){#connectionOverlay .connection-dialog{padding:23px 20px}.demo-warning{margin:12px auto 0}}
