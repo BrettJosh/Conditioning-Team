@@ -178,7 +178,7 @@ What you get:
 
 ### A. The Google Sheet (done)
 
-The script points at the Google Sheet **[Sponsorship outreach 2026](https://docs.google.com/spreadsheets/d/1yvBS7TYPy7v-kQldwYSJAvq4dMuGF1ZUkLP_SKPy_Is/edit)** (the tracker saved as a Google Sheet). Nothing to do unless you move to a different sheet: then either set the script property `STUDIO_SPONSORSHIP_SHEET_ID` (step B4) to the new sheet's ID, or name the new sheet exactly `Brand Sponsorship Tracker`.
+The script points at the Google Sheet **[Sponsorship outreach 2026](https://docs.google.com/spreadsheets/d/1yvBS7TYPy7v-kQldwYSJAvq4dMuGF1ZUkLP_SKPy_Is/edit)** (the tracker saved as a Google Sheet). Nothing to do unless you move to a different sheet: then set the script property `STUDIO_SPONSORSHIP_SHEET_ID` (step B4) to the new sheet's ID. The script deliberately uses spreadsheet access only — a Drive lookup would need full Drive access, which Google blocks for unverified scripts on personal accounts ("This app is blocked").
 
 Keep the tabs **Brands**, **Agencies** and **Action list** as they are: the column headings in **row 4** of Brands and Agencies (and the `Priority…` heading row of Action list) are what the app reads. You can add columns, change statuses and sort rows freely; the first time the app runs it appends an **ID** column to Brands and Agencies and creates two tabs, **Email log** and a hidden **Studio meta**. Leave those alone.
 
@@ -188,7 +188,9 @@ Keep the tabs **Brands**, **Agencies** and **Action list** as they are: the colu
 2. Replace the contents of **Code.gs** with [google-apps-script/Code.gs](google-apps-script/Code.gs) from this repository (one routing line was added; the calendar behaves exactly as before).
 3. Add a second file: **＋ → Script**, name it `Sponsorships`, and paste in [google-apps-script/Sponsorships.gs](google-apps-script/Sponsorships.gs). Save.
 4. Optional: **Project Settings → Script properties** → add `STUDIO_SPONSORSHIP_SHEET_ID` = the ID from a sheet's URL, only if you ever want a different sheet than *Sponsorship outreach 2026*.
-5. **Deploy → Manage deployments → ✎ → Version: New version → Deploy.** Google may ask you to re-authorise (the script can now open a second sheet, and can look one up in Drive by name as a fallback). The web app URL does not change, so Netlify needs nothing new.
+5. **Deploy → Manage deployments → ✎ → Version: New version → Deploy.** Google may ask you to re-authorise (the script can now open a second sheet). On the "Google hasn't verified this app" screen choose Advanced → Go to … (unsafe) → Allow; that is normal for your own script. The web app URL does not change, so Netlify needs nothing new.
+
+If there is **no existing deployment** (the dialog says "Please select a deployment type"), create one: ⚙ → **Web app**, Execute as **Me**, Who has access **Anyone** → Deploy → copy the **Web app URL**. Then add the script property `STUDIO_CALENDAR_SECRET` (any long random string) under Project Settings, and in Netlify set `STUDIO_CALENDAR_SCRIPT_URL` to that URL and `STUDIO_CALENDAR_SCRIPT_SECRET` to the same string. One deployment serves both the calendar and the sponsorships.
 6. Open the studio site, connect with your workspace code as usual, and choose **Sponsorships**. Press **Refresh** if it was already open.
 
 ### C. Connect Zoho Mail (one-time, about five minutes)

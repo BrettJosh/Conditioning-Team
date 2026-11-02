@@ -11,11 +11,11 @@
  * in the tracker is restructured, so the Summary tab formulas keep working.
  *
  * Finding the sheet: Script property STUDIO_SPONSORSHIP_SHEET_ID (the ID in the
- * sheet's URL) wins; otherwise the "Sponsorship outreach 2026" sheet below is used;
- * failing that, the first spreadsheet in Drive named exactly "Brand Sponsorship Tracker".
+ * sheet's URL) wins; otherwise the "Sponsorship outreach 2026" sheet below is used.
+ * Only SpreadsheetApp is used on purpose: a Drive lookup would need full Drive access,
+ * which Google blocks for unverified scripts on personal accounts.
  */
 const SPONSOR_SHEET_ID = '1yvBS7TYPy7v-kQldwYSJAvq4dMuGF1ZUkLP_SKPy_Is'; // "Sponsorship outreach 2026"
-const SPONSOR_SHEET_NAME = 'Brand Sponsorship Tracker';
 const SPONSOR_TABS = { brands: 'Brands', agencies: 'Agencies' };
 const ACTION_TAB = 'Action list';
 const EMAIL_TAB = 'Email log';
@@ -44,14 +44,8 @@ const EDITABLE = {
 
 function sponsorWorkbook() {
   const id = PropertiesService.getScriptProperties().getProperty('STUDIO_SPONSORSHIP_SHEET_ID');
-  if (id) return SpreadsheetApp.openById(id.trim());
-  try { return SpreadsheetApp.openById(SPONSOR_SHEET_ID); } catch (e) { /* sheet moved or deleted: fall back to a name lookup */ }
-  const files = DriveApp.getFilesByName(SPONSOR_SHEET_NAME);
-  while (files.hasNext()) {
-    const file = files.next();
-    if (file.getMimeType() === MimeType.GOOGLE_SHEETS) return SpreadsheetApp.openById(file.getId());
-  }
-  throw Error('Sponsorship sheet not found. Set the STUDIO_SPONSORSHIP_SHEET_ID script property to the sheet\'s ID, or name the Google Sheet "' + SPONSOR_SHEET_NAME + '".');
+  try { return SpreadsheetApp.openById((id || SPONSOR_SHEET_ID).trim()); }
+  catch (e) { throw Error('Sponsorship sheet not found. Set the STUDIO_SPONSORSHIP_SHEET_ID script property to the ID in the sheet\'s URL.'); }
 }
 
 function tz() { return Session.getScriptTimeZone() || 'Europe/London'; }
