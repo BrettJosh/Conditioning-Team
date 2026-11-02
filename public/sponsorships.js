@@ -150,13 +150,14 @@ function renderStats() {
   const all = [...s.brands.map(r => ({ ...r, g: group(r.status) })), ...s.agencies.map(r => ({ ...r, g: group(r.status) }))];
   const brandsWon = s.brands.filter(r => group(r.status) === 'won');
   const value = brandsWon.reduce((n, r) => n + (Number(r.agreedValue) || 0), 0);
-  const you = all.filter(r => r.g === 'you').length, them = all.filter(r => r.g === 'them').length, cold = s.brands.filter(r => group(r.status) === 'cold').length;
+  const split = g => { const b = s.brands.filter(r => group(r.status) === g).length, a = s.agencies.filter(r => group(r.status) === g).length; return { n: b + a, sub: `${b} brand${b === 1 ? '' : 's'} · ${a} agenc${a === 1 ? 'y' : 'ies'}` }; };
+  const you = split('you'), them = split('them'), cold = s.brands.filter(r => group(r.status) === 'cold').length;
   const week = s.emails.filter(e => e.date >= weekAgoIso()).length, unmatched = s.emails.filter(e => e.tab === 'unmatched').length;
   const synced = s.sync?.lastRun?.at ? 'Synced ' + fmtDateTime(s.sync.lastRun.at) : (s.demo ? 'Sample data' : 'Not synced yet');
   const tiles = [
     { n: brandsWon.length, label: 'deals signed', sub: value ? money(value) + ' agreed' : 'no value recorded', cls: 'won', f: 'won', v: 'brands' },
-    { n: you, label: 'waiting on you', sub: 'reply or decide', cls: 'you', f: 'you', v: 'brands' },
-    { n: them, label: 'waiting on them', sub: 'ball in their court', cls: 'them', f: 'them', v: 'brands' },
+    { n: you.n, label: 'waiting on you', sub: you.sub, cls: 'you', f: 'you', v: 'brands' },
+    { n: them.n, label: 'waiting on them', sub: them.sub, cls: 'them', f: 'them', v: 'brands' },
     { n: cold, label: 'cold pitches, no reply', sub: 'follow up or drop', cls: 'cold', f: 'cold', v: 'brands' },
     { n: week, label: 'emails this week', sub: (unmatched ? unmatched + ' unmatched · ' : '') + synced, cls: 'mail', f: 'week', v: 'emails' }
   ];
@@ -164,7 +165,8 @@ function renderStats() {
 }
 function renderTools() {
   $('sponsorViews').innerHTML = VIEWS.map(v => { const count = v.id === 'actions' ? s.actions.length : v.id === 'emails' ? s.emails.length : records(v.id).length; return `<button type="button" class="tab" data-sponsor-view="${v.id}" aria-pressed="${v.id === s.view}">${v.icon} ${v.label} <span class="tab-count">${count}</span></button>`; }).join('');
-  $('sponsorFilters').innerHTML = FILTERS[s.view].map(([id, label]) => `<button type="button" class="tab sponsor-filter" data-sponsor-filter="${id}" aria-pressed="${id === s.filter}">${esc(label)}</button>`).join('');
+  const countFor = id => s.view === 'brands' || s.view === 'agencies' ? (id === 'all' ? records(s.view).length : records(s.view).filter(r => group(r.status) === id).length) : null;
+  $('sponsorFilters').innerHTML = FILTERS[s.view].map(([id, label]) => { const n = countFor(id); return `<button type="button" class="tab sponsor-filter" data-sponsor-filter="${id}" aria-pressed="${id === s.filter}">${esc(label)}${n == null ? '' : ` <span class="tab-count">${n}</span>`}</button>`; }).join('');
   $('sponsorAddBtn').innerHTML = s.view === 'agencies' ? '＋ Add agency' : '＋ Add brand';
   $('sponsorAddBtn').hidden = s.view === 'actions' || s.view === 'emails';
   const link = $('sponsorSheetLink'); link.hidden = !s.sheetUrl; if (s.sheetUrl) link.href = s.sheetUrl;
