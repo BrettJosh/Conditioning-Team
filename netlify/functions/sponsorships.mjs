@@ -72,7 +72,7 @@ export default async function handler(request) {
     else return fail('Unsupported sponsorship action.');
 
     const upstream = await fetch(url, { method: 'POST', headers: { 'content-type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ ...payload, secret }), redirect: 'follow', signal: AbortSignal.timeout(19000) });
-    const raw = await upstream.text(); let parsed; try { parsed = JSON.parse(raw); } catch { return fail('Google Sheets connection returned an unexpected response. Check your Apps Script deployment (the Sponsorships.gs file must be in the same project).', 502); }
+    const raw = await upstream.text(); let parsed; try { parsed = JSON.parse(raw); } catch { return fail('Google Sheets connection returned an unexpected response. Check the Apps Script: run studioSelfTest in the editor, then deploy a new version.', 502); }
     if (!upstream.ok || !parsed.ok) return fail(parsed.error || 'Google Sheets update failed.', upstream.status >= 400 && upstream.status < 500 ? 400 : 502);
     return Response.json(parsed, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {

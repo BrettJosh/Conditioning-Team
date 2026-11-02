@@ -95,8 +95,7 @@ netlify/
   lib/
     zoho-sync.mjs      # shared Zoho Mail logic
 google-apps-script/
-  Code.gs              # content calendar (routes sponsor* actions)
-  Sponsorships.gs      # sponsorship tracker actions
+  Code.gs              # ONE file: content calendar + sponsorship tracker + studioSelfTest()
 ```
 
 No `npm install` required, no third-party UI frameworks or asset CDNs. JavaScript and CSS are plain, easy to maintain, and Netlify functions run with Node's built-in `fetch`.
@@ -182,11 +181,13 @@ The script points at the Google Sheet **[Sponsorship outreach 2026](https://docs
 
 Keep the tabs **Brands**, **Agencies** and **Action list** as they are: the column headings in **row 4** of Brands and Agencies (and the `Priority…` heading row of Action list) are what the app reads. You can add columns, change statuses and sort rows freely; the first time the app runs it appends an **ID** column to Brands and Agencies and creates two tabs, **Email log** and a hidden **Studio meta**. Leave those alone.
 
-### B. Update the Apps Script (one-time, same project as the calendar)
+### B. Update the Apps Script (one-time)
 
-1. Open the **2026-content-plan** Google Sheet → **Extensions → Apps Script**.
-2. Replace the contents of **Code.gs** with [google-apps-script/Code.gs](google-apps-script/Code.gs) from this repository (one routing line was added; the calendar behaves exactly as before).
-3. Add a second file: **＋ → Script**, name it `Sponsorships`, and paste in [google-apps-script/Sponsorships.gs](google-apps-script/Sponsorships.gs). Save.
+The whole bridge is **one file**, [google-apps-script/Code.gs](google-apps-script/Code.gs): the content calendar at the top, the sponsorship tracker below it, and a `studioSelfTest()` function at the end.
+
+1. Open the Apps Script project that runs the calendar (the one whose web app URL is in Netlify as `STUDIO_CALENDAR_SCRIPT_URL`; currently the standalone project **Studio bridge** at script.google.com).
+2. Click **Code.gs** → select all → delete → paste in the repository's Code.gs → save. If the project has any other `.gs` file (an old `Sponsorships.gs` / `Subscriptions.gs`), remove it: hover it → ⋮ → **Remove**. One file only.
+3. In the toolbar pick **studioSelfTest** and press **Run**; the Execution log should print *Secret set*, *Calendar OK*, *Sponsorships OK*. If it stops on a red line, that line is the problem.
 4. Optional: **Project Settings → Script properties** → add `STUDIO_SPONSORSHIP_SHEET_ID` = the ID from a sheet's URL, only if you ever want a different sheet than *Sponsorship outreach 2026*.
 5. **Deploy → Manage deployments → ✎ → Version: New version → Deploy.** Google may ask you to re-authorise (the script can now open a second sheet). On the "Google hasn't verified this app" screen choose Advanced → Go to … (unsafe) → Allow; that is normal for your own script. The web app URL does not change, so Netlify needs nothing new.
 
@@ -235,3 +236,4 @@ Matched emails bump that row's **Last activity** (the sheet's "Days since" formu
 - The access code is still shared-password access (see the Notion section). The Zoho token grants **read-only** mailbox access and lives only in Netlify; rotate it by deleting the Self Client in the API console.
 - Row IDs are stored in the ID column: don't clear it, and sort or move rows as you like.
 - Scheduled runs are only visible in the Netlify function logs; the **Zoho Mail** dialog in the app shows the last run, what it added, and the last error if any.
+- A deployment is a snapshot: after any change to Code.gs, **Deploy → Manage deployments → ✎ → New version → Deploy**, or the site keeps talking to the old code.
