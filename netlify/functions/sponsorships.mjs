@@ -48,7 +48,7 @@ export default async function handler(request) {
       return Response.json({ ok: true, ...result }, { headers: { 'Cache-Control': 'no-store' } });
     }
     if (action === 'zohoSync') {
-      const result = await runSync({ url, secret, pageBudget: Math.min(6, Math.max(1, Number(data.pages) || 4)), trigger: 'manual' });
+      const result = await runSync({ url, secret, pageBudget: Math.min(4, Math.max(1, Number(data.pages) || 2)), trigger: 'manual' });
       return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
     }
 

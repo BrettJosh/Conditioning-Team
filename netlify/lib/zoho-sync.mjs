@@ -184,6 +184,8 @@ async function resolveAccount(cfg, token, state) {
  * Runs one sync chunk. options: { url, secret } for the Apps Script, pageBudget (pages across both folders).
  * Returns a summary for the UI; the sheet keeps the state between runs.
  */
+/** Netlify stops a web request after ~10 s, so a manual run stops fetching once this much time has gone and writes what it has. */
+const TIME_BUDGET_MS = { manual: 4500, schedule: 6500 };
 export async function runSync({ url, secret, pageBudget = 4, trigger = 'schedule' } = {}) {
   const cfg = zohoConfig();
   const status = zohoStatus();
@@ -212,6 +214,7 @@ export async function runSync({ url, secret, pageBudget = 4, trigger = 'schedule
       let start = backfilling ? (bf.done ? null : bf.start) : 1;
       if (start === null) continue;
       while (pagesUsed < pageBudget) {
+        if (Date.now() - started > (TIME_BUDGET_MS[trigger] || TIME_BUDGET_MS.manual)) break;
         const page = await zohoGet(cfg, token, '/api/accounts/' + state.accountId + '/messages/view', { folderId, start, limit: PAGE_SIZE, sortBy: 'date', sortorder: false, includeto: true });
         pagesUsed++;
         const list = Array.isArray(page) ? page : [];
@@ -238,6 +241,10 @@ export async function runSync({ url, secret, pageBudget = 4, trigger = 'schedule
     state.lastRun = { at: new Date().toISOString(), trigger, added: 0, scanned, pagesUsed, backfillDone: nowBackfillDone, ms: Date.now() - started };
     delete state.lastError;
     found.sort((a, b) => a.date.localeCompare(b.date));
+    if (found.length > 250) { // write the rest next run: the pages are re-walked thanks to the overlap + known-id dedupe
+      for (const key of ['inbox', 'sent']) { const bf = state.backfill[key]; if (bf && !bf.done) bf.start = Math.max(1, bf.start - PAGE_SIZE); }
+      found.length = 250;
+    }
     const result = await callScript(url, secret, { action: 'sponsorEmails', emails: found, state: { ...state, lastRun: { ...state.lastRun, added: found.length } } });
     return { ok: true, added: result.added, skipped: result.skipped, touched: result.touched, scanned, pagesUsed, backfillDone: nowBackfillDone, backfillRemaining: nowBackfillDone ? 0 : (pagesUsed >= pageBudget ? 1 : 0), mailbox: state.mailbox, lastSyncAt: state.lastSyncAt || '' };
   } catch (error) {

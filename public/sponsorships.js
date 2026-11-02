@@ -50,7 +50,7 @@ async function api(payload) {
   const board = B()?.getState();
   if (!board || board.mode !== 'notion') throw Error('Connect your workspace (top right) to use the shared sponsorship tracker.');
   const resp = await fetch('/.netlify/functions/sponsorships', { method: 'POST', headers: { 'content-type': 'application/json', 'x-board-key': board.code }, body: JSON.stringify(payload), cache: 'no-store' });
-  const text = await resp.text(); let data; try { data = JSON.parse(text); } catch { throw Error('Sponsorships server returned an unexpected response.'); }
+  const text = await resp.text(); let data; try { data = JSON.parse(text); } catch { throw Error(resp.status === 502 || resp.status === 504 ? 'The server took too long — press Sync emails again; each run picks up where the last stopped.' : 'Sponsorships server returned an unexpected response.'); }
   if (!resp.ok || data.ok === false) throw Error(data.error || 'Sponsorships request failed.');
   return data;
 }
@@ -312,7 +312,7 @@ async function runSync() {
   if (s.busy) return; s.busy = true; const btn = $('sponsorSyncBtn'); btn.disabled = true; notice('Syncing Zoho Mail — this takes a few seconds…');
   let result = null;
   try {
-    result = await api({ action: 'zohoSync', pages: 4 });
+    result = await api({ action: 'zohoSync', pages: 2 });
     notice('');
     toast(`${result.added} new email${result.added === 1 ? '' : 's'} logged (${result.scanned} scanned).${result.backfillDone ? '' : ' Still catching up on history — sync again in a moment.'}`);
   } catch (err) {
