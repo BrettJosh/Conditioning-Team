@@ -167,8 +167,27 @@ function writeFields(info, tab, rowNumber, patch) {
     if (DATE_FIELDS.indexOf(key) >= 0) value = toCellDate(isoDate(value));
     else if (key === 'agreedValue') value = numberOrBlank(value);
     else value = clean(value);
-    info.sheet.getRange(rowNumber, info.cols[key]).setValue(value);
+    const cell = info.sheet.getRange(rowNumber, info.cols[key]);
+    if (key === 'status') addStatusOption(info, cell, value);
+    try { cell.setValue(value); }
+    catch (e) {
+      if (key !== 'status' || !/validation/i.test(String(e.message || e))) throw e;
+      cell.setDataValidation(null); cell.setValue(value); // the sheet's dropdown rejected a new status: keep the value, drop the rule for that cell
+    }
   });
+}
+/** The Status column in the sheet is a dropdown; a status chosen in the app that it doesn't know yet is added to the list. */
+function addStatusOption(info, cell, value) {
+  try {
+    const rule = cell.getDataValidation();
+    if (!value || !rule || rule.getCriteriaType() !== SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST) return;
+    const args = rule.getCriteriaValues(), list = (args[0] || []).map(String);
+    if (list.indexOf(value) >= 0) return;
+    list.push(value);
+    const built = SpreadsheetApp.newDataValidation().requireValueInList(list, args[1] !== false).setAllowInvalid(rule.getAllowInvalid()).build();
+    const lastRow = Math.max(info.sheet.getLastRow(), cell.getRow());
+    info.sheet.getRange(info.headerRow + 1, cell.getColumn(), lastRow - info.headerRow, 1).setDataValidation(built);
+  } catch (e) { /* the dropdown is a convenience; never block a save over it */ }
 }
 
 /** Action list tab: headers on row 3, open items until the "Completed" marker row. */

@@ -10,11 +10,11 @@ const VIEWS = [
   { id: 'actions', label: 'Action list', icon: '↗' },
   { id: 'emails', label: 'Email log', icon: '✉' }
 ];
-const BRAND_STATUSES = ['Deal signed', "Awaiting Josh's reply", 'Awaiting their reply', 'In conversation', 'No reply', 'Went quiet', 'Declined by brand', 'Declined by Josh'];
-const AGENCY_STATUSES = ['Active – deal done', "Awaiting Josh's reply", 'Awaiting their reply', 'On file – no brand yet', 'On file – offer declined', 'Went quiet'];
+const BRAND_STATUSES = ["Awaiting Josh's reply", 'Awaiting their reply', 'In conversation', 'Deal signed', 'No reply', 'Went quiet', 'Declined by brand', 'Declined by Josh', 'Ignored'];
+const AGENCY_STATUSES = ["Awaiting Josh's reply", 'Awaiting their reply', 'Active – deal done', 'On file – no brand yet', 'On file – offer declined', 'Went quiet', 'Ignored'];
 const FILTERS = {
-  brands: [['all', 'All'], ['you', 'Waiting on you'], ['them', 'Waiting on them'], ['live', 'In conversation'], ['won', 'Deals signed'], ['cold', 'No reply'], ['quiet', 'Went quiet'], ['lost', 'Declined']],
-  agencies: [['all', 'All'], ['you', 'Waiting on you'], ['them', 'Waiting on them'], ['live', 'On file'], ['won', 'Deal done'], ['lost', 'Offer declined'], ['quiet', 'Went quiet']],
+  brands: [['all', 'All'], ['you', 'Waiting on you'], ['them', 'Waiting on them'], ['live', 'In conversation'], ['won', 'Deals signed'], ['cold', 'No reply'], ['quiet', 'Went quiet'], ['lost', 'Declined / ignored']],
+  agencies: [['all', 'All'], ['you', 'Waiting on you'], ['them', 'Waiting on them'], ['live', 'On file'], ['won', 'Deal done'], ['lost', 'Declined / ignored'], ['quiet', 'Went quiet']],
   actions: [['all', 'Open'], ['done', 'Completed']],
   emails: [['all', 'All'], ['unmatched', 'Unmatched'], ['in', 'Received'], ['out', 'Sent'], ['week', 'This week']]
 };
@@ -83,7 +83,7 @@ function group(status) {
   if (t.includes("josh's reply") || t.includes('josh reply') || t.includes('waiting on you')) return 'you';
   if (t.includes('their reply') || t.includes('waiting on them')) return 'them';
   if (t.includes('signed') || t.includes('deal done') || t.includes('active')) return 'won';
-  if (t.includes('declined') || t.includes('passed') || t.includes('lost')) return 'lost';
+  if (t.includes('declined') || t.includes('passed') || t.includes('lost') || t.includes('ignored')) return 'lost';
   if (t.includes('no reply')) return 'cold';
   if (t.includes('quiet')) return 'quiet';
   if (t.includes('conversation') || t.includes('on file') || t.includes('negotiat')) return 'live';
@@ -203,7 +203,12 @@ function openRecord(tab, id) {
   $('sponsorDrawerTitle').textContent = record ? record.name + '.' : (brand ? 'New brand.' : 'New agency.');
   $('sponsorDrawerMeta').textContent = record ? [record.status, record.lastActivity ? 'last activity ' + fmtDate(record.lastActivity) : '', record.firstContact ? 'first contact ' + fmtDate(record.firstContact) : ''].filter(Boolean).join(' · ') : 'Saved straight to the Google Sheet.';
   $('sponsorId').value = id || ''; $('sponsorTab').value = tab;
-  $('sponsorStatusOptions').innerHTML = (brand ? BRAND_STATUSES : AGENCY_STATUSES).map(x => `<option value="${esc(x)}"></option>`).join('');
+  // Every known status, plus any custom ones already used in the sheet, plus this row's own value if it is something else.
+  const known = brand ? BRAND_STATUSES : AGENCY_STATUSES;
+  const inUse = [...new Set(records(tab).map(r => r.status).filter(Boolean))].filter(x => !known.includes(x));
+  const statuses = [...known, ...inUse];
+  if (record?.status && !statuses.includes(record.status)) statuses.push(record.status);
+  $('sponsorStatus').innerHTML = statuses.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
   document.querySelectorAll('#sponsorOverlay [data-brand-only]').forEach(el => { el.hidden = !brand; });
   document.querySelectorAll('#sponsorOverlay [data-agency-only]').forEach(el => { el.hidden = brand; });
   const f = { name: 'sponsorName', status: 'sponsorStatus', lastActivity: 'sponsorLastActivity', summary: 'sponsorSummary', nextStep: 'sponsorNextStep', firstContact: 'sponsorFirstContact', initiatedBy: 'sponsorInitiatedBy', type: 'sponsorType', via: 'sponsorVia', category: 'sponsorCategory', rate: 'sponsorRate', agreedValue: 'sponsorAgreedValue', terms: 'sponsorTerms', brands: 'sponsorBrands', contact: 'sponsorContact', history: 'sponsorHistory' };

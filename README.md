@@ -171,7 +171,7 @@ What you get:
 
 - **Summary tiles** — deals signed (and agreed value), waiting on you, waiting on them, cold pitches with no reply, emails this week. Click a tile to filter.
 - **Brands / Agencies** — sortable, searchable grids (click a column heading to sort; "most attention needed first" by default). Status pills are colour-coded: red = they're waiting on you. Each row shows who wrote last and how long ago, from the email log.
-- **Row drawer** — edit any field, add a dated note or log an email by hand, and see every matched email for that brand. Saves go straight to the sheet.
+- **Row drawer** — edit any field (Status is a dropdown of every status, including **Ignored**), add a dated note or log an email by hand, and see every matched email for that brand. Saves go straight to the sheet; a status the sheet's own dropdown doesn't know yet is added to it automatically.
 - **Action list** — the open items from the sheet's Action list tab, with a "Mark done" tick that writes back.
 - **Email log** — every email to or from a sponsorship contact, newest first. Anything the sync couldn't match (a new agency pitching, say) is highlighted with an **Assign to…** picker; assigning also saves that address as a contact so the next email matches on its own.
 
