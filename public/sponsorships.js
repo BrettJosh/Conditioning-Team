@@ -5,6 +5,7 @@ const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const B = () => window.StudioBoard;
 const TODAY = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 const VIEWS = [
+  { id: 'all', label: 'Everything', icon: '◎' },
   { id: 'brands', label: 'Brands', icon: '✦' },
   { id: 'agencies', label: 'Agencies', icon: '◫' },
   { id: 'actions', label: 'Action list', icon: '↗' },
@@ -13,6 +14,7 @@ const VIEWS = [
 const BRAND_STATUSES = ["Awaiting Josh's reply", 'Awaiting their reply', 'In conversation', 'Deal signed', 'No reply', 'Went quiet', 'Declined by brand', 'Declined by Josh', 'Ignored'];
 const AGENCY_STATUSES = ["Awaiting Josh's reply", 'Awaiting their reply', 'Active – deal done', 'On file – no brand yet', 'On file – offer declined', 'Went quiet', 'Ignored'];
 const FILTERS = {
+  all: [['all', 'All'], ['you', 'Waiting on you'], ['them', 'Waiting on them'], ['live', 'In conversation / on file'], ['won', 'Deals'], ['cold', 'No reply'], ['quiet', 'Went quiet'], ['lost', 'Declined / ignored']],
   brands: [['all', 'All'], ['you', 'Waiting on you'], ['them', 'Waiting on them'], ['live', 'In conversation'], ['won', 'Deals signed'], ['cold', 'No reply'], ['quiet', 'Went quiet'], ['lost', 'Declined / ignored']],
   agencies: [['all', 'All'], ['you', 'Waiting on you'], ['them', 'Waiting on them'], ['live', 'On file'], ['won', 'Deal done'], ['lost', 'Declined / ignored'], ['quiet', 'Went quiet']],
   actions: [['all', 'Open'], ['done', 'Completed']],
@@ -41,7 +43,7 @@ const DEMO = {
     { date: '2026-10-24T11:05:00Z', direction: 'in', matchedTo: '', tab: 'unmatched', recordId: '', from: 'Redouan <redouan@example.com>', to: 'josh', subject: 'Sponsorship opportunity — Primalfluence', snippet: 'We put creators forward to brands like…', messageId: 'demo-m3', threadId: 't3', folder: 'Inbox', matchedBy: 'keyword' }
   ]
 };
-const s = { brands: [], agencies: [], actions: [], completed: [], emails: [], sheetUrl: '', sync: {}, view: 'brands', filter: 'all', search: '', sort: { key: '', dir: 1 }, loaded: false, busy: false, demo: true, selected: null, zoho: null };
+const s = { brands: [], agencies: [], actions: [], completed: [], emails: [], sheetUrl: '', sync: {}, view: 'all', filter: 'all', search: '', sort: { key: '', dir: 1 }, loaded: false, busy: false, demo: true, selected: null, zoho: null };
 
 const connected = () => { const b = B()?.getState(); return Boolean(b && b.mode === 'notion'); };
 function notice(text, error = false) { const el = $('sponsorNotice'); el.hidden = !text; el.textContent = text; el.classList.toggle('error', error); }
@@ -101,7 +103,8 @@ function lastEmails() {
   ['brands', 'agencies'].forEach(tab => records(tab).forEach(r => { const list = emailsFor(tab, r); if (list.length) map[tab + '|' + r.id] = list.reduce((a, b) => (b.date > a.date ? b : a)); }));
   return map;
 }
-function records(tab) { return tab === 'agencies' ? s.agencies : s.brands; }
+function records(tab) { return tab === 'agencies' ? s.agencies : tab === 'all' ? [...s.brands.map(r => ({ ...r, tab: 'brands' })), ...s.agencies.map(r => ({ ...r, tab: 'agencies' }))] : s.brands; }
+const isRecordView = () => s.view === 'brands' || s.view === 'agencies' || s.view === 'all';
 function weekAgoIso() { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString(); }
 
 function filtered() {
@@ -115,7 +118,7 @@ function filtered() {
       (!q || [e.matchedTo, e.from, e.to, e.subject, e.snippet].join(' ').toLowerCase().includes(q)));
   }
   const last = lastEmails();
-  return records(s.view).map(r => ({ ...r, group: group(r.status), days: days(r.lastActivity), last: last[s.view + '|' + r.id] || null }))
+  return records(s.view).map(r => ({ ...r, group: group(r.status), days: days(r.lastActivity), last: last[(r.tab || s.view) + '|' + r.id] || null }))
     .filter(r => (s.filter === 'all' || r.group === s.filter) && (!q || [r.name, r.status, r.summary, r.nextStep, r.via, r.contact, r.category, r.rate, r.terms, r.brands, r.type, r.history].join(' ').toLowerCase().includes(q)));
 }
 function sorted(list) {
@@ -156,8 +159,8 @@ function renderStats() {
   const synced = s.sync?.lastRun?.at ? 'Synced ' + fmtDateTime(s.sync.lastRun.at) : (s.demo ? 'Sample data' : 'Not synced yet');
   const tiles = [
     { n: brandsWon.length, label: 'deals signed', sub: value ? money(value) + ' agreed' : 'no value recorded', cls: 'won', f: 'won', v: 'brands' },
-    { n: you.n, label: 'waiting on you', sub: you.sub, cls: 'you', f: 'you', v: 'brands' },
-    { n: them.n, label: 'waiting on them', sub: them.sub, cls: 'them', f: 'them', v: 'brands' },
+    { n: you.n, label: 'waiting on you', sub: you.sub, cls: 'you', f: 'you', v: 'all' },
+    { n: them.n, label: 'waiting on them', sub: them.sub, cls: 'them', f: 'them', v: 'all' },
     { n: cold, label: 'cold pitches, no reply', sub: 'follow up or drop', cls: 'cold', f: 'cold', v: 'brands' },
     { n: week, label: 'emails this week', sub: (unmatched ? unmatched + ' unmatched · ' : '') + synced, cls: 'mail', f: 'week', v: 'emails' }
   ];
@@ -165,18 +168,21 @@ function renderStats() {
 }
 function renderTools() {
   $('sponsorViews').innerHTML = VIEWS.map(v => { const count = v.id === 'actions' ? s.actions.length : v.id === 'emails' ? s.emails.length : records(v.id).length; return `<button type="button" class="tab" data-sponsor-view="${v.id}" aria-pressed="${v.id === s.view}">${v.icon} ${v.label} <span class="tab-count">${count}</span></button>`; }).join('');
-  const countFor = id => s.view === 'brands' || s.view === 'agencies' ? (id === 'all' ? records(s.view).length : records(s.view).filter(r => group(r.status) === id).length) : null;
+  const countFor = id => isRecordView() ? (id === 'all' ? records(s.view).length : records(s.view).filter(r => group(r.status) === id).length) : null;
   $('sponsorFilters').innerHTML = FILTERS[s.view].map(([id, label]) => { const n = countFor(id); return `<button type="button" class="tab sponsor-filter" data-sponsor-filter="${id}" aria-pressed="${id === s.filter}">${esc(label)}${n == null ? '' : ` <span class="tab-count">${n}</span>`}</button>`; }).join('');
   $('sponsorAddBtn').innerHTML = s.view === 'agencies' ? '＋ Add agency' : '＋ Add brand';
-  $('sponsorAddBtn').hidden = s.view === 'actions' || s.view === 'emails';
+  $('sponsorAddBtn').hidden = !isRecordView();
   const link = $('sponsorSheetLink'); link.hidden = !s.sheetUrl; if (s.sheetUrl) link.href = s.sheetUrl;
 }
 function renderTable() {
   const list = sorted(filtered());
   const table = $('sponsorTable');
-  $('sponsorMeta').textContent = list.length + ' ' + (s.view === 'actions' ? (s.filter === 'done' ? 'completed' : 'open') + ' action' + (list.length === 1 ? '' : 's') : s.view === 'emails' ? 'email' + (list.length === 1 ? '' : 's') : (s.view === 'brands' ? 'brand' : 'agenc') + (list.length === 1 ? (s.view === 'brands' ? '' : 'y') : (s.view === 'brands' ? 's' : 'ies'))) + (s.sort.key ? '' : s.view === 'brands' || s.view === 'agencies' ? ' · most attention needed first' : s.view === 'emails' ? ' · newest first' : ' · by priority');
+  $('sponsorMeta').textContent = list.length + ' ' + (s.view === 'actions' ? (s.filter === 'done' ? 'completed' : 'open') + ' action' + (list.length === 1 ? '' : 's') : s.view === 'emails' ? 'email' + (list.length === 1 ? '' : 's') : s.view === 'all' ? (list.length === 1 ? 'brand or agency' : 'brands and agencies') : (s.view === 'brands' ? 'brand' : 'agenc') + (list.length === 1 ? (s.view === 'brands' ? '' : 'y') : (s.view === 'brands' ? 's' : 'ies'))) + (s.sort.key ? '' : isRecordView() ? ' · most attention needed first' : s.view === 'emails' ? ' · newest first' : ' · by priority');
   if (!list.length) { table.innerHTML = `<tbody><tr><td class="sponsor-empty">${s.view === 'emails' && !s.emails.length ? 'No emails logged yet. Connect Zoho Mail and press Sync emails, or log one from a brand.' : 'Nothing matches this view.'}</td></tr></tbody>`; return; }
-  if (s.view === 'brands') {
+  if (s.view === 'all') {
+    table.innerHTML = `<thead><tr>${th('Name', 'name')}${th('Type', 'tab')}${th('Status', 'status')}${tp("What's happening")}${tp('Next step')}${th('Last activity', 'lastActivity', 'num')}${th('Last email', 'last')}${th('Via / type', 'via')}</tr></thead><tbody>` +
+      list.map(r => `<tr data-open="${esc(r.tab)}" data-id="${esc(r.id)}" tabindex="0"><td class="sponsor-name"><strong>${esc(r.name)}</strong><small>${esc(r.tab === 'brands' ? (r.category || '') : (r.type || ''))}</small></td><td><span class="sponsor-kind ${esc(r.tab)}">${r.tab === 'brands' ? '✦ Brand' : '◫ Agency'}</span></td><td>${pill(r.status)}</td><td class="sponsor-text">${esc(clamp(r.summary))}</td><td class="sponsor-text">${esc(clamp(r.tab === 'brands' ? r.nextStep : r.brands, 110))}</td><td class="num"><span class="sponsor-date">${esc(fmtDate(r.lastActivity))}</span>${daysBadge(r)}</td><td>${lastChip(r)}</td><td class="sponsor-text">${esc(clamp(r.tab === 'brands' ? r.via : r.terms, 60))}</td></tr>`).join('') + '</tbody>';
+  } else if (s.view === 'brands') {
     table.innerHTML = `<thead><tr>${th('Brand', 'name')}${th('Status', 'status')}${tp("What's happening")}${tp("Next step")}${th('Last activity', 'lastActivity', 'num')}${th('Last email', 'last')}${th('Via', 'via')}${th('Rate / value', 'agreedValue')}</tr></thead><tbody>` +
       list.map(r => `<tr data-open="brands" data-id="${esc(r.id)}" tabindex="0"><td class="sponsor-name"><strong>${esc(r.name)}</strong><small>${esc(r.category || '')}${r.initiatedBy ? (r.category ? ' · ' : '') + 'via ' + esc(r.initiatedBy.toLowerCase() === 'josh' ? 'your pitch' : r.initiatedBy.toLowerCase()) : ''}</small></td><td>${pill(r.status)}</td><td class="sponsor-text">${esc(clamp(r.summary))}</td><td class="sponsor-text">${esc(clamp(r.nextStep, 110))}</td><td class="num"><span class="sponsor-date">${esc(fmtDate(r.lastActivity))}</span>${daysBadge(r)}</td><td>${lastChip(r)}</td><td class="sponsor-text">${esc(clamp(r.via, 40))}</td><td class="sponsor-text">${r.agreedValue !== '' && r.agreedValue != null && !String(r.rate || '').includes(money(r.agreedValue)) ? '<strong>' + esc(money(r.agreedValue)) + '</strong> ' : ''}${esc(clamp(r.rate, 70))}</td></tr>`).join('') + '</tbody>';
   } else if (s.view === 'agencies') {

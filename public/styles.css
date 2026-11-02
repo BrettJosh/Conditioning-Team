@@ -201,6 +201,8 @@ body.local-demo-mode .connection-btn{background:#ffe1df;border-color:#95252e;col
 .sponsor-snippet{color:var(--muted);max-width:340px}
 .sponsor-pill{display:inline-block;border:1.5px solid var(--ink);border-radius:999px;padding:5px 9px;font-size:10px;font-weight:900;white-space:nowrap;background:#ece7dc}
 .sponsor-pill-you{background:#ffc9c9;border-color:#a33a40}.sponsor-pill-them{background:var(--yellow)}.sponsor-pill-won{background:var(--mint)}.sponsor-pill-live{background:var(--blue)}.sponsor-pill-lost{background:var(--lilac)}.sponsor-pill-cold{background:#ece7dc}.sponsor-pill-quiet{background:#e6cbb6}
+.sponsor-kind{display:inline-block;border:1.5px solid var(--ink);border-radius:8px;padding:5px 8px;font-size:10px;font-weight:900;white-space:nowrap;background:var(--white)}
+.sponsor-kind.brands{background:#fff0c3}.sponsor-kind.agencies{background:var(--lilac)}
 .sponsor-date{display:block;font-weight:800}
 .sponsor-days{display:inline-block;margin-top:4px;font-size:10px;font-weight:900;color:var(--muted);background:#f0ece2;border-radius:6px;padding:2px 6px}
 .sponsor-days.hot{background:#ffc9c9;color:#7f2029}.sponsor-days.muted{background:transparent}
