@@ -88,6 +88,15 @@ public/
 netlify/
   functions/
     notion.mjs
+    production.mjs
+    calendar.mjs
+    sponsorships.mjs   # Sponsorships tab bridge + Zoho actions
+    zoho-sync.mjs      # hourly scheduled Zoho Mail sync
+  lib/
+    zoho-sync.mjs      # shared Zoho Mail logic
+google-apps-script/
+  Code.gs              # content calendar (routes sponsor* actions)
+  Sponsorships.gs      # sponsorship tracker actions
 ```
 
 No `npm install` required, no third-party UI frameworks or asset CDNs. JavaScript and CSS are plain, easy to maintain, and Netlify functions run with Node's built-in `fetch`.
@@ -153,3 +162,74 @@ The app now includes a **Content calendar** tab displaying three months at a tim
 **Limitations:** The existing sheet holds one text value per date. The app treats that cell as one scheduled entry and won't merge two occupied days. For multiple planned uploads on one day, edit the source sheet text manually or extend the schema later. No calendar data is copied into Notion. If the Google bridge is not configured, the app shows an error and cannot edit or reschedule entries. Dates are limited to 2026.
 
 **Logo:** The header loads your actual uploaded channel logo from `public/assets/josh-logo-original.webp`, converted losslessly from the original PNG; shape and transparency are preserved. The earlier hand-drawn SVG is no longer used.
+
+
+## Sponsorships tab: brand deals with a live email log from Zoho Mail
+
+The **Sponsorships** tab is the brand-deal tracker as a live spreadsheet: every brand and agency, its status, next step, rate and history, plus an **Email log** that fills itself from Zoho Mail. The Google Sheet **Brand Sponsorship Tracker** stays the source of truth — the app reads and writes it through the same Apps Script bridge as the content calendar, so there are **no new Netlify variables for the sheet part**.
+
+What you get:
+
+- **Summary tiles** — deals signed (and agreed value), waiting on you, waiting on them, cold pitches with no reply, emails this week. Click a tile to filter.
+- **Brands / Agencies** — sortable, searchable grids (click a column heading to sort; "most attention needed first" by default). Status pills are colour-coded: red = they're waiting on you. Each row shows who wrote last and how long ago, from the email log.
+- **Row drawer** — edit any field, add a dated note or log an email by hand, and see every matched email for that brand. Saves go straight to the sheet.
+- **Action list** — the open items from the sheet's Action list tab, with a "Mark done" tick that writes back.
+- **Email log** — every email to or from a sponsorship contact, newest first. Anything the sync couldn't match (a new agency pitching, say) is highlighted with an **Assign to…** picker; assigning also saves that address as a contact so the next email matches on its own.
+
+### A. The Google Sheet (one-time)
+
+1. Upload `Brand_Sponsorship_Tracker_Aug-Oct_2026.xlsx` to Google Drive, open it and choose **File → Save as Google Sheets**.
+2. Name the new Google Sheet exactly **`Brand Sponsorship Tracker`** (the script finds it by name). Alternatively copy its ID from the URL into the script property in step B4.
+3. Keep the tabs **Brands**, **Agencies** and **Action list** as they are: the column headings in **row 4** of Brands and Agencies (and row 3 of Action list) are what the app reads. You can add columns, change statuses and sort rows freely; the first time the app runs it appends an **ID** column to Brands and Agencies and creates two tabs, **Email log** and a hidden **Studio meta**. Leave those alone.
+
+### B. Update the Apps Script (one-time, same project as the calendar)
+
+1. Open the **2026-content-plan** Google Sheet → **Extensions → Apps Script**.
+2. Replace the contents of **Code.gs** with [google-apps-script/Code.gs](google-apps-script/Code.gs) from this repository (one routing line was added; the calendar behaves exactly as before).
+3. Add a second file: **＋ → Script**, name it `Sponsorships`, and paste in [google-apps-script/Sponsorships.gs](google-apps-script/Sponsorships.gs). Save.
+4. Optional: **Project Settings → Script properties** → add `STUDIO_SPONSORSHIP_SHEET_ID` = the ID from the tracker sheet's URL. Skip this if the sheet is named `Brand Sponsorship Tracker`.
+5. **Deploy → Manage deployments → ✎ → Version: New version → Deploy.** Google will ask you to re-authorise because the script can now look up a sheet by name (Drive access). The web app URL does not change, so Netlify needs nothing new.
+6. Open the studio site, connect with your workspace code as usual, and choose **Sponsorships**. Press **Refresh** if it was already open.
+
+### C. Connect Zoho Mail (one-time, about five minutes)
+
+The sync runs on the server (`netlify/functions/zoho-sync.mjs`, hourly) and on demand (**Sync emails**). Your Zoho password is never involved; the app uses a long-lived OAuth token that lives only in Netlify.
+
+1. Go to the Zoho API console for your data centre — **https://api-console.zoho.eu** if your mailbox is at `mail.zoho.eu`, **https://api-console.zoho.com** if it is at `mail.zoho.com` — and sign in with the Zoho account that holds the business mailbox.
+2. **Add Client → Self Client → Create.** Open the **Client Secret** tab and copy the **Client ID** and **Client Secret**.
+3. In **Netlify → conditioningteam → Project configuration → Environment variables**, add:
+   - `ZOHO_CLIENT_ID` = the Client ID
+   - `ZOHO_CLIENT_SECRET` = the Client Secret (mark it sensitive)
+   - `ZOHO_REGION` = `eu` for mail.zoho.eu, `com` for mail.zoho.com (also accepted: `in`, `com.au`, `jp`, `ca`, `sa`, `com.cn`, `ae`)
+   Redeploy.
+4. Back in the API console, open the Self Client → **Generate Code** tab. Scope: `ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.messages.READ`. Time duration: 10 minutes. Description: anything. **Create**, then copy the code.
+5. In the studio site, **Sponsorships → ✉ Zoho Mail**, paste the code and press **Exchange for a token**. Copy the refresh token it shows (this is the only time it is displayed; it is not stored anywhere by the app).
+6. In Netlify, add `ZOHO_REFRESH_TOKEN` = that token (mark it sensitive). Redeploy.
+7. Press **⇣ Sync emails**. The first runs walk back through your Inbox and Sent folders to **1 July 2026** (change with `ZOHO_BACKFILL_FROM`, format `YYYY-MM-DD`), a few hundred emails per run, so press it a few times or let the hourly schedule finish. After that each run only looks at new mail.
+
+Optional: `ZOHO_OWN_ADDRESSES` = comma-separated extra addresses that count as "you" (aliases or a second mailbox name), if sent mail is being logged as received.
+
+### How emails are matched
+
+Every message in Inbox and Sent is compared with the email addresses in the **Contact** column of Brands and Agencies:
+
+1. exact address match → that brand or agency;
+2. same company domain (not gmail/outlook and the like) → that brand or agency;
+3. same thread as an already-matched email → inherits;
+4. otherwise it is kept only when the subject or first line reads like a sponsorship (sponsor, partnership, collab, brand deal, media kit, rate, campaign, influencer, "x Josh Brett", …) and it isn't an automated sender or a newsletter → **Unmatched**, for you to assign or ignore.
+
+Matched emails bump that row's **Last activity** (the sheet's "Days since" formula follows). **Status** is never changed by the sync — that stays a human decision; the "who wrote last" chip tells you when a status is stale.
+
+### Daily use
+
+- Red pills and the **Waiting on you** tile are the inbox. Open the row, read the thread, reply in Zoho, then update the status or tick the action.
+- Log calls, decisions and anything that didn't happen over email from the drawer ("Log an email or note"); it goes to the top of the history.
+- The source sheet is always one click away (**↗ Source sheet**) for bulk edits; press **Refresh** afterwards.
+
+### Limitations and security
+
+- The sync keeps the message date, sender, recipients, subject and the first ~300 characters of each matched email in the sheet — not full bodies or attachments. Open the thread in Zoho for the rest.
+- Zoho's list is paged 200 at a time, so a single run is capped at a few pages; the hourly schedule catches up on anything missed.
+- The access code is still shared-password access (see the Notion section). The Zoho token grants **read-only** mailbox access and lives only in Netlify; rotate it by deleting the Self Client in the API console.
+- Row IDs are stored in the ID column: don't clear it, and sort or move rows as you like.
+- Scheduled runs are only visible in the Netlify function logs; the **Zoho Mail** dialog in the app shows the last run, what it added, and the last error if any.

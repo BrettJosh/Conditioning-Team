@@ -3,6 +3,7 @@
  * Paste this code into a bound Google Apps Script project for that spreadsheet.
  * In Apps Script Project Settings, create Script property STUDIO_CALENDAR_SECRET.
  * Deploy as Web app, execute as Me, access Anyone. Keep the URL and secret in Netlify only.
+ * Sponsorships.gs (same project) handles every action whose name starts with "sponsor".
  */
 const PLAN_SHEET='2026 Content Plan';
 const METRICS_SHEET='Studio Metrics';
@@ -25,7 +26,9 @@ function events(sheet){const data=sheet.getRange('B2:M32').getDisplayValues(),li
 function doPost(e){try{const data=JSON.parse(e.postData.contents||'{}'),secret=PropertiesService.getScriptProperties().getProperty('STUDIO_CALENDAR_SECRET');
  if(!secret||data.secret!==secret)return json({ok:false,error:'Incorrect calendar secret.'});
  const lock=LockService.getScriptLock();lock.waitLock(15000);
- try{const sheet=main(),action=data.action;
+ try{const action=data.action;
+  if(String(action||'').indexOf('sponsor')===0)return json(sponsorRequest(data)); // Sponsorships.gs
+  const sheet=main();
   if(action==='list')return json({ok:true,events:events(sheet)});
   if(action==='save'){
    if(!validDate(data.date)||!String(data.text||'').trim())throw Error('Valid 2026 date and title required.');
