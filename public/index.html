@@ -40,6 +40,7 @@
   <button class="studio-tab" data-view-tab="archive" role="tab" aria-selected="false">◷ Archives</button>
   <button class="studio-tab" data-view-tab="production" role="tab" aria-selected="false">▣ Production</button>
   <button class="studio-tab" data-view-tab="calendar" role="tab" aria-selected="false">▦ Content calendar</button>
+  <button class="studio-tab" data-view-tab="sponsorships" role="tab" aria-selected="false">✦ Sponsorships</button>
 </nav>
 <section class="workspace" id="weeklyWorkspace" aria-label="Project task board">
         <div class="workspace-heading">
@@ -117,6 +118,29 @@
   <div class="calendar-summary" id="calendarSummary"></div>
   <div class="calendar-grid" id="calendarGrid"></div>
 </section>
+<section class="workspace sponsor-workspace" id="sponsorWorkspace" aria-label="Sponsorship pipeline" hidden>
+  <div class="workspace-heading"><div><div class="overline">/ FOLLOW THE MONEY</div><h2>BRAND <span class="scribble">DEALS</span></h2></div>
+    <div class="workspace-actions sponsor-actions">
+      <button class="quiet-btn" id="sponsorRefresh" type="button" title="Reload from Google Sheets">↻ <span>Refresh</span></button>
+      <a class="quiet-btn sponsor-sheet-link" id="sponsorSheetLink" href="#" target="_blank" rel="noopener" hidden>↗ <span>Source sheet</span></a>
+      <button class="quiet-btn" id="sponsorZohoBtn" type="button" title="Zoho Mail connection">✉ <span>Zoho Mail</span></button>
+      <button class="secondary-btn" id="sponsorSyncBtn" type="button" title="Pull new emails from Zoho Mail now">⇣ <span>Sync emails</span></button>
+      <button class="primary-btn" id="sponsorAddBtn" type="button">＋ Add brand</button>
+    </div></div>
+  <p class="sponsor-intro">Every brand and agency conversation in one place. Emails to and from your sponsorship contacts land in the log automatically from Zoho Mail; statuses, next steps and rates stay yours to edit. The Google Sheet stays the source of truth.</p>
+  <div id="sponsorNotice" class="notice" role="status" hidden></div>
+  <div id="sponsorSetupHelp" class="notice" hidden>
+    <strong>Connect the sponsorship tracker to activate this tab.</strong>
+    It reads the "Brand Sponsorship Tracker" Google Sheet through the same Apps Script bridge as the content calendar, plus one extra script file.
+    <a href="https://github.com/BrettJosh/Conditioning-Team/blob/main/README.md#sponsorships-tab-brand-deals-with-a-live-email-log-from-zoho-mail" target="_blank" rel="noopener noreferrer">Follow the setup steps in GitHub</a>.
+    <a href="https://app.netlify.com/" target="_blank" rel="noopener noreferrer">Open Netlify settings</a>.
+  </div>
+  <div class="sponsor-stats" id="sponsorStats" aria-label="Pipeline summary"></div>
+  <div class="board-tools sponsor-tools"><div class="project-tabs" id="sponsorViews" role="group" aria-label="Sponsorship views"></div><label class="search-box" aria-label="Search sponsorships"><span>⌕</span><input id="sponsorSearch" type="search" placeholder="Find a brand, agency or email..." autocomplete="off"></label></div>
+  <div class="project-tabs sponsor-filters" id="sponsorFilters" role="group" aria-label="Filter rows"></div>
+  <p id="sponsorMeta" class="sponsor-meta"></p>
+  <div class="sponsor-table-wrap"><table class="sponsor-table" id="sponsorTable" aria-label="Sponsorship records"></table></div>
+</section>
     </main>
   </div>
 
@@ -179,6 +203,28 @@
 <label>Average view duration <input id="calendarAvd" type="text" maxlength="30" placeholder="e.g. 7:30"></label>
 <div class="form-actions"><button class="secondary-btn" id="calendarDelete" type="button" hidden>Remove slot</button><button class="primary-btn" id="calendarSave" type="submit">Save to Google Sheets ↗</button></div>
 </form></aside></div>
+  <div class="overlay" id="sponsorOverlay" hidden><div class="overlay-backdrop" data-sponsor-close></div>
+<aside class="task-drawer sponsor-drawer" role="dialog" aria-modal="true" aria-labelledby="sponsorDrawerTitle"><div class="drawer-top"><span class="overline" id="sponsorDrawerOverline">/ THE DEAL</span><button class="icon-close" data-sponsor-close type="button" aria-label="Close">✕</button></div>
+<h2 id="sponsorDrawerTitle">Brand.</h2><p id="sponsorDrawerMeta" class="sponsor-drawer-meta"></p>
+<form id="sponsorForm" class="task-form"><input type="hidden" id="sponsorId"><input type="hidden" id="sponsorTab">
+<label>Name <input id="sponsorName" type="text" required maxlength="160" placeholder="Brand or agency"></label>
+<div class="form-row"><label>Status <input id="sponsorStatus" type="text" list="sponsorStatusOptions" maxlength="60" placeholder="Pick or type"><datalist id="sponsorStatusOptions"></datalist></label><label>Last activity <input id="sponsorLastActivity" type="date"></label></div>
+<label>What's happening (one line) <textarea id="sponsorSummary" rows="2" maxlength="800"></textarea></label>
+<label data-brand-only>Next step <textarea id="sponsorNextStep" rows="2" maxlength="800" placeholder="What needs to happen next?"></textarea></label>
+<div class="form-row"><label>First contact <input id="sponsorFirstContact" type="date"></label><label data-brand-only>Initiated by <select id="sponsorInitiatedBy"><option value="">—</option><option>Josh</option><option>Brand</option><option>Agency</option></select></label><label data-agency-only>Type <input id="sponsorType" type="text" maxlength="120" placeholder="Sponsorship agency, marketplace…"></label></div>
+<div class="form-row" data-brand-only><label>Via <input id="sponsorVia" type="text" maxlength="200" placeholder="Direct, or the agency"></label><label>Category <input id="sponsorCategory" type="text" maxlength="120"></label></div>
+<div class="form-row" data-brand-only><label>Rate discussed <input id="sponsorRate" type="text" maxlength="300"></label><label>Agreed value (USD) <input id="sponsorAgreedValue" type="number" min="0" step="1" placeholder="Only once signed"></label></div>
+<div data-agency-only class="task-form"><label>Terms / rate on file <input id="sponsorTerms" type="text" maxlength="400"></label><label>Brands brought or mentioned <input id="sponsorBrands" type="text" maxlength="400"></label></div>
+<label>Contact <textarea id="sponsorContact" rows="3" maxlength="1500" placeholder="Name, role, email — one per line. Emails here are what the Zoho sync matches on."></textarea></label>
+<div class="task-notes-block"><div class="task-notes-heading"><label for="sponsorHistory">Full history</label></div><textarea id="sponsorHistory" rows="7" maxlength="6000" placeholder="• 2 Nov: what happened"></textarea></div>
+<div class="form-actions"><span id="sponsorSaveStatus" class="sponsor-save-status" role="status"></span><button class="primary-btn" id="sponsorSave" type="submit">Save to Google Sheets ↗</button></div></form>
+<div class="comments-section" id="sponsorNoteBlock"><div class="comments-title"><h3>Log an email or note</h3><span class="overline">/ KEEP IT CURRENT</span></div>
+<form id="sponsorNoteForm" class="comment-form sponsor-note-form"><div class="form-row"><label>What <select id="sponsorNoteDirection"><option value="in">They wrote to me</option><option value="out">I wrote to them</option><option value="note">Note or decision</option></select></label><label>When <input id="sponsorNoteDate" type="date"></label></div><label for="sponsorNoteText" class="sr-only">What happened</label><textarea id="sponsorNoteText" rows="2" maxlength="1500" placeholder="What happened? Goes to the top of the history and bumps Last activity."></textarea><button class="secondary-btn" type="submit">Add to history ↗</button></form></div>
+<div class="comments-section" id="sponsorEmailsBlock"><div class="comments-title"><h3>Emails <span id="sponsorEmailCount">0</span></h3><span class="overline">/ FROM ZOHO MAIL</span></div><div id="sponsorEmailList" class="comments-list"></div></div>
+</aside></div>
+  <div class="overlay centered-overlay" id="zohoOverlay" hidden><div class="overlay-backdrop" data-zoho-close></div>
+<section class="connection-dialog zoho-dialog" role="dialog" aria-modal="true" aria-labelledby="zohoTitle"><div class="drawer-top"><span class="overline">/ EMAIL SOURCE</span><button class="icon-close" data-zoho-close type="button" aria-label="Close">✕</button></div>
+<span class="connect-sticker" id="zohoSticker">● NOT CONNECTED</span><h2 id="zohoTitle">Connect<br><span class="highlight-inline">Zoho Mail.</span></h2><div id="zohoBody"></div></section></div>
   <div class="overlay centered-overlay" id="connectionOverlay" hidden>
     <div class="overlay-backdrop" data-close-connection></div>
     <section class="connection-dialog" role="dialog" aria-modal="true" aria-labelledby="connectTitle" aria-describedby="connectionStatus">
@@ -197,6 +243,6 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="./app.js" defer></script><script src="./weekly.js" defer></script><script src="./production.js" defer></script><script src="./calendar.js" defer></script>
+  <script src="./app.js" defer></script><script src="./weekly.js" defer></script><script src="./production.js" defer></script><script src="./calendar.js" defer></script><script src="./sponsorships.js" defer></script>
 </body>
 </html>

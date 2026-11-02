@@ -160,3 +160,72 @@ body.local-demo-mode .connection-btn{background:#ffe1df;border-color:#95252e;col
 #connectionOverlay .connection-form .primary-btn{font-size:16px;padding:15px}
 #connectionOverlay .text-btn{display:block;margin:17px auto;color:#6e3637}
 @media(max-width:600px){#connectionOverlay .connection-dialog{padding:23px 20px}.demo-warning{margin:12px auto 0}}
+
+/* Sponsorships: a spreadsheet you can actually read, backed by the Google Sheet. */
+.studio-tabs{flex-wrap:wrap}
+.sponsor-workspace{padding-bottom:90px}
+.sponsor-intro{font-size:14px;line-height:1.6;max-width:880px;color:var(--muted);margin:-2px 0 20px}
+.sponsor-actions{flex-wrap:wrap;justify-content:flex-end}
+.sponsor-sheet-link{display:inline-flex;align-items:center;gap:5px;text-decoration:none;color:var(--ink)}
+.sponsor-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin:0 0 24px}
+.sponsor-stat{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;border:2.3px solid var(--ink);border-radius:16px;padding:16px 17px 14px;background:var(--white);box-shadow:var(--shadow-sm);transition:transform .12s,box-shadow .12s;min-width:0}
+.sponsor-stat:hover{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--ink)}
+.sponsor-stat b{font-size:32px;line-height:1;letter-spacing:-.05em;font-weight:1000}
+.sponsor-stat span{font-size:11px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+.sponsor-stat small{font-size:11px;color:var(--muted);font-weight:700;line-height:1.35;overflow-wrap:anywhere}
+.sponsor-stat-won{background:var(--mint)}.sponsor-stat-you{background:#ffd3d3}.sponsor-stat-them{background:var(--yellow)}.sponsor-stat-cold{background:#ece7dc}.sponsor-stat-mail{background:var(--blue)}
+.sponsor-tools{margin-bottom:12px}
+.sponsor-filters{margin:0 0 10px}
+.sponsor-filters .tab{font-size:11px;padding:7px 11px;background:var(--paper)}
+.sponsor-filters .tab[aria-pressed="true"]{background:var(--pink)}
+.sponsor-meta{color:var(--muted);font-size:11px;font-weight:800;margin:0 0 14px}
+.sponsor-table-wrap{border:2.5px solid var(--ink);border-radius:16px;background:var(--white);box-shadow:var(--shadow);overflow:auto;max-height:min(78vh,1100px);scrollbar-width:thin;scrollbar-color:#c8bdaa transparent}
+.sponsor-table{width:100%;min-width:1040px;border-collapse:separate;border-spacing:0;font-size:12.5px;line-height:1.4}
+.sponsor-table thead th{position:sticky;top:0;z-index:2;background:var(--yellow);border-bottom:2px solid var(--ink);text-align:left;padding:0;font-size:10px;letter-spacing:.09em;text-transform:uppercase;white-space:nowrap}
+.sponsor-table thead th:first-child{border-top-left-radius:13px}.sponsor-table thead th:last-child{border-top-right-radius:13px}
+.sponsor-th{display:block;padding:13px 12px;font-weight:900}
+.sponsor-sort{border:0;background:transparent;padding:13px 12px;font-size:10px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:var(--ink);width:100%;text-align:left}
+.sponsor-sort:hover,.sponsor-sort.active{background:#ffe68d}
+.sponsor-table tbody td{padding:11px 12px;border-bottom:1px solid #e3dccd;vertical-align:top;min-width:0}
+.sponsor-table tbody tr:last-child td{border-bottom:0}
+.sponsor-table tbody tr[data-open]{cursor:pointer}
+.sponsor-table tbody tr[data-open]:hover td,.sponsor-table tbody tr[data-open]:focus-visible td{background:#fff4c9}
+.sponsor-table tbody tr[data-open]:focus-visible{outline:3px solid #2684ff;outline-offset:-3px}
+.sponsor-table tr.is-unmatched td{background:#fff8ec}
+.sponsor-table tr.is-done td{opacity:.55}
+.sponsor-table td.num,.sponsor-table th.num{white-space:nowrap}
+.sponsor-name{min-width:170px;max-width:260px}
+.sponsor-name strong{display:block;font-size:13.5px;letter-spacing:-.02em;line-height:1.3;overflow-wrap:anywhere}
+.sponsor-name small{display:block;color:var(--muted);font-size:10.5px;font-weight:700;margin-top:3px}
+.sponsor-text{max-width:300px;color:#3b3934;overflow-wrap:anywhere}
+.sponsor-snippet{color:var(--muted);max-width:340px}
+.sponsor-pill{display:inline-block;border:1.5px solid var(--ink);border-radius:999px;padding:5px 9px;font-size:10px;font-weight:900;white-space:nowrap;background:#ece7dc}
+.sponsor-pill-you{background:#ffc9c9;border-color:#a33a40}.sponsor-pill-them{background:var(--yellow)}.sponsor-pill-won{background:var(--mint)}.sponsor-pill-live{background:var(--blue)}.sponsor-pill-lost{background:var(--lilac)}.sponsor-pill-cold{background:#ece7dc}.sponsor-pill-quiet{background:#e6cbb6}
+.sponsor-date{display:block;font-weight:800}
+.sponsor-days{display:inline-block;margin-top:4px;font-size:10px;font-weight:900;color:var(--muted);background:#f0ece2;border-radius:6px;padding:2px 6px}
+.sponsor-days.hot{background:#ffc9c9;color:#7f2029}.sponsor-days.muted{background:transparent}
+.sponsor-last{display:inline-block;font-size:10.5px;font-weight:850;border-radius:8px;padding:5px 8px;background:#eef1f6;white-space:nowrap}
+.sponsor-last.in{background:#d2e5fe}.sponsor-last.out{background:#d8f0db}.sponsor-last.warn{background:#ffe1a0}.sponsor-last.none{color:var(--muted);background:transparent;font-style:italic;font-weight:700}
+.sponsor-dir{display:inline-grid;place-items:center;width:26px;height:26px;border:1.5px solid var(--ink);border-radius:8px;font-weight:900;font-size:14px}
+.sponsor-dir.in{background:var(--blue)}.sponsor-dir.out{background:var(--mint)}
+.sponsor-priority{display:inline-block;border-radius:6px;padding:4px 7px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;background:#ece7dc}
+.sponsor-priority.high{background:#ffc9c9}.sponsor-priority.medium{background:var(--yellow)}.sponsor-priority.low{background:#d8f0db}
+.sponsor-check{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;white-space:nowrap;cursor:pointer}
+.sponsor-check input{accent-color:#228a6b;width:16px;height:16px}
+.sponsor-assign{border:1.5px solid var(--ink);border-radius:8px;background:var(--yellow);font-size:11px;font-weight:800;padding:6px 8px;max-width:180px}
+.sponsor-empty{padding:48px 20px!important;text-align:center;color:var(--muted);font-weight:800;border:0!important}
+.sponsor-drawer{width:min(600px,100vw)}
+.sponsor-drawer-meta{font-size:12px;color:var(--muted);font-weight:800;margin:-12px 0 22px}
+.sponsor-save-status{font-size:11px;color:var(--muted);font-weight:750}
+.sponsor-note-form .form-row{margin-bottom:0}
+.sponsor-note-form label{font-size:12px;font-weight:900;display:grid;gap:8px}
+.sponsor-note-form select,.sponsor-note-form input{background:#fffefa;border:1.9px solid var(--ink);border-radius:10px;padding:10px 12px;color:var(--ink);font-size:13px;min-width:0}
+.sponsor-email.in{border-left:5px solid var(--blue)}.sponsor-email.out{border-left:5px solid var(--mint)}
+.zoho-dialog{width:min(620px,calc(100vw - 24px))}
+.zoho-copy{font-size:13px;line-height:1.65;color:#35312d}
+.zoho-copy code,.zoho-dialog .helper-copy code,.connection-status code{background:#fff;border:1px solid #cfc7b5;border-radius:5px;padding:1px 5px;font-size:11px}
+.zoho-dialog .connect-sticker.on{background:var(--mint)}
+.zoho-token-label{display:grid;gap:8px;font-size:12px;font-weight:900;margin:14px 0 10px}
+.zoho-token-label textarea{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;border:1.9px solid var(--ink);border-radius:10px;padding:10px;background:#fffefa;resize:vertical}
+@media(max-width:1100px){.sponsor-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.sponsor-table-wrap{max-height:none}}
+@media(max-width:680px){.sponsor-workspace .workspace-heading{flex-direction:column;align-items:flex-start;gap:12px}.sponsor-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.sponsor-stat{padding:13px}.sponsor-stat b{font-size:26px}.sponsor-actions{justify-content:flex-start}.sponsor-table{min-width:900px;font-size:12px}}

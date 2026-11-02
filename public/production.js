@@ -106,6 +106,7 @@ function boot(){
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('productionDrawer').hidden)closeProject();});
   let tab='weekly';try{tab=sessionStorage.getItem('studio-active-tab')||'weekly';}catch{}
   show(tab==='production'?'production':'weekly');
+  try{sessionStorage.setItem('studio-active-tab',tab);}catch{} // keep the saved tab for the calendar/sponsorship scripts, which restore their own views
 }
 boot();
 })();
