@@ -176,19 +176,19 @@ What you get:
 - **Action list** — the open items from the sheet's Action list tab, with a "Mark done" tick that writes back.
 - **Email log** — every email to or from a sponsorship contact, newest first. Anything the sync couldn't match (a new agency pitching, say) is highlighted with an **Assign to…** picker; assigning also saves that address as a contact so the next email matches on its own.
 
-### A. The Google Sheet (one-time)
+### A. The Google Sheet (done)
 
-1. Upload `Brand_Sponsorship_Tracker_Aug-Oct_2026.xlsx` to Google Drive, open it and choose **File → Save as Google Sheets**.
-2. Name the new Google Sheet exactly **`Brand Sponsorship Tracker`** (the script finds it by name). Alternatively copy its ID from the URL into the script property in step B4.
-3. Keep the tabs **Brands**, **Agencies** and **Action list** as they are: the column headings in **row 4** of Brands and Agencies (and row 3 of Action list) are what the app reads. You can add columns, change statuses and sort rows freely; the first time the app runs it appends an **ID** column to Brands and Agencies and creates two tabs, **Email log** and a hidden **Studio meta**. Leave those alone.
+The script points at the Google Sheet **[Sponsorship outreach 2026](https://docs.google.com/spreadsheets/d/1yvBS7TYPy7v-kQldwYSJAvq4dMuGF1ZUkLP_SKPy_Is/edit)** (the tracker saved as a Google Sheet). Nothing to do unless you move to a different sheet: then either set the script property `STUDIO_SPONSORSHIP_SHEET_ID` (step B4) to the new sheet's ID, or name the new sheet exactly `Brand Sponsorship Tracker`.
+
+Keep the tabs **Brands**, **Agencies** and **Action list** as they are: the column headings in **row 4** of Brands and Agencies (and the `Priority…` heading row of Action list) are what the app reads. You can add columns, change statuses and sort rows freely; the first time the app runs it appends an **ID** column to Brands and Agencies and creates two tabs, **Email log** and a hidden **Studio meta**. Leave those alone.
 
 ### B. Update the Apps Script (one-time, same project as the calendar)
 
 1. Open the **2026-content-plan** Google Sheet → **Extensions → Apps Script**.
 2. Replace the contents of **Code.gs** with [google-apps-script/Code.gs](google-apps-script/Code.gs) from this repository (one routing line was added; the calendar behaves exactly as before).
 3. Add a second file: **＋ → Script**, name it `Sponsorships`, and paste in [google-apps-script/Sponsorships.gs](google-apps-script/Sponsorships.gs). Save.
-4. Optional: **Project Settings → Script properties** → add `STUDIO_SPONSORSHIP_SHEET_ID` = the ID from the tracker sheet's URL. Skip this if the sheet is named `Brand Sponsorship Tracker`.
-5. **Deploy → Manage deployments → ✎ → Version: New version → Deploy.** Google will ask you to re-authorise because the script can now look up a sheet by name (Drive access). The web app URL does not change, so Netlify needs nothing new.
+4. Optional: **Project Settings → Script properties** → add `STUDIO_SPONSORSHIP_SHEET_ID` = the ID from a sheet's URL, only if you ever want a different sheet than *Sponsorship outreach 2026*.
+5. **Deploy → Manage deployments → ✎ → Version: New version → Deploy.** Google may ask you to re-authorise (the script can now open a second sheet, and can look one up in Drive by name as a fallback). The web app URL does not change, so Netlify needs nothing new.
 6. Open the studio site, connect with your workspace code as usual, and choose **Sponsorships**. Press **Refresh** if it was already open.
 
 ### C. Connect Zoho Mail (one-time, about five minutes)
