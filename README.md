@@ -245,10 +245,10 @@ The **Content calendar** colours every entry by where it stands:
 
 - **Yellow — Upcoming**: the date hasn't passed yet.
 - **Orange — Not live yet**: the date has passed and no matching video is on the channel.
-- **Green — Published**: a long-form video (over 3 minutes, so Shorts are ignored) went live on the channel that day, or within 3 days of it, or the entry has a **YouTube link** saved. It shows views, and the entry's drawer shows the thumbnail, views, likes, comments, days live and views per day.
+- **Green — Published**: a long-form video (over 3 minutes, so Shorts are ignored) is matched to the entry, in this order: a saved **YouTube link**; a video published that day; a video on the **same topic** (the plan title and the YouTube title share a key word, e.g. "Steroids age you" ↔ "Why Steroid Users Age So Fast") published up to **14 days either side**; otherwise the nearest upload within 3 days. When the video went out on a different day, the green card moves to that day and says "planned 23 Oct"; the drawer offers **Move this entry to … in the sheet** to make it permanent. The card shows views; the drawer shows the thumbnail, views, likes, comments, days live and views per day.
 - **Dashed card — Live, not in plan**: a long-form upload in 2026 that matches no calendar entry. Click it to add it to the plan.
 
-Each entry also has a **Sponsor** (pick from the brands in the Sponsorship tracker, or type one) and a **Sponsor status**: *In progress*, *Invoiced* or *Paid*. A sponsor named in brackets at the end of the title, e.g. "Crossfit (Shokz)", is suggested automatically. Sponsor, status and YouTube link are saved in the **Studio Metrics** tab of the content-plan sheet (one row per date, alongside the optional 7-day views / CTR / AVD you type in from YouTube Studio).
+Each entry also has a **Sponsor** (pick from the brands in the Sponsorship tracker, or type one) and a **Sponsor status**: *In progress*, *Invoiced* or *Paid*. The sponsor shows on its own card under the video, coloured by status; click it to change the status. A sponsor named in brackets at the end of the title, e.g. "Crossfit (Shokz)", shows as a dashed *suggested* card until you confirm it. Sponsor, status and YouTube link are saved in the **Studio Metrics** tab of the content-plan sheet (one row per date, alongside the optional 7-day views / CTR / AVD you type in from YouTube Studio).
 
 ### One-time setup
 

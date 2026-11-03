@@ -268,3 +268,17 @@ body.local-demo-mode .connection-btn{background:#ffe1df;border-color:#95252e;col
 #calendarSponsorHint:empty{display:none}
 @media(max-width:600px){.cal-yt-card{grid-template-columns:96px 1fr}.cal-yt-card img{width:96px}.cal-yt-stats{grid-template-columns:repeat(2,1fr)}}
 .calendar-event.cal-scheduled:hover{background:#f6d877}.calendar-event.cal-overdue:hover{background:#ffb871}.calendar-event.cal-published:hover{background:#c9f1e2}.calendar-event.cal-extra:hover{background:#f1fbf6}
+/* Sponsor card under the video card */
+.cal-sponsor{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;margin-top:4px;border:1.3px solid var(--ink);border-radius:5px;padding:5px;background:#fffefa;cursor:pointer;line-height:1.2}
+.cal-sponsor:hover{filter:brightness(.96)}
+.cal-sponsor-name{font-size:10px;font-weight:900;overflow-wrap:anywhere}
+.cal-sponsor-status{align-self:flex-start;font-size:8.5px;font-weight:900;letter-spacing:.03em;text-transform:uppercase;border-radius:4px;padding:2px 5px;background:#ece7dc;border:1px solid rgba(0,0,0,.25)}
+.cal-sponsor.sp-paid{background:#e5f7ef}.cal-sponsor.sp-paid .cal-sponsor-status{background:var(--mint);border-color:#2d7f66}
+.cal-sponsor.sp-invoiced{background:#eaf2ff}.cal-sponsor.sp-invoiced .cal-sponsor-status{background:var(--blue);border-color:#3b6fb3}
+.cal-sponsor.sp-in-progress{background:#fff8dc}.cal-sponsor.sp-in-progress .cal-sponsor-status{background:var(--yellow);border-color:#8a6d00}
+.cal-sponsor.sp-none .cal-sponsor-status{background:#ffd3d3;border-color:#a33a40}
+.cal-sponsor.sp-suggested{border-style:dashed;background:transparent;opacity:.85}.cal-sponsor.sp-suggested .cal-sponsor-status{background:transparent;text-transform:none;letter-spacing:0;border:0;padding:0;color:var(--muted)}
+.cal-ev-moved{display:block;font-size:8.5px;font-weight:800;opacity:.7}
+.cal-move-live{margin-top:10px;font-size:12px;padding:9px 12px}
+.cal-sponsor-status{max-width:100%;white-space:normal;overflow-wrap:anywhere;letter-spacing:0;font-size:8px}
+.cal-sponsor-name{font-size:9.5px}

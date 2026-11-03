@@ -12,6 +12,7 @@ const SPONSOR_STATUSES=['In progress','Invoiced','Paid'];
 const notice=(text,error=false)=>{const el=$('calendarNotice');el.hidden=!text;el.textContent=text;el.classList.toggle('error',error)};
 
 /* published = a matching long-form video is live on the channel; otherwise yellow until the day passes, then orange */
+const shownOn=e=>stateOf(e)==='published'&&e.yt?.date&&e.yt.date.startsWith('2026-')?e.yt.date:e.date;
 function stateOf(e){if(e.yt&&e.yt.live!=='upcoming')return'published';return e.date<todayIso()?'overdue':'scheduled'}
 const STATE_LABEL={published:'Published',scheduled:'Upcoming',overdue:'Not live yet'};
 const statusClass=s=>'sp-'+String(s||'none').toLowerCase().replace(/\s+/g,'-');
@@ -22,7 +23,8 @@ async function api(payload){
  const text=await resp.text();let data;try{data=JSON.parse(text)}catch{throw Error(resp.status===502||resp.status===504?'The calendar took too long to answer. Press Refresh.':'Calendar server returned an unexpected response.')}
  if(!resp.ok||!data.ok)throw Error(data.error||'Calendar request failed.');return data;
 }
-function apply(data){state.events=data.events||[];state.youtube=data.youtube||{};state.extras=data.youtube?.extras||[];state.bridgeVersion=Number(data.bridgeVersion)||0;state.loaded=true;render()}
+function apply(data){state.events=data.events||[];state.youtube=data.youtube||{};state.extras=data.youtube?.extras||[];state.bridgeVersion=Number(data.bridgeVersion)||0;state.loaded=true;render();
+ if(!state.brands)loadBrands().then(b=>{if(b&&b.length)render()})}
 async function refresh(){
  if(state.busy)return;state.busy=true;$('calendarRefresh').disabled=true;notice('Loading the content plan from Google Sheets…');
  try{const r=await api({action:'list',fresh:true});apply(r);notice(state.bridgeVersion<2?'Sponsor details and YouTube links need the updated Apps Script: paste the new Code.gs into Studio bridge and deploy a new version.':'');$('calendarSetupHelp').hidden=true;}
@@ -32,10 +34,19 @@ async function refresh(){
 
 /* ---------- rendering ---------- */
 function chip(item){
- const st=stateOf(item),y=item.yt;
+ const st=stateOf(item),y=item.yt,moved=shownOn(item)!==item.date;
  const status=st==='published'?'✓ Published'+(y?'</span><span class="cal-ev-views">'+compact(y.views)+' views':''):st==='overdue'?'! Not live yet':'◷ Upcoming';
- const sponsor=item.sponsor?'<span class="cal-ev-sponsor '+statusClass(item.sponsorStatus)+'">◆ '+esc(item.sponsor)+(item.sponsorStatus?' · '+esc(item.sponsorStatus):'')+'</span>':'';
- return '<button class="calendar-event cal-'+st+'" type="button" draggable="true" data-edit-date="'+item.date+'" title="'+esc(STATE_LABEL[st])+' — drag to reschedule or click to edit"><span class="cal-ev-title">'+esc(item.text)+'</span><span class="cal-ev-state">'+status+'</span>'+sponsor+'</button>';
+ const plannedNote=moved?'<span class="cal-ev-moved">planned '+esc(fmtDay(item.date))+'</span>':'';
+ return '<button class="calendar-event cal-'+st+'" type="button" draggable="true" data-edit-date="'+item.date+'" title="'+esc(STATE_LABEL[st])+' — drag to reschedule or click to edit"><span class="cal-ev-title">'+esc(item.text)+'</span><span class="cal-ev-state">'+status+'</span>'+plannedNote+'</button>'+sponsorCard(item);
+}
+/* The sponsor sits on its own card under the video: name + payment status. A sponsor named in brackets in the
+   title and found in the tracker shows as a dashed "suggested" card until it's saved. */
+function sponsorCard(item){
+ const name=item.sponsor||suggestSponsor(item.text,state.brands||[]);
+ if(!name)return'';
+ const saved=Boolean(item.sponsor),status=saved?(item.sponsorStatus||''):'';
+ const label=saved?(status||'Status not set'):'Suggested · click to confirm';
+ return '<button class="cal-sponsor '+(saved?statusClass(status):'sp-suggested')+'" type="button" data-sponsor-date="'+item.date+'" title="Sponsor — click to update the deal status"><span class="cal-sponsor-name">◆ '+esc(name)+'</span><span class="cal-sponsor-status">'+esc(label)+'</span></button>';
 }
 function extraChip(v){return '<button class="calendar-event cal-extra" type="button" data-extra="'+esc(v.id)+'" title="On YouTube but not in the plan — click to add it"><span class="cal-ev-title">'+esc(v.title)+'</span><span class="cal-ev-state">✓ Live, not in plan</span><span class="cal-ev-views">'+compact(v.views)+' views</span></button>'}
 function renderSummary(list){
@@ -57,7 +68,7 @@ function renderSummary(list){
 }
 function render(){
  const start=state.start,end=Math.min(12,start+3),inRange=d=>{const m=Number(d.slice(5,7))-1;return m>=start&&m<end};
- const list=state.events.filter(e=>inRange(e.date)),extras=state.extras.filter(v=>v.date.startsWith('2026-')&&inRange(v.date));
+ const list=state.events.filter(e=>inRange(shownOn(e))),extras=state.extras.filter(v=>v.date.startsWith('2026-')&&inRange(v.date));
  const months=Array.from({length:end-start},(_,i)=>new Date(2026,start+i,1).toLocaleDateString('en-GB',{month:'long'}));
  $('calendarRange').textContent=months.join(' · ')+' 2026';
  $('calendarPrevious').disabled=start===0;$('calendarNext').disabled=start>=9;
@@ -67,10 +78,10 @@ function render(){
   const heads=['M','T','W','T','F','S','S'].map(x=>'<span>'+x+'</span>').join('');
   const blank=Array.from({length:offset},()=>'<span class="calendar-empty-day"></span>').join('');
   const cells=Array.from({length:days},(_,i)=>{
-    const day=i+1,date=iso(month,day),items=state.events.filter(x=>x.date===date),ext=extras.filter(v=>v.date===date),today=date===todayIso();
+    const day=i+1,date=iso(month,day),items=state.events.filter(x=>shownOn(x)===date),ext=extras.filter(v=>v.date===date),today=date===todayIso(),taken=items.length||state.events.some(x=>x.date===date);
     return '<div class="calendar-day'+(today?' calendar-today':'')+'" data-calendar-date="'+date+'"><span class="calendar-day-number">'+day+'</span>'+
       items.map(chip).join('')+ext.map(extraChip).join('')+
-      (!items.length?'<button class="calendar-empty-add" type="button" data-add-date="'+date+'" aria-label="Schedule a video on '+date+'">＋</button>':'')+'</div>';
+      (!taken?'<button class="calendar-empty-add" type="button" data-add-date="'+date+'" aria-label="Schedule a video on '+date+'">＋</button>':'')+'</div>';
    }).join('');
   return '<section class="calendar-month"><h3>'+name+' <small>2026</small></h3><div class="calendar-weekdays">'+heads+'</div><div class="calendar-days">'+blank+cells+'</div></section>';
  }).join('');
@@ -87,7 +98,7 @@ async function loadBrands(){
 }
 function suggestSponsor(text,brands){
  const m=String(text||'').match(/\(([^)]+)\)\s*$/);if(!m)return'';const hint=m[1].trim().toLowerCase();if(hint.length<2)return'';
- return brands.find(b=>b.toLowerCase()===hint)||brands.find(b=>b.toLowerCase().includes(hint))||brands.find(b=>hint.includes(b.toLowerCase().split(/[\s—–-]+/)[0]))||'';
+ return brands.find(b=>b.toLowerCase()===hint)||brands.find(b=>b.toLowerCase().includes(hint))||brands.find(b=>{const w=b.toLowerCase().split(/[\s—–-]+/)[0];return w.length>=4&&hint.includes(w)})||'';
 }
 function renderYt(e){
  const box=$('calendarYt'),y=e&&e.yt;
@@ -96,7 +107,8 @@ function renderYt(e){
  box.hidden=false;
  box.innerHTML='<a class="cal-yt-card" href="'+esc(y.url)+'" target="_blank" rel="noopener noreferrer">'+(y.thumb?'<img src="'+esc(y.thumb)+'" alt="" loading="lazy">':'')+'<span><strong>'+esc(y.title)+'</strong><small>Published '+esc(fmtDay(y.date))+' · '+age+' day'+(age===1?'':'s')+' live · '+esc(dur(y.seconds))+'</small></span></a>'+
   '<div class="cal-yt-stats"><span><b>'+compact(y.views)+'</b>views</span><span><b>'+compact(y.likes)+'</b>likes</span><span><b>'+compact(y.comments)+'</b>comments</span><span><b>'+compact(age?y.views/age:y.views)+'</b>views / day</span></div>'+
-  '<p class="cal-yt-match">'+(y.matchedBy==='link'?'Linked by the YouTube link below.':y.matchedBy==='date'?'Matched automatically: published on this date.':'Matched automatically: published within 3 days of this date. Wrong video? Paste the right link below.')+'</p>';
+  '<p class="cal-yt-match">'+(y.matchedBy==='link'?'Linked by the YouTube link below.':y.matchedBy==='date'?'Matched automatically: published on this date.':y.matchedBy==='title'?'Matched by topic: planned for '+esc(fmtDay(e.date))+', went out '+esc(fmtDay(y.date))+'. Wrong video? Paste the right link below.':'Matched automatically: published within 3 days of this date. Wrong video? Paste the right link below.')+'</p>'+
+  (y.date!==e.date&&y.date.startsWith('2026-')?'<button type="button" class="quiet-btn cal-move-live" data-move-from="'+esc(e.date)+'" data-move-to="'+esc(y.date)+'">Move this entry to '+esc(fmtDay(y.date))+' in the sheet</button>':'');
 }
 async function showEditor(date=null,extra=null){
  const existing=date?state.events.find(e=>e.date===date):null;
@@ -142,6 +154,8 @@ function boot(){
  $('calendarNext').addEventListener('click',()=>{state.start=Math.min(9,state.start+3);render()});
  $('calendarNew').addEventListener('click',()=>showEditor());
  $('calendarGrid').addEventListener('click',e=>{const edit=e.target.closest('[data-edit-date]'),add=e.target.closest('[data-add-date]'),ext=e.target.closest('[data-extra]');
+  const spon=e.target.closest('[data-sponsor-date]');
+  if(spon){showEditor(spon.dataset.sponsorDate).then(()=>{$('calendarSponsorStatus').scrollIntoView({block:'center'});$('calendarSponsorStatus').focus()});return}
   if(edit)showEditor(edit.dataset.editDate);else if(ext){const v=state.extras.find(x=>x.id===ext.dataset.extra);if(v&&state.events.some(x=>x.date===v.date)){window.open(v.url,'_blank','noopener');}else if(v)showEditor(null,v);}else if(add)showEditor(add.dataset.addDate)});
  $('calendarGrid').addEventListener('dragstart',e=>{const el=e.target.closest('[data-edit-date]');if(el){e.dataTransfer.setData('text/plain',el.dataset.editDate);e.dataTransfer.effectAllowed='move';}});
  $('calendarGrid').addEventListener('dragover',e=>{if(e.target.closest('[data-calendar-date]'))e.preventDefault()});
@@ -151,7 +165,9 @@ function boot(){
   save({action:'save',from:state.from,previousText:state.previousText,date:$('calendarDate').value,text:$('calendarText').value.trim(),
    metrics:{views:$('calendarViews').value,ctr:$('calendarCtr').value,avd:$('calendarAvd').value,sponsor,sponsorStatus:sponsor?$('calendarSponsorStatus').value:'',youtubeUrl:$('calendarYoutube').value.trim()}})});
  $('calendarDelete').addEventListener('click',()=>{if(state.from&&confirm('Remove this publishing slot from the source spreadsheet?'))save({action:'remove',from:state.from,previousText:state.previousText})});
- $('calendarOverlay').addEventListener('click',e=>{if(e.target.closest('[data-calendar-close]'))closeEditor()});
+ $('calendarOverlay').addEventListener('click',async e=>{if(e.target.closest('[data-calendar-close]')){closeEditor();return}
+  const mv=e.target.closest('[data-move-from]');if(!mv)return;mv.disabled=true;
+  try{const item=state.events.find(x=>x.date===mv.dataset.moveFrom);if(item&&!item.youtubeUrl&&item.yt)item.youtubeUrl=item.yt.url;await onMove(mv.dataset.moveFrom,mv.dataset.moveTo);closeEditor()}catch(err){notice(err.message,true);mv.disabled=false}});
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('calendarOverlay').hidden)closeEditor()});
  const previous=sessionStorage.getItem('studio-active-tab');show(previous==='calendar'?'calendar':'weekly');if(previous==='calendar'){$('weeklyWorkspace').hidden=true;$('productionWorkspace').hidden=true;}
 }

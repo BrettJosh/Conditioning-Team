@@ -5,7 +5,8 @@
  * Reads the channel's uploads playlist back to the start of the year, keeps long-form videos
  * (over 3 minutes, so Shorts are ignored) and matches them to calendar entries:
  *   1. a YouTube link saved on the entry, 2. a video published that day (UK time),
- *   3. the nearest unclaimed video within 3 days (for a publish that slipped a day or two).
+ *   3. a video on the same topic (shared title words) up to 14 days either side,
+ *   4. the nearest unclaimed video within 3 days (for a publish that slipped a day or two).
  * Costs a handful of quota units per refresh (the free quota is 10,000 a day); cached for 10 minutes.
  */
 const API = 'https://www.googleapis.com/youtube/v3';
@@ -36,6 +37,19 @@ export function videoIdFrom(text) {
   const m = t.match(/(?:[?&]v=|youtu\.be\/|\/shorts\/|\/live\/|\/embed\/|\/video\/)([A-Za-z0-9_-]{11})/) || t.match(/^([A-Za-z0-9_-]{11})$/);
   return m ? m[1] : '';
 }
+/* Topic matching: the plan title vs the YouTube title, after dropping filler words and the "(Sponsor)" bit. */
+const STOP = new Set('publish published video videos the a an and or of to in on for with why how what when who you your my me i is are was so do does did this that it its we our vs about tbc part ep episode new doc documentary full official trailer just really most more than then from into over after before every can will not no yes they them their there here be been being have has had get got make made one two'.split(' '));
+export function topicWords(text) {
+  return new Set(String(text || '').replace(/\([^)]*\)\s*$/, ' ').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/)
+    .map(w => w.length > 4 && w.endsWith('ies') ? w.slice(0, -3) + 'y' : w.length > 4 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)
+    .filter(w => w.length >= 3 && !STOP.has(w)));
+}
+export function topicScore(planText, videoTitle) {
+  const a = topicWords(planText), b = topicWords(videoTitle);
+  const shared = [...a].filter(w => b.has(w));
+  return shared.length >= 2 || shared.some(w => w.length >= 5) ? shared.length : 0;
+}
+const TITLE_WINDOW = { before: 14, after: 14 };
 export const londonDate = iso => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
 const dayDiff = (a, b) => Math.round((new Date(a + 'T12:00:00Z') - new Date(b + 'T12:00:00Z')) / 86400000);
 
@@ -100,6 +114,19 @@ export async function enrich(events, { fresh = false, prefetched = null } = {}) 
     const v = longform.find(x => !claimed.has(x.id) && x.date === e.date);
     if (v) { claimed.add(v.id); e.yt = { ...v, matchedBy: 'date' }; }
   }
+  // Same topic, published up to 14 days either side (a slipped upload, often with a reworded title).
+  const topical = [];
+  for (const e of events) {
+    if (e.yt || videoIdFrom(e.youtubeUrl)) continue;
+    for (const v of longform) {
+      if (claimed.has(v.id)) continue;
+      const d = dayDiff(v.date, e.date); if (d < -TITLE_WINDOW.before || d > TITLE_WINDOW.after) continue;
+      const score = topicScore(e.text, v.title); if (score) topical.push({ e, v, score, d: Math.abs(d) });
+    }
+  }
+  topical.sort((a, b) => b.score - a.score || a.d - b.d);
+  for (const { e, v } of topical) { if (e.yt || claimed.has(v.id)) continue; claimed.add(v.id); e.yt = { ...v, matchedBy: 'title' }; }
+  // Anything left: the nearest upload within 3 days, whatever its title.
   const pairs = [];
   for (const e of events) {
     if (e.yt || videoIdFrom(e.youtubeUrl)) continue;
