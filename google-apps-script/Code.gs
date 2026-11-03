@@ -12,13 +12,24 @@ function json(o){return ContentService.createTextOutput(JSON.stringify(o)).setMi
 function validDate(x){if(typeof x!=='string'||!/^2026-\d\d-\d\d$/.test(x))return false;const d=new Date(x+'T12:00:00Z');return !isNaN(d)&&d.toISOString().slice(0,10)===x}
 function spot(date){const p=date.split('-').map(Number);return{row:p[2]+1,col:p[1]+1}}
 function main(){const sheet=SpreadsheetApp.openById('1zvaFJCApnz6YFzJCXUtC9BSLW40pR58vyPM7pgSWfB4').getSheetByName(PLAN_SHEET);if(!sheet)throw Error('Content plan tab missing');return sheet}
-function metricsSheet(){const wb=SpreadsheetApp.openById('1zvaFJCApnz6YFzJCXUtC9BSLW40pR58vyPM7pgSWfB4');let sheet=wb.getSheetByName(METRICS_SHEET);if(!sheet){sheet=wb.insertSheet(METRICS_SHEET);sheet.getRange(1,1,1,4).setValues([['Date','Views at 7 days','CTR percent','Average view duration']]);}return sheet}
-function metrics(){const s=SpreadsheetApp.openById('1zvaFJCApnz6YFzJCXUtC9BSLW40pR58vyPM7pgSWfB4').getSheetByName(METRICS_SHEET);const map={};if(s&&s.getLastRow()>1){for(const row of s.getRange(2,1,s.getLastRow()-1,4).getValues()){const date=String(row[0]||'');if(date)map[date]={views:row[1]??'',ctr:row[2]??'',avd:row[3]??''}}}return map}
-function writeMetric(oldDate,date,values,remove){const s=metricsSheet(),end=s.getLastRow();let target=0;
- if(end>1){const rows=s.getRange(2,1,end-1,1).getValues();for(let i=0;i<rows.length;i++){if(String(rows[i][0])===String(oldDate||date)){target=i+2;break}}}
- if(remove){if(target)s.deleteRow(target);return}
- const row=[date,String(values?.views??''),String(values?.ctr??''),String(values?.avd??'')];
- if(target)s.getRange(target,1,1,4).setValues([row]);else s.appendRow(row)
+/** Studio Metrics tab (same spreadsheet): one row per calendar date. Columns are found by their heading, so new ones can be added. */
+const METRIC_FIELDS={views:'Views at 7 days',ctr:'CTR percent',avd:'Average view duration',sponsor:'Sponsor',sponsorStatus:'Sponsor status',youtubeUrl:'YouTube link'};
+const BRIDGE_VERSION=2;
+function metricsSheet(){const wb=SpreadsheetApp.openById('1zvaFJCApnz6YFzJCXUtC9BSLW40pR58vyPM7pgSWfB4');let sheet=wb.getSheetByName(METRICS_SHEET);if(!sheet)sheet=wb.insertSheet(METRICS_SHEET);
+ const width=Math.max(sheet.getLastColumn(),1),head=sheet.getRange(1,1,1,width).getValues()[0].map(h=>String(h||'').trim());
+ if(!head[0]){head[0]='Date';sheet.getRange(1,1).setValue('Date')}
+ Object.keys(METRIC_FIELDS).forEach(k=>{if(head.indexOf(METRIC_FIELDS[k])<0){head.push(METRIC_FIELDS[k]);sheet.getRange(1,head.length).setValue(METRIC_FIELDS[k])}});
+ return{sheet,head}}
+function metrics(){const{sheet,head}=metricsSheet(),last=sheet.getLastRow(),map={};if(last<2)return map;
+ const range=sheet.getRange(2,1,last-1,head.length),raw=range.getValues(),shown=range.getDisplayValues();
+ raw.forEach((r,n)=>{const date=isoDate(r[0]);if(!date)return;const o={};Object.keys(METRIC_FIELDS).forEach(k=>{const i=head.indexOf(METRIC_FIELDS[k]);o[k]=i>0?String(shown[n][i]||''):''});map[date]=o});
+ return map}
+function writeMetric(oldDate,date,values,remove){const{sheet,head}=metricsSheet(),end=sheet.getLastRow(),want=String(oldDate||date);let target=0;
+ if(end>1){const col=sheet.getRange(2,1,end-1,1).getValues();for(let i=0;i<col.length;i++){if(isoDate(col[i][0])===want){target=i+2;break}}}
+ if(remove){if(target)sheet.deleteRow(target);return}
+ const row=target?sheet.getRange(target,1,1,head.length).getDisplayValues()[0]:head.map(()=>'');row[0]=date;
+ Object.keys(METRIC_FIELDS).forEach(k=>{const i=head.indexOf(METRIC_FIELDS[k]);if(i>0&&values&&Object.prototype.hasOwnProperty.call(values,k))row[i]=String(values[k]??'').slice(0,500)});
+ const range=sheet.getRange(target||end+1,1,1,head.length);range.setNumberFormat('@');range.setValues([row]) // stored as plain text so "7:30" and dates stay exactly as typed
 }
 function events(sheet){const data=sheet.getRange('B2:M32').getDisplayValues(),list=[];const metric=metrics();
  for(let m=0;m<12;m++)for(let d=1;d<=31;d++){const day=data[d-1][m];const key='2026-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');if(!validDate(key)||!day.trim())continue;list.push({date:key,text:day,...(metric[key]||{})})}
@@ -30,7 +41,7 @@ function doPost(e){try{const data=JSON.parse(e.postData.contents||'{}'),secret=P
  try{const action=data.action;
   if(String(action||'').indexOf('sponsor')===0)return json(sponsorRequest(data)); // Sponsorships.gs
   const sheet=main();
-  if(action==='list')return json({ok:true,events:events(sheet)});
+  if(action==='list')return json({ok:true,events:events(sheet),bridgeVersion:BRIDGE_VERSION});
   if(action==='save'){
    if(!validDate(data.date)||!String(data.text||'').trim())throw Error('Valid 2026 date and title required.');
    if(data.from&&!validDate(data.from))throw Error('Invalid previous date.');
@@ -39,13 +50,13 @@ function doPost(e){try{const data=JSON.parse(e.postData.contents||'{}'),secret=P
    if(data.from&&data.from!==data.date){const src=spot(data.from),srcRange=sheet.getRange(src.row,src.col);if(String(srcRange.getDisplayValue()||'')!==String(data.previousText||''))throw Error('The source entry changed in Google Sheets. Refresh before moving it.');srcRange.clearContent();}
    if(data.from===data.date&&previous!==String(data.previousText||''))throw Error('This entry changed in Google Sheets. Refresh before saving.');
    dstRange.setValue(String(data.text).slice(0,1500));writeMetric(data.from||data.date,data.date,data.metrics,false);
-   return json({ok:true,events:events(sheet)});
+   return json({ok:true,events:events(sheet),bridgeVersion:BRIDGE_VERSION});
   }
   if(action==='remove'){
    if(!validDate(data.from))throw Error('Valid date required.');
    const src=spot(data.from),cell=sheet.getRange(src.row,src.col);
    if(String(cell.getDisplayValue()||'')!==String(data.previousText||''))throw Error('This entry changed in Google Sheets. Refresh before removing it.');
-   cell.clearContent();writeMetric(data.from,data.from,null,true);return json({ok:true,events:events(sheet)});
+   cell.clearContent();writeMetric(data.from,data.from,null,true);return json({ok:true,events:events(sheet),bridgeVersion:BRIDGE_VERSION});
   }
   throw Error('Unknown calendar action');
  }finally{lock.releaseLock()}

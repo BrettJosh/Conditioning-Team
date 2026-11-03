@@ -365,6 +365,6 @@ function boot() {
   let wasConnected = connected();
   setInterval(() => { const now = connected(); if (now === wasConnected) return; wasConnected = now; s.loaded = false; if (!$('sponsorWorkspace').hidden) refresh(true); }, 1000);
 }
-window.StudioSponsorships = { refresh, runSync };
+window.StudioSponsorships = { refresh, runSync, brandNames: () => (s.loaded && !s.demo ? s.brands.slice().sort((a, b) => (group(a.status) === 'won' ? 0 : 1) - (group(b.status) === 'won' ? 0 : 1) || a.name.localeCompare(b.name)).map(b => b.name) : null) };
 boot();
 })();

@@ -106,7 +106,7 @@
 <section class="workspace calendar-workspace" id="calendarWorkspace" aria-label="2026 content calendar" hidden>
   <div class="workspace-heading"><div><div class="overline">/ PUBLISHING ROADMAP</div><h2>CONTENT <span class="scribble">CALENDAR</span></h2></div>
   <div class="workspace-actions"><button class="quiet-btn" id="calendarRefresh">↻ Refresh</button><a class="quiet-btn calendar-sheet-link" href="https://docs.google.com/spreadsheets/d/1zvaFJCApnz6YFzJCXUtC9BSLW40pR58vyPM7pgSWfB4/edit" target="_blank" rel="noopener">↗ Source sheet</a></div></div>
-  <p class="calendar-intro">Your publishing plan for the rest of 2026. Drag a video onto a new day, or click it to adjust the date and add key metrics. The Google Sheet stays the source of truth.</p>
+  <p class="calendar-intro">Your publishing plan for the rest of 2026. Yellow is coming up, orange is past its date but not on YouTube yet, green is live — detected from your channel automatically. Click a video for its stats, sponsor and payment status; drag it to reschedule. The Google Sheet stays the source of truth.</p>
   <div id="calendarNotice" class="notice" role="status" hidden></div>
   <div id="calendarSetupHelp" class="notice" hidden>
     <strong>Connect your Google Sheet to activate this calendar.</strong>
@@ -194,13 +194,21 @@
   </div>
 
   <div class="overlay" id="calendarOverlay" hidden><div class="overlay-backdrop" data-calendar-close></div>
-<aside class="task-drawer" role="dialog" aria-modal="true" aria-labelledby="calendarEditorTitle"><div class="drawer-top"><span class="overline">/ PUBLISHING SLOT</span><button class="icon-close" data-calendar-close type="button">✕</button></div>
-<h2 id="calendarEditorTitle">Plan a video.</h2><form id="calendarForm" class="task-form">
+<aside class="task-drawer calendar-drawer" role="dialog" aria-modal="true" aria-labelledby="calendarEditorTitle"><div class="drawer-top"><span class="overline">/ PUBLISHING SLOT</span><button class="icon-close" data-calendar-close type="button" aria-label="Close">✕</button></div>
+<h2 id="calendarEditorTitle">Plan a video.</h2><span id="calendarStateBadge" class="cal-state-badge" hidden></span>
+<div id="calendarYt" class="cal-yt" hidden></div>
+<form id="calendarForm" class="task-form">
 <label>Video or publishing note <textarea id="calendarText" rows="3" maxlength="1500" required placeholder="Publish video: Rich Piana"></textarea></label>
 <label>Scheduled publish date <input type="date" id="calendarDate" min="2026-01-01" max="2026-12-31" required></label>
 <p class="calendar-field-hint">Moving an existing video removes the old date entry. Dates already containing another entry cannot be overwritten.</p>
+<fieldset class="cal-fieldset"><legend>◆ Sponsorship</legend>
+<div class="form-row"><label>Sponsor <input id="calendarSponsor" type="text" list="calendarSponsorOptions" maxlength="120" placeholder="None — or pick a brand" autocomplete="off"><datalist id="calendarSponsorOptions"></datalist></label>
+<label>Sponsor status <select id="calendarSponsorStatus"></select></label></div>
+<p class="calendar-field-hint" id="calendarSponsorHint"></p></fieldset>
+<label>YouTube link <input id="calendarYoutube" type="url" maxlength="300" placeholder="Filled in automatically once live — paste a link to override"></label>
+<fieldset class="cal-fieldset"><legend>From YouTube Studio (optional)</legend>
 <div class="form-row"><label>Views (7 days) <input id="calendarViews" type="number" min="0" step="1" placeholder="Optional"></label><label>CTR (%) <input id="calendarCtr" type="number" min="0" max="100" step="0.1" placeholder="Optional"></label></div>
-<label>Average view duration <input id="calendarAvd" type="text" maxlength="30" placeholder="e.g. 7:30"></label>
+<label>Average view duration <input id="calendarAvd" type="text" maxlength="30" placeholder="e.g. 7:30"></label></fieldset>
 <div class="form-actions"><button class="secondary-btn" id="calendarDelete" type="button" hidden>Remove slot</button><button class="primary-btn" id="calendarSave" type="submit">Save to Google Sheets ↗</button></div>
 </form></aside></div>
   <div class="overlay" id="sponsorOverlay" hidden><div class="overlay-backdrop" data-sponsor-close></div>

@@ -237,3 +237,32 @@ Matched emails bump that row's **Last activity** (the sheet's "Days since" formu
 - Row IDs are stored in the ID column: don't clear it, and sort or move rows as you like.
 - Scheduled runs are only visible in the Netlify function logs; the **Zoho Mail** dialog in the app shows the last run, what it added, and the last error if any.
 - A deployment is a snapshot: after any change to Code.gs, **Deploy → Manage deployments → ✎ → New version → Deploy**, or the site keeps talking to the old code.
+
+
+## YouTube on the calendar: published status, stats and sponsors
+
+The **Content calendar** colours every entry by where it stands:
+
+- **Yellow — Upcoming**: the date hasn't passed yet.
+- **Orange — Not live yet**: the date has passed and no matching video is on the channel.
+- **Green — Published**: a long-form video (over 3 minutes, so Shorts are ignored) went live on the channel that day, or within 3 days of it, or the entry has a **YouTube link** saved. It shows views, and the entry's drawer shows the thumbnail, views, likes, comments, days live and views per day.
+- **Dashed card — Live, not in plan**: a long-form upload in 2026 that matches no calendar entry. Click it to add it to the plan.
+
+Each entry also has a **Sponsor** (pick from the brands in the Sponsorship tracker, or type one) and a **Sponsor status**: *In progress*, *Invoiced* or *Paid*. A sponsor named in brackets at the end of the title, e.g. "Crossfit (Shokz)", is suggested automatically. Sponsor, status and YouTube link are saved in the **Studio Metrics** tab of the content-plan sheet (one row per date, alongside the optional 7-day views / CTR / AVD you type in from YouTube Studio).
+
+### One-time setup
+
+1. **Apps Script** — paste the repository's [Code.gs](google-apps-script/Code.gs) into **Studio bridge** (Cmd+A, paste, save), run **studioSelfTest**, then **Deploy → Manage deployments → ✎ → New version → Deploy**. Until then the calendar shows a notice and sponsor details won't save.
+2. **YouTube API key** (public data only, free):
+   1. [Google Cloud console](https://console.cloud.google.com/) → the project linked to Studio bridge → **APIs & Services → Library** → search **YouTube Data API v3** → **Enable**.
+   2. **APIs & Services → Credentials → + Create credentials → API key**. Open the new key → **API restrictions → Restrict key → YouTube Data API v3** → **Save**. Copy the key.
+   3. Netlify → Environment variables: `YOUTUBE_API_KEY` = the key (mark secret). Optional: `YOUTUBE_CHANNEL_HANDLE` if the channel isn't `@brettjosh`. Redeploy.
+3. Open **Content calendar** and press **Refresh**.
+
+Stats are fetched on each Refresh (cached for 10 minutes) and cost a handful of the 10,000 free daily quota units.
+
+**Not included:** CTR, impressions, retention and watch time come from the private YouTube *Analytics* API, which needs the channel owner to sign in. Keep typing those into the drawer from YouTube Studio for now.
+
+### If the sheet tabs suddenly say "Google Sheets returned a page instead of data"
+
+Studio bridge is linked to a Google Cloud project whose consent screen is in **Testing**. Google can make that approval lapse after about 7 days. To fix it: open Studio bridge in Apps Script, choose **studioSelfTest**, press **Run**, approve, then press **Refresh** on the site. Switching the consent screen to **In production** (Google Auth Platform → Audience → Publish app) stops this, at the cost of the "unverified app" warning when approving.
