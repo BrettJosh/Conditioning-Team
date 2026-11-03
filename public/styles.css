@@ -282,3 +282,68 @@ body.local-demo-mode .connection-btn{background:#ffe1df;border-color:#95252e;col
 .cal-move-live{margin-top:10px;font-size:12px;padding:9px 12px}
 .cal-sponsor-status{max-width:100%;white-space:normal;overflow-wrap:anywhere;letter-spacing:0;font-size:8px}
 .cal-sponsor-name{font-size:9.5px}
+
+/* Calendar v3: compact, even cells; detail lives in the "This quarter" list */
+.calendar-day{min-height:78px;padding:4px 4px 6px}
+.calendar-day-number{font-size:10px;line-height:1;padding:2px 2px 0 0}
+.calendar-event{gap:2px;padding:5px 5px 4px 6px;margin-top:4px;border-width:1.2px;border-left-width:4px;border-radius:6px;white-space:normal;overflow-wrap:break-word;word-break:normal;font-size:10px;line-height:1.2}
+.calendar-event.cal-published{background:#dcf5eb;border-color:#1f6f57}
+.calendar-event.cal-scheduled{background:#fff3c4;border-color:#a88400}
+.calendar-event.cal-overdue{background:#ffe3c7;border-color:#b45309}
+.calendar-event.cal-extra{background:#fffefa;border-style:dashed;border-color:#2d7f66}
+.calendar-event.cal-published:hover{background:#c8eedf}.calendar-event.cal-scheduled:hover{background:#fdeba6}.calendar-event.cal-overdue:hover{background:#ffd4ab}.calendar-event.cal-extra:hover{background:#f1fbf6}
+.cal-ev-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:900;font-size:10px;line-height:1.2}
+.cal-ev-meta{display:block;font-size:9px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.8}
+.cal-ev-moved{font-weight:900}
+.cal-sponsor{flex-direction:column;align-items:flex-start;gap:2px;margin-top:3px;padding:3px 5px 4px 6px;border-width:1px;border-left-width:4px;border-radius:6px}
+.cal-sponsor-name{display:block;width:100%;font-size:9px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-sponsor-status{font-size:8px;white-space:nowrap;padding:1px 4px;border-radius:3px;text-transform:none;letter-spacing:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.cal-sponsor.sp-paid{border-color:#1f6f57}.cal-sponsor.sp-invoiced{border-color:#3b6fb3}.cal-sponsor.sp-in-progress{border-color:#a88400}.cal-sponsor.sp-none{border-color:#a33a40}
+.cal-sponsor.sp-suggested{border-color:#8c877d}
+
+.cal-agenda-box{margin-top:28px}
+.cal-agenda-box:empty{display:none}
+.cal-agenda-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.cal-agenda-head h3{margin:0;font-size:24px;letter-spacing:-.04em}
+.cal-agenda-head span{font-size:11px;color:var(--muted);font-weight:800}
+.cal-agenda-wrap{border:2.5px solid var(--ink);border-radius:16px;background:var(--white);box-shadow:var(--shadow);overflow-x:auto}
+.cal-agenda{width:100%;min-width:720px;border-collapse:collapse;font-size:13px}
+.cal-agenda th{background:var(--yellow);border-bottom:2px solid var(--ink);text-align:left;padding:11px 12px;font-size:10px;letter-spacing:.09em;text-transform:uppercase}
+.cal-agenda td{padding:10px 12px;border-bottom:1px solid #e3dccd;vertical-align:middle}
+.cal-agenda tbody tr:last-child td{border-bottom:0}
+.cal-agenda tbody tr{cursor:pointer}
+.cal-agenda tbody tr:hover td,.cal-agenda tbody tr:focus-visible td{background:#fff4c9}
+.cal-agenda td strong{display:block;font-size:13.5px;letter-spacing:-.01em}
+.cal-agenda td small{display:block;color:var(--muted);font-size:11px;font-weight:700;margin-top:3px}
+.cal-a-date{white-space:nowrap;font-weight:850}
+.cal-agenda .num{text-align:right;white-space:nowrap;font-weight:850}
+.cal-agenda .muted{color:#b0a898}
+.cal-pill{display:inline-block;white-space:nowrap;border:1.5px solid var(--ink);border-radius:999px;padding:4px 9px;font-size:10.5px;font-weight:900}
+.cal-pill.cal-published{background:var(--mint)}.cal-pill.cal-scheduled{background:#fbe39a}.cal-pill.cal-overdue{background:#ffc98f}.cal-pill.cal-extra{background:#fffefa;border-style:dashed}
+.cal-a-sponsor{font-weight:900;white-space:nowrap}.cal-a-sponsor.suggested{color:var(--muted);font-style:italic}
+.cal-deal{display:inline-block;white-space:nowrap;border-radius:6px;padding:4px 8px;font-size:10.5px;font-weight:900;border:1.2px solid rgba(0,0,0,.3);background:#ece7dc}
+.cal-deal.sp-paid{background:var(--mint)}.cal-deal.sp-invoiced{background:var(--blue)}.cal-deal.sp-in-progress{background:var(--yellow)}.cal-deal.sp-none{background:#ffd3d3}.cal-deal.sp-suggested{background:transparent;border-style:dashed;color:var(--muted)}
+
+/* Calendar v3.1: one-line cards in the month grids */
+.calendar-day{min-height:70px}
+.calendar-event{padding:4px 5px 4px 6px;border-left-width:3px;gap:1px}
+.cal-ev-title{display:block;-webkit-line-clamp:unset;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
+.cal-ev-meta{font-size:9px}
+.cal-sponsor{flex-direction:row;padding:3px 5px 3px 6px;border-left-width:3px;border-radius:5px;margin-top:3px}
+.cal-sponsor-name{font-size:9px}
+.cal-sponsor.sp-in-progress{background:#fbe39a}.cal-sponsor.sp-invoiced{background:#bcd8ff}.cal-sponsor.sp-paid{background:#a8e8cf}.cal-sponsor.sp-none{background:#ffd3d3}
+.cal-sponsor.sp-suggested{background:transparent;border-style:dashed;color:var(--muted)}
+.cal-key{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:10.5px;font-weight:800;color:var(--muted)}
+.cal-key b{color:var(--ink);font-weight:900;margin-right:2px}
+.cal-key i{display:inline-block;width:12px;height:12px;border-radius:3px;border:1.2px solid rgba(0,0,0,.45);margin-left:6px}
+.cal-key .k-scheduled{background:#fff3c4;border-left:3px solid #a88400}.cal-key .k-overdue{background:#ffe3c7;border-left:3px solid #b45309}.cal-key .k-published{background:#dcf5eb;border-left:3px solid #1f6f57}
+.cal-key .k-in-progress{background:#fbe39a}.cal-key .k-invoiced{background:#bcd8ff}.cal-key .k-paid{background:#a8e8cf}.cal-key .k-suggested{background:transparent;border-style:dashed}
+.cal-key-sep{width:1px;height:14px;background:#cfc7b5;margin:0 6px 0 10px}
+
+/* Calendar v3.2: whole words on up to two lines, more room per day */
+.calendar-grid{gap:12px}
+.calendar-day{padding:3px 3px 5px}
+.calendar-event{padding:3px 4px 3px 5px}
+.cal-ev-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;overflow:hidden;text-overflow:clip;overflow-wrap:normal;word-break:normal;hyphens:auto;-webkit-hyphens:auto;font-size:9.5px;line-height:1.18}
+.cal-sponsor{padding:2px 4px 2px 5px}
+@media(max-width:1380px){.calendar-day{padding:3px 2px 5px}.calendar-event,.cal-sponsor{padding-left:4px;padding-right:3px;border-left-width:2px}.cal-ev-title{font-size:9px}.cal-ev-meta,.cal-sponsor-name{font-size:8.5px}}

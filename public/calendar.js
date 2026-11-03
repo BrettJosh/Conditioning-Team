@@ -33,22 +33,48 @@ async function refresh(){
 }
 
 /* ---------- rendering ---------- */
+/* Short display title: drop the "Publish video -" habit, and the "(Sponsor)" bit when the sponsor tag shows it anyway. */
+function shortTitle(item,sponsorName){
+ let t=String(item.text||'').replace(/^\s*publish(ed)?\s*(video)?\s*[-–—:]?\s*/i,'').trim();
+ if(sponsorName)t=t.replace(/\s*\([^)]*\)\s*$/,'').trim();
+ if(!t||/^video$/i.test(t))t='Untitled video';
+ return t.charAt(0).toUpperCase()+t.slice(1);
+}
+const sponsorOf=item=>item.sponsor?{name:item.sponsor,status:item.sponsorStatus||'',saved:true}:(()=>{const n=suggestSponsor(item.text,state.brands||[]);return n?{name:n,status:'',saved:false}:null})();
+function tooltip(item){
+ const st=stateOf(item),y=item.yt,sp=sponsorOf(item),lines=[item.text,STATE_LABEL[st]+(y?' · '+compact(y.views)+' views':'')];
+ if(shownOn(item)!==item.date)lines.push('Planned '+fmtDay(item.date)+', went out '+fmtDay(shownOn(item)));
+ if(sp)lines.push('Sponsor: '+sp.name+' — '+(sp.saved?(sp.status||'status not set'):'suggested, click to confirm'));
+ return lines.join('\n');
+}
+/* Grid card: two-line title + one meta line. The sponsor is a slim tag right under it, coloured by deal status. */
 function chip(item){
- const st=stateOf(item),y=item.yt,moved=shownOn(item)!==item.date;
- const status=st==='published'?'✓ Published'+(y?'</span><span class="cal-ev-views">'+compact(y.views)+' views':''):st==='overdue'?'! Not live yet':'◷ Upcoming';
- const plannedNote=moved?'<span class="cal-ev-moved">planned '+esc(fmtDay(item.date))+'</span>':'';
- return '<button class="calendar-event cal-'+st+'" type="button" draggable="true" data-edit-date="'+item.date+'" title="'+esc(STATE_LABEL[st])+' — drag to reschedule or click to edit"><span class="cal-ev-title">'+esc(item.text)+'</span><span class="cal-ev-state">'+status+'</span>'+plannedNote+'</button>'+sponsorCard(item);
+ const st=stateOf(item),y=item.yt,sp=sponsorOf(item);
+ const meta=st==='published'?'✓ '+(y?compact(y.views):'Live'):st==='overdue'?'! Not live':'◷ Soon';
+ return '<button class="calendar-event cal-'+st+'" type="button" draggable="true" data-edit-date="'+item.date+'" title="'+esc(tooltip(item))+'"><span class="cal-ev-title">'+esc(shortTitle(item,sp&&sp.name))+'</span><span class="cal-ev-meta">'+meta+(shownOn(item)!==item.date?' <span class="cal-ev-moved">↪</span>':'')+'</span></button>'+sponsorTag(item,sp);
 }
-/* The sponsor sits on its own card under the video: name + payment status. A sponsor named in brackets in the
-   title and found in the tracker shows as a dashed "suggested" card until it's saved. */
-function sponsorCard(item){
- const name=item.sponsor||suggestSponsor(item.text,state.brands||[]);
- if(!name)return'';
- const saved=Boolean(item.sponsor),status=saved?(item.sponsorStatus||''):'';
- const label=saved?(status||'Status not set'):'Suggested · click to confirm';
- return '<button class="cal-sponsor '+(saved?statusClass(status):'sp-suggested')+'" type="button" data-sponsor-date="'+item.date+'" title="Sponsor — click to update the deal status"><span class="cal-sponsor-name">◆ '+esc(name)+'</span><span class="cal-sponsor-status">'+esc(label)+'</span></button>';
+function sponsorTag(item,sp){
+ if(!sp)return'';
+ const label=sp.saved?(sp.status||'No status'):'Suggested — click to confirm';
+ return '<button class="cal-sponsor '+(sp.saved?statusClass(sp.status):'sp-suggested')+'" type="button" data-sponsor-date="'+item.date+'" title="'+esc('Sponsor: '+sp.name+' — '+label)+'" aria-label="'+esc('Sponsor '+sp.name+', '+label)+'"><span class="cal-sponsor-name">◆ '+esc(sp.name)+(sp.saved?'':' ?')+'</span></button>';
 }
-function extraChip(v){return '<button class="calendar-event cal-extra" type="button" data-extra="'+esc(v.id)+'" title="On YouTube but not in the plan — click to add it"><span class="cal-ev-title">'+esc(v.title)+'</span><span class="cal-ev-state">✓ Live, not in plan</span><span class="cal-ev-views">'+compact(v.views)+' views</span></button>'}
+function extraChip(v){return '<button class="calendar-event cal-extra" type="button" data-extra="'+esc(v.id)+'" title="'+esc(v.title+'\nOn YouTube but not in the plan · '+compact(v.views)+' views — click to add it')+'"><span class="cal-ev-title">'+esc(v.title)+'</span><span class="cal-ev-meta">✓ '+compact(v.views)+' · unplanned</span></button>'}
+
+/* The readable version: one row per video in the quarter. */
+const pillFor=st=>'<span class="cal-pill cal-'+st+'">'+(st==='published'?'✓ Published':st==='overdue'?'! Not live yet':st==='extra'?'✓ Live, not planned':'◷ Upcoming')+'</span>';
+function renderAgenda(list,extras){
+ const rows=[...list.map(e=>({kind:'plan',e,date:shownOn(e)})),...extras.map(v=>({kind:'extra',v,date:v.date}))].sort((a,b)=>a.date.localeCompare(b.date));
+ if(!rows.length){$('calendarAgenda').innerHTML='';return}
+ const dayLabel=d=>new Date(d+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+ $('calendarAgenda').innerHTML='<div class="cal-agenda-head"><h3>This quarter</h3><span>'+rows.length+' video'+(rows.length===1?'':'s')+' · click a row to open it</span></div><div class="cal-agenda-wrap"><table class="cal-agenda"><thead><tr><th>Date</th><th>Video</th><th>Status</th><th class="num">Views</th><th>Sponsor</th><th>Deal</th></tr></thead><tbody>'+
+  rows.map(r=>{
+   if(r.kind==='extra'){const v=r.v;return '<tr data-extra="'+esc(v.id)+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(v.date))+'</td><td><strong>'+esc(v.title)+'</strong><small>On YouTube, not in the plan</small></td><td>'+pillFor('extra')+'</td><td class="num">'+compact(v.views)+'</td><td class="muted">—</td><td></td></tr>'}
+   const e=r.e,st=stateOf(e),sp=sponsorOf(e),y=e.yt,moved=r.date!==e.date;
+   const sub=[y&&y.title&&y.title.toLowerCase()!==String(e.text).toLowerCase()?'YouTube: '+y.title:'',moved?'Planned '+fmtDay(e.date):''].filter(Boolean).join(' · ');
+   const deal=sp?(sp.saved?'<span class="cal-deal '+statusClass(sp.status)+'">'+esc(sp.status||'No status')+'</span>':'<span class="cal-deal sp-suggested">Confirm?</span>'):'';
+   return '<tr data-edit-date="'+e.date+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(r.date))+'</td><td><strong>'+esc(shortTitle(e,sp&&sp.name))+'</strong>'+(sub?'<small>'+esc(sub)+'</small>':'')+'</td><td>'+pillFor(st)+'</td><td class="num">'+(y?compact(y.views):'<span class="muted">—</span>')+'</td><td>'+(sp?'<span class="cal-a-sponsor'+(sp.saved?'':' suggested')+'" data-sponsor-date="'+e.date+'">◆ '+esc(sp.name)+'</span>':'<span class="muted">—</span>')+'</td><td>'+deal+'</td></tr>';
+  }).join('')+'</tbody></table></div>';
+}
 function renderSummary(list){
  const pub=list.filter(e=>stateOf(e)==='published'),up=list.filter(e=>stateOf(e)==='scheduled'),late=list.filter(e=>stateOf(e)==='overdue');
  const views=pub.reduce((n,e)=>n+(e.yt?.views||0),0),sp=list.filter(e=>e.sponsor);
@@ -64,7 +90,8 @@ function renderSummary(list){
  const ytLine=!y.configured?'<span class="cal-yt-note">Connect YouTube to mark videos published automatically — see the README (“YouTube on the calendar”).</span>'
   :y.error?'<span class="cal-yt-note error">YouTube: '+esc(y.error)+'</span>'
   :'<span class="cal-yt-note">YouTube: '+esc(y.channel?.title||'')+' · '+compact(y.channel?.subscribers)+' subscribers · updated on Refresh</span>';
- $('calendarSummary').innerHTML='<div class="cal-sum-row">'+pills+'</div>'+ytLine;
+ const key='<span class="cal-key"><b>Key</b><i class="k-scheduled"></i>Upcoming<i class="k-overdue"></i>Not live yet<i class="k-published"></i>Published<span class="cal-key-sep"></span><b>◆ Sponsor deal</b><i class="k-in-progress"></i>In progress<i class="k-invoiced"></i>Invoiced<i class="k-paid"></i>Paid<i class="k-suggested"></i>Suggested</span>';
+ $('calendarSummary').innerHTML='<div class="cal-sum-row">'+pills+'</div>'+key+ytLine;
 }
 function render(){
  const start=state.start,end=Math.min(12,start+3),inRange=d=>{const m=Number(d.slice(5,7))-1;return m>=start&&m<end};
@@ -85,6 +112,7 @@ function render(){
    }).join('');
   return '<section class="calendar-month"><h3>'+name+' <small>2026</small></h3><div class="calendar-weekdays">'+heads+'</div><div class="calendar-days">'+blank+cells+'</div></section>';
  }).join('');
+ renderAgenda(list,extras);
 }
 
 /* ---------- editor ---------- */
@@ -153,10 +181,12 @@ function boot(){
  $('calendarPrevious').addEventListener('click',()=>{state.start=Math.max(0,state.start-3);render()});
  $('calendarNext').addEventListener('click',()=>{state.start=Math.min(9,state.start+3);render()});
  $('calendarNew').addEventListener('click',()=>showEditor());
- $('calendarGrid').addEventListener('click',e=>{const edit=e.target.closest('[data-edit-date]'),add=e.target.closest('[data-add-date]'),ext=e.target.closest('[data-extra]');
+ const onPick=e=>{const edit=e.target.closest('[data-edit-date]'),add=e.target.closest('[data-add-date]'),ext=e.target.closest('[data-extra]');
   const spon=e.target.closest('[data-sponsor-date]');
   if(spon){showEditor(spon.dataset.sponsorDate).then(()=>{$('calendarSponsorStatus').scrollIntoView({block:'center'});$('calendarSponsorStatus').focus()});return}
-  if(edit)showEditor(edit.dataset.editDate);else if(ext){const v=state.extras.find(x=>x.id===ext.dataset.extra);if(v&&state.events.some(x=>x.date===v.date)){window.open(v.url,'_blank','noopener');}else if(v)showEditor(null,v);}else if(add)showEditor(add.dataset.addDate)});
+  if(edit)showEditor(edit.dataset.editDate);else if(ext){const v=state.extras.find(x=>x.id===ext.dataset.extra);if(v&&state.events.some(x=>x.date===v.date)){window.open(v.url,'_blank','noopener');}else if(v)showEditor(null,v);}else if(add)showEditor(add.dataset.addDate)};
+ $('calendarGrid').addEventListener('click',onPick);$('calendarAgenda').addEventListener('click',onPick);
+ $('calendarAgenda').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('tr'))onPick(e)});
  $('calendarGrid').addEventListener('dragstart',e=>{const el=e.target.closest('[data-edit-date]');if(el){e.dataTransfer.setData('text/plain',el.dataset.editDate);e.dataTransfer.effectAllowed='move';}});
  $('calendarGrid').addEventListener('dragover',e=>{if(e.target.closest('[data-calendar-date]'))e.preventDefault()});
  $('calendarGrid').addEventListener('drop',async e=>{const day=e.target.closest('[data-calendar-date]');if(!day)return;e.preventDefault();const from=e.dataTransfer.getData('text/plain');if(!from)return;try{await onMove(from,day.dataset.calendarDate)}catch(err){notice(err.message,true)}});
