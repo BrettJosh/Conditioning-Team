@@ -145,6 +145,8 @@ No production database or existing Notion credentials need changing. The server-
 
 The app now includes a **Content calendar** tab displaying three months at a time (October–December initially). It reads the existing Google Sheet [2026-content-plan](https://docs.google.com/spreadsheets/d/1zvaFJCApnz6YFzJCXUtC9BSLW40pR58vyPM7pgSWfB4/edit), tab **2026 Content Plan** (month columns B–M, day rows 2–32). Click an entry to edit it, or drag the entry to an empty day to reschedule. Moving clears the original date cell. Clicking an empty day plans a new video. Existing populated target dates are protected from accidental overwrite.
 
+**Planning ahead (2027 and beyond):** press **Later →** to keep going past December — the calendar runs from January 2026 to December 2030, one quarter at a time, and **Back to this quarter** jumps home. Each year lives in its own tab of the same spreadsheet: the first time a video is saved into a new year, the bridge copies the **2026 Content Plan** layout into a fresh **2027 Content Plan** tab (entries cleared, the year label updated). Videos can be dragged or re-dated across years. Saving into 2027+ needs bridge version 3 or newer — the calendar says so if the deployed `Code.gs` is older.
+
 **One-time setup:**
 
 1. Open the Google Sheet. Select **Extensions → Apps Script**. In the editor, replace the starter script with the contents of [google-apps-script/Code.gs](google-apps-script/Code.gs) in this repository. Save the project.

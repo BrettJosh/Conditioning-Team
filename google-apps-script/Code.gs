@@ -1,20 +1,32 @@
 /**
- * Josh Brett Studio Content Calendar, backed by existing 2026-content-plan Google Sheet.
- * Paste this code into a bound Google Apps Script project for that spreadsheet.
+ * Josh Brett Studio Content Calendar, backed by the 2026-content-plan Google Sheet.
+ * One tab per year: "2026 Content Plan", "2027 Content Plan", … (months in columns B–M, days in rows 2–32).
+ * A later year's tab is created the first time a video is saved into it, as a copy of the 2026 layout without entries.
  * In Apps Script Project Settings, create Script property STUDIO_CALENDAR_SECRET.
  * Deploy as Web app, execute as Me, access Anyone. Keep the URL and secret in Netlify only.
  * ONE file holds everything: the content calendar (top) and the Sponsorships tab (below).
  * Actions whose name starts with "sponsor" are routed to sponsorRequest() further down.
  */
-const PLAN_SHEET='2026 Content Plan';
+const PLAN_BOOK='1zvaFJCApnz6YFzJCXUtC9BSLW40pR58vyPM7pgSWfB4';
+const FIRST_YEAR=2026,LAST_YEAR=2030;
+const planTab=y=>y+' Content Plan';
 const METRICS_SHEET='Studio Metrics';
 function json(o){return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON)}
-function validDate(x){if(typeof x!=='string'||!/^2026-\d\d-\d\d$/.test(x))return false;const d=new Date(x+'T12:00:00Z');return !isNaN(d)&&d.toISOString().slice(0,10)===x}
+function validDate(x){if(typeof x!=='string'||!/^\d{4}-\d\d-\d\d$/.test(x))return false;const y=Number(x.slice(0,4));if(y<FIRST_YEAR||y>LAST_YEAR)return false;const d=new Date(x+'T12:00:00Z');return !isNaN(d)&&d.toISOString().slice(0,10)===x}
 function spot(date){const p=date.split('-').map(Number);return{row:p[2]+1,col:p[1]+1}}
-function main(){const sheet=SpreadsheetApp.openById('1zvaFJCApnz6YFzJCXUtC9BSLW40pR58vyPM7pgSWfB4').getSheetByName(PLAN_SHEET);if(!sheet)throw Error('Content plan tab missing');return sheet}
+function planSheet(year,create){
+ const wb=SpreadsheetApp.openById(PLAN_BOOK);let sheet=wb.getSheetByName(planTab(year));
+ if(sheet||!create)return sheet;
+ const base=wb.getSheetByName(planTab(FIRST_YEAR));if(!base)throw Error('The "'+planTab(FIRST_YEAR)+'" tab is missing.');
+ sheet=base.copyTo(wb).setName(planTab(year));
+ sheet.getRange('B2:M32').clearContent();
+ const head=sheet.getRange(1,1,1,13),labels=head.getDisplayValues()[0];
+ if(labels.some(v=>String(v).indexOf(String(FIRST_YEAR))>=0))head.setValues([labels.map(v=>String(v).split(String(FIRST_YEAR)).join(String(year)))]);
+ return sheet}
+function main(){const sheet=planSheet(FIRST_YEAR,false);if(!sheet)throw Error('Content plan tab missing');return sheet}
 /** Studio Metrics tab (same spreadsheet): one row per calendar date. Columns are found by their heading, so new ones can be added. */
 const METRIC_FIELDS={views:'Views at 7 days',ctr:'CTR percent',avd:'Average view duration',sponsor:'Sponsor',sponsorStatus:'Sponsor status',youtubeUrl:'YouTube link'};
-const BRIDGE_VERSION=2;
+const BRIDGE_VERSION=3;
 function metricsSheet(){const wb=SpreadsheetApp.openById('1zvaFJCApnz6YFzJCXUtC9BSLW40pR58vyPM7pgSWfB4');let sheet=wb.getSheetByName(METRICS_SHEET);if(!sheet)sheet=wb.insertSheet(METRICS_SHEET);
  const width=Math.max(sheet.getLastColumn(),1),head=sheet.getRange(1,1,1,width).getValues()[0].map(h=>String(h||'').trim());
  if(!head[0]){head[0]='Date';sheet.getRange(1,1).setValue('Date')}
@@ -31,32 +43,36 @@ function writeMetric(oldDate,date,values,remove){const{sheet,head}=metricsSheet(
  Object.keys(METRIC_FIELDS).forEach(k=>{const i=head.indexOf(METRIC_FIELDS[k]);if(i>0&&values&&Object.prototype.hasOwnProperty.call(values,k))row[i]=String(values[k]??'').slice(0,500)});
  const range=sheet.getRange(target||end+1,1,1,head.length);range.setNumberFormat('@');range.setValues([row]) // stored as plain text so "7:30" and dates stay exactly as typed
 }
-function events(sheet){const data=sheet.getRange('B2:M32').getDisplayValues(),list=[];const metric=metrics();
- for(let m=0;m<12;m++)for(let d=1;d<=31;d++){const day=data[d-1][m];const key='2026-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');if(!validDate(key)||!day.trim())continue;list.push({date:key,text:day,...(metric[key]||{})})}
+function events(){const metric=metrics(),list=[];
+ for(let y=FIRST_YEAR;y<=LAST_YEAR;y++){const sheet=planSheet(y,false);if(!sheet)continue;const data=sheet.getRange('B2:M32').getDisplayValues();
+  for(let m=0;m<12;m++)for(let d=1;d<=31;d++){const day=data[d-1][m];const key=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');if(!validDate(key)||!day.trim())continue;list.push({date:key,text:day,...(metric[key]||{})})}}
  return list
 }
 function doPost(e){try{const data=JSON.parse(e.postData.contents||'{}'),secret=PropertiesService.getScriptProperties().getProperty('STUDIO_CALENDAR_SECRET');
  if(!secret||data.secret!==secret)return json({ok:false,error:'Incorrect calendar secret.'});
  const lock=LockService.getScriptLock();lock.waitLock(15000);
  try{const action=data.action;
-  if(String(action||'').indexOf('sponsor')===0)return json(sponsorRequest(data)); // Sponsorships.gs
-  const sheet=main();
-  if(action==='list')return json({ok:true,events:events(sheet),bridgeVersion:BRIDGE_VERSION});
+  if(String(action||'').indexOf('sponsor')===0)return json(sponsorRequest(data)); // sponsorships, further down
+  main();
+  const done=()=>json({ok:true,events:events(),bridgeVersion:BRIDGE_VERSION,years:{first:FIRST_YEAR,last:LAST_YEAR}});
+  if(action==='list')return done();
   if(action==='save'){
-   if(!validDate(data.date)||!String(data.text||'').trim())throw Error('Valid 2026 date and title required.');
+   if(!validDate(data.date)||!String(data.text||'').trim())throw Error('A date between '+FIRST_YEAR+' and '+LAST_YEAR+' and a title are required.');
    if(data.from&&!validDate(data.from))throw Error('Invalid previous date.');
-   const dst=spot(data.date),dstRange=sheet.getRange(dst.row,dst.col),previous=String(dstRange.getDisplayValue()||'');
+   const dstSheet=planSheet(Number(data.date.slice(0,4)),true);
+   const dst=spot(data.date),dstRange=dstSheet.getRange(dst.row,dst.col),previous=String(dstRange.getDisplayValue()||'');
    if(data.from!==data.date&&previous.trim())throw Error('The destination day already has a plan. Select another day or edit that existing slot.');
-   if(data.from&&data.from!==data.date){const src=spot(data.from),srcRange=sheet.getRange(src.row,src.col);if(String(srcRange.getDisplayValue()||'')!==String(data.previousText||''))throw Error('The source entry changed in Google Sheets. Refresh before moving it.');srcRange.clearContent();}
+   if(data.from&&data.from!==data.date){const srcSheet=planSheet(Number(data.from.slice(0,4)),false);const src=spot(data.from),srcRange=srcSheet&&srcSheet.getRange(src.row,src.col);if(!srcRange||String(srcRange.getDisplayValue()||'')!==String(data.previousText||''))throw Error('The source entry changed in Google Sheets. Refresh before moving it.');srcRange.clearContent();}
    if(data.from===data.date&&previous!==String(data.previousText||''))throw Error('This entry changed in Google Sheets. Refresh before saving.');
    dstRange.setValue(String(data.text).slice(0,1500));writeMetric(data.from||data.date,data.date,data.metrics,false);
-   return json({ok:true,events:events(sheet),bridgeVersion:BRIDGE_VERSION});
+   return done();
   }
   if(action==='remove'){
    if(!validDate(data.from))throw Error('Valid date required.');
-   const src=spot(data.from),cell=sheet.getRange(src.row,src.col);
+   const srcSheet=planSheet(Number(data.from.slice(0,4)),false);if(!srcSheet)throw Error('That entry is no longer in Google Sheets. Refresh.');
+   const src=spot(data.from),cell=srcSheet.getRange(src.row,src.col);
    if(String(cell.getDisplayValue()||'')!==String(data.previousText||''))throw Error('This entry changed in Google Sheets. Refresh before removing it.');
-   cell.clearContent();writeMetric(data.from,data.from,null,true);return json({ok:true,events:events(sheet),bridgeVersion:BRIDGE_VERSION});
+   cell.clearContent();writeMetric(data.from,data.from,null,true);return done();
   }
   throw Error('Unknown calendar action');
  }finally{lock.releaseLock()}

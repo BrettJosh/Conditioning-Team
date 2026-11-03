@@ -14,7 +14,7 @@ export default async function handler(request){
  let data;try{data=await request.json();}catch{return fail('Invalid request JSON.');}
  const action=String(data.action||'');
  if(!['list','save','remove'].includes(action))return fail('Unsupported calendar action.');
- const validDate=d=>typeof d==='string'&&/^2026-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(d)&&new Date(d+'T12:00:00Z').toISOString().slice(0,10)===d;
+ const validDate=d=>typeof d==='string'&&/^20(2[6-9]|30)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(d)&&new Date(d+'T12:00:00Z').toISOString().slice(0,10)===d; // 2026–2030
  if(['save','remove'].includes(action)&&data.from&&!validDate(data.from))return fail('Invalid source date.');
  if(action==='save'&&(!validDate(data.date)||!String(data.text||'').trim()||String(data.text).length>1500))return fail('A valid date and title are required.');
  const payload={action,from:data.from||null,previousText:String(data.previousText??''),date:data.date,text:data.text};

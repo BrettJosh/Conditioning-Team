@@ -1,9 +1,14 @@
 (()=>{
 'use strict';
 const $=id=>document.getElementById(id);
-const state={events:[],extras:[],youtube:{},bridgeVersion:0,start:9,loaded:false,busy:false,from:null,previousText:'',brands:null,editing:null};
+const state={events:[],extras:[],youtube:{},bridgeVersion:0,start:null,loaded:false,busy:false,from:null,previousText:'',brands:null,editing:null};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const iso=(m,d)=>'2026-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+/* Months are counted from January 2026 (0) so the quarter view can run on into later years; one sheet tab per year. */
+const FIRST_YEAR=2026,LAST_YEAR=2030,MAX_START=(LAST_YEAR-FIRST_YEAR)*12+9;
+const yearOf=abs=>FIRST_YEAR+Math.floor(abs/12),monthOf=abs=>abs%12;
+const iso=(abs,d)=>yearOf(abs)+'-'+String(monthOf(abs)+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+const absOf=date=>(Number(date.slice(0,4))-FIRST_YEAR)*12+Number(date.slice(5,7))-1;
+const currentQuarterStart=()=>{const a=absOf(new Date().toLocaleDateString('en-CA'));return Math.min(MAX_START,Math.max(0,a-a%3))};
 const todayIso=()=>new Date().toLocaleDateString('en-CA');
 const compact=n=>new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:1}).format(Number(n)||0);
 const fmtDay=d=>new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});
@@ -12,7 +17,7 @@ const SPONSOR_STATUSES=['In progress','Invoiced','Paid'];
 const notice=(text,error=false)=>{const el=$('calendarNotice');el.hidden=!text;el.textContent=text;el.classList.toggle('error',error)};
 
 /* published = a matching long-form video is live on the channel; otherwise yellow until the day passes, then orange */
-const shownOn=e=>stateOf(e)==='published'&&e.yt?.date&&e.yt.date.startsWith('2026-')?e.yt.date:e.date;
+const shownOn=e=>stateOf(e)==='published'&&e.yt?.date&&e.yt.date>=FIRST_YEAR+'-01-01'?e.yt.date:e.date;
 function stateOf(e){if(e.yt&&e.yt.live!=='upcoming')return'published';return e.date<todayIso()?'overdue':'scheduled'}
 const STATE_LABEL={published:'Published',scheduled:'Upcoming',overdue:'Not live yet'};
 const statusClass=s=>'sp-'+String(s||'none').toLowerCase().replace(/\s+/g,'-');
@@ -27,7 +32,7 @@ function apply(data){state.events=data.events||[];state.youtube=data.youtube||{}
  if(!state.brands)loadBrands().then(b=>{if(b&&b.length)render()})}
 async function refresh(){
  if(state.busy)return;state.busy=true;$('calendarRefresh').disabled=true;notice('Loading the content plan from Google Sheets…');
- try{const r=await api({action:'list',fresh:true});apply(r);notice(state.bridgeVersion<2?'Sponsor details and YouTube links need the updated Apps Script: paste the new Code.gs into Studio bridge and deploy a new version.':'');$('calendarSetupHelp').hidden=true;}
+ try{const r=await api({action:'list',fresh:true});apply(r);notice(state.bridgeVersion<3?'Sponsor details, YouTube links and planning into 2027 need the updated Apps Script: paste the new Code.gs into Studio bridge and deploy a new version.':'');$('calendarSetupHelp').hidden=true;}
  catch(e){notice(e.message,true);const needsSetup=/not configured|calendar readme|apps script url|connection is not configured/i.test(e.message);$('calendarSetupHelp').hidden=!needsSetup;if(!state.loaded){$('calendarGrid').innerHTML='<div class="calendar-empty">Your content plan is still safely stored in Google Sheets. Connect the calendar integration to view and edit it here.</div>';}}
  finally{state.busy=false;$('calendarRefresh').disabled=false}
 }
@@ -67,7 +72,7 @@ function renderAgenda(list,extras){
  const rows=[...list.map(e=>({kind:'plan',e,date:shownOn(e)})),...extras.map(v=>({kind:'extra',v,date:v.date}))].sort((a,b)=>a.date.localeCompare(b.date));
  if(!rows.length){$('calendarAgenda').innerHTML='';return}
  const dayLabel=d=>new Date(d+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
- $('calendarAgenda').innerHTML='<div class="cal-agenda-head"><h3>This quarter</h3><span>'+rows.length+' video'+(rows.length===1?'':'s')+' · click a row to open it</span></div><div class="cal-agenda-wrap"><table class="cal-agenda"><thead><tr><th>Date</th><th>Video</th><th>Status</th><th class="num">Views</th><th>Sponsor</th><th>Deal</th></tr></thead><tbody>'+
+ $('calendarAgenda').innerHTML='<div class="cal-agenda-head"><h3>'+(state.start===currentQuarterStart()?'This quarter':esc($('calendarRange').textContent))+'</h3><span>'+rows.length+' video'+(rows.length===1?'':'s')+' · click a row to open it</span></div><div class="cal-agenda-wrap"><table class="cal-agenda"><thead><tr><th>Date</th><th>Video</th><th>Status</th><th class="num">Views</th><th>Sponsor</th><th>Deal</th></tr></thead><tbody>'+
   rows.map(r=>{
    if(r.kind==='extra'){const v=r.v;return '<tr data-extra="'+esc(v.id)+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(v.date))+'</td><td><strong>'+esc(v.title)+'</strong><small>On YouTube, not in the plan</small></td><td>'+pillFor('extra')+'</td><td class="num">'+compact(v.views)+'</td><td class="muted">—</td><td></td></tr>'}
    const e=r.e,st=stateOf(e),sp=sponsorOf(e),y=e.yt,moved=r.date!==e.date;
@@ -95,14 +100,16 @@ function renderSummary(list){
  $('calendarSummary').innerHTML='<div class="cal-sum-row">'+pills+'</div>'+key+ytLine;
 }
 function render(){
- const start=state.start,end=Math.min(12,start+3),inRange=d=>{const m=Number(d.slice(5,7))-1;return m>=start&&m<end};
- const list=state.events.filter(e=>inRange(shownOn(e))),extras=state.extras.filter(v=>v.date.startsWith('2026-')&&inRange(v.date));
- const months=Array.from({length:end-start},(_,i)=>new Date(2026,start+i,1).toLocaleDateString('en-GB',{month:'long'}));
- $('calendarRange').textContent=months.join(' · ')+' 2026';
- $('calendarPrevious').disabled=start===0;$('calendarNext').disabled=start>=9;
+ if(state.start==null)state.start=currentQuarterStart();
+ const start=state.start,end=start+3,inRange=d=>{const a=absOf(d);return a>=start&&a<end};
+ const list=state.events.filter(e=>inRange(shownOn(e))),extras=state.extras.filter(v=>v.date>=FIRST_YEAR+'-01-01'&&inRange(v.date));
+ const months=Array.from({length:3},(_,i)=>new Date(yearOf(start+i),monthOf(start+i),1).toLocaleDateString('en-GB',{month:'long'}));
+ $('calendarRange').textContent=months.join(' · ')+' '+yearOf(start);
+ $('calendarPrevious').disabled=start<=0;$('calendarNext').disabled=start>=MAX_START;
+ $('calendarThisQuarter').hidden=start===currentQuarterStart();
  renderSummary(list);
  $('calendarGrid').innerHTML=months.map((name,k)=>{
-  const month=start+k,days=new Date(2026,month+1,0).getDate(),offset=(new Date(2026,month,1).getDay()+6)%7;
+  const month=start+k,yr=yearOf(month),mo=monthOf(month),days=new Date(yr,mo+1,0).getDate(),offset=(new Date(yr,mo,1).getDay()+6)%7;
   const heads=['M','T','W','T','F','S','S'].map(x=>'<span>'+x+'</span>').join('');
   const blank=Array.from({length:offset},()=>'<span class="calendar-empty-day"></span>').join('');
   const cells=Array.from({length:days},(_,i)=>{
@@ -111,7 +118,7 @@ function render(){
       items.map(chip).join('')+ext.map(extraChip).join('')+
       (!taken?'<button class="calendar-empty-add" type="button" data-add-date="'+date+'" aria-label="Schedule a video on '+date+'">＋</button>':'')+'</div>';
    }).join('');
-  return '<section class="calendar-month"><h3>'+name+' <small>2026</small></h3><div class="calendar-weekdays">'+heads+'</div><div class="calendar-days">'+blank+cells+'</div></section>';
+  return '<section class="calendar-month"><h3>'+name+' <small>'+yr+'</small></h3><div class="calendar-weekdays">'+heads+'</div><div class="calendar-days">'+blank+cells+'</div></section>';
  }).join('');
  renderAgenda(list,extras);
 }
@@ -137,7 +144,7 @@ function renderYt(e){
  box.innerHTML='<a class="cal-yt-card" href="'+esc(y.url)+'" target="_blank" rel="noopener noreferrer">'+(y.thumb?'<img src="'+esc(y.thumb)+'" alt="" loading="lazy">':'')+'<span><strong>'+esc(y.title)+'</strong><small>Published '+esc(fmtDay(y.date))+' · '+age+' day'+(age===1?'':'s')+' live · '+esc(dur(y.seconds))+'</small></span></a>'+
   '<div class="cal-yt-stats"><span><b>'+compact(y.views)+'</b>views</span><span><b>'+compact(y.likes)+'</b>likes</span><span><b>'+compact(y.comments)+'</b>comments</span><span><b>'+compact(age?y.views/age:y.views)+'</b>views / day</span></div>'+
   '<p class="cal-yt-match">'+(y.matchedBy==='link'?'Linked by the YouTube link below.':y.matchedBy==='date'?'Matched automatically: published on this date.':y.matchedBy==='title'?'Matched by topic: planned for '+esc(fmtDay(e.date))+', went out '+esc(fmtDay(y.date))+'. Wrong video? Paste the right link below.':'Matched automatically: published within 3 days of this date. Wrong video? Paste the right link below.')+'</p>'+
-  (y.date!==e.date&&y.date.startsWith('2026-')?'<button type="button" class="quiet-btn cal-move-live" data-move-from="'+esc(e.date)+'" data-move-to="'+esc(y.date)+'">Move this entry to '+esc(fmtDay(y.date))+' in the sheet</button>':'');
+  (y.date!==e.date&&y.date>=FIRST_YEAR+'-01-01'?'<button type="button" class="quiet-btn cal-move-live" data-move-from="'+esc(e.date)+'" data-move-to="'+esc(y.date)+'">Move this entry to '+esc(fmtDay(y.date))+' in the sheet</button>':'');
 }
 const LINK_DAYS=14;
 const daysApart=(a,b)=>Math.abs(Math.round((new Date(a+'T12:00:00')-new Date(b+'T12:00:00'))/86400000));
@@ -185,7 +192,8 @@ function show(tab){
  if(isCalendar){$('weeklyWorkspace').hidden=true;$('productionWorkspace').hidden=true;$('sponsorWorkspace')&&($('sponsorWorkspace').hidden=true);if(!state.loaded)refresh();}
 }
 async function save(payload){
- if(state.busy)return;state.busy=true;$('calendarSave').disabled=true;$('calendarDelete').disabled=true;
+ if(state.busy)return;
+ if(payload.date&&payload.date>=(FIRST_YEAR+1)+'-01-01'&&state.bridgeVersion<3){notice('Planning '+payload.date.slice(0,4)+' needs the updated Apps Script: paste the new Code.gs into Studio bridge and deploy a new version.',true);return}state.busy=true;$('calendarSave').disabled=true;$('calendarDelete').disabled=true;
  try{const data=await api(payload);apply(data);closeEditor();notice('Saved to Google Sheets.');}
  catch(e){notice(e.message,true);}
  finally{state.busy=false;$('calendarSave').disabled=false;$('calendarDelete').disabled=false;}
@@ -202,7 +210,8 @@ function boot(){
  document.querySelectorAll('[data-view-tab]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.viewTab)));
  $('calendarRefresh').addEventListener('click',refresh);
  $('calendarPrevious').addEventListener('click',()=>{state.start=Math.max(0,state.start-3);render()});
- $('calendarNext').addEventListener('click',()=>{state.start=Math.min(9,state.start+3);render()});
+ $('calendarNext').addEventListener('click',()=>{state.start=Math.min(MAX_START,state.start+3);render()});
+ $('calendarThisQuarter').addEventListener('click',()=>{state.start=currentQuarterStart();render()});
  $('calendarNew').addEventListener('click',()=>showEditor());
  const onPick=e=>{const edit=e.target.closest('[data-edit-date]'),add=e.target.closest('[data-add-date]'),ext=e.target.closest('[data-extra]');
   const spon=e.target.closest('[data-sponsor-date]');

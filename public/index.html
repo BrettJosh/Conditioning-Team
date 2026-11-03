@@ -106,7 +106,7 @@
 <section class="workspace calendar-workspace" id="calendarWorkspace" aria-label="2026 content calendar" hidden>
   <div class="workspace-heading"><div><div class="overline">/ PUBLISHING ROADMAP</div><h2>CONTENT <span class="scribble">CALENDAR</span></h2></div>
   <div class="workspace-actions"><button class="quiet-btn" id="calendarRefresh">↻ Refresh</button><a class="quiet-btn calendar-sheet-link" href="https://docs.google.com/spreadsheets/d/1zvaFJCApnz6YFzJCXUtC9BSLW40pR58vyPM7pgSWfB4/edit" target="_blank" rel="noopener">↗ Source sheet</a></div></div>
-  <p class="calendar-intro">Your publishing plan for the rest of 2026. Yellow is coming up, orange is past its date but not on YouTube yet, green is live — detected from your channel automatically. Click a video for its stats, sponsor and payment status; drag it to reschedule. The Google Sheet stays the source of truth.</p>
+  <p class="calendar-intro">Your publishing plan, a quarter at a time — press Later to plan into 2027. Yellow is coming up, orange is past its date but not on YouTube yet, green is live — detected from your channel automatically. Click a video for its stats, sponsor and payment status; drag it to reschedule. The Google Sheet stays the source of truth.</p>
   <div id="calendarNotice" class="notice" role="status" hidden></div>
   <div id="calendarSetupHelp" class="notice" hidden>
     <strong>Connect your Google Sheet to activate this calendar.</strong>
@@ -114,7 +114,7 @@
     <a href="https://github.com/BrettJosh/Conditioning-Team/blob/main/README.md#2026-publishing-calendar-google-sheet-stays-the-source-of-truth" target="_blank" rel="noopener noreferrer">Follow the setup steps in GitHub</a>.
     <a href="https://app.netlify.com/" target="_blank" rel="noopener noreferrer">Open Netlify settings</a>.
   </div>
-  <div class="calendar-toolbar"><div class="calendar-nav"><button id="calendarPrevious" class="quiet-btn" type="button">← Earlier</button><strong id="calendarRange">October–December 2026</strong><button id="calendarNext" class="quiet-btn" type="button">Later →</button></div><button id="calendarNew" class="primary-btn" type="button">＋ Plan a video</button></div>
+  <div class="calendar-toolbar"><div class="calendar-nav"><button id="calendarPrevious" class="quiet-btn" type="button">← Earlier</button><strong id="calendarRange">October–December 2026</strong><button id="calendarNext" class="quiet-btn" type="button">Later →</button><button id="calendarThisQuarter" class="text-btn cal-today-btn" type="button" hidden>Back to this quarter</button></div><button id="calendarNew" class="primary-btn" type="button">＋ Plan a video</button></div>
   <div class="calendar-summary" id="calendarSummary"></div>
   <div class="calendar-grid" id="calendarGrid"></div>
   <div class="cal-agenda-box" id="calendarAgenda"></div>
@@ -201,7 +201,7 @@
 <div id="calendarLink" class="cal-link" hidden></div>
 <form id="calendarForm" class="task-form">
 <label>Video title <textarea id="calendarText" rows="2" maxlength="1500" required placeholder="e.g. Rich Piana (MacroFactor) — a sponsor in brackets is picked up automatically"></textarea></label>
-<label>Scheduled publish date <input type="date" id="calendarDate" min="2026-01-01" max="2026-12-31" required></label>
+<label>Scheduled publish date <input type="date" id="calendarDate" min="2026-01-01" max="2030-12-31" required></label>
 <p class="calendar-field-hint">Moving an existing video removes the old date entry. Dates already containing another entry cannot be overwritten.</p>
 <fieldset class="cal-fieldset"><legend>◆ Sponsorship</legend>
 <div class="form-row"><label>Sponsor <input id="calendarSponsor" type="text" list="calendarSponsorOptions" maxlength="120" placeholder="None — or pick a brand" autocomplete="off"><datalist id="calendarSponsorOptions"></datalist></label>
