@@ -48,10 +48,11 @@ function tooltip(item){
  return lines.join('\n');
 }
 /* Grid card: two-line title + one meta line. The sponsor is a slim tag right under it, coloured by deal status. */
+const isUntitled=item=>shortTitle(item,'x')==='Untitled video';
 function chip(item){
  const st=stateOf(item),y=item.yt,sp=sponsorOf(item);
  const meta=st==='published'?'✓ '+(y?compact(y.views):'Live'):st==='overdue'?'! Not live':'◷ Soon';
- return '<button class="calendar-event cal-'+st+'" type="button" draggable="true" data-edit-date="'+item.date+'" title="'+esc(tooltip(item))+'"><span class="cal-ev-title">'+esc(shortTitle(item,sp&&sp.name))+'</span><span class="cal-ev-meta">'+meta+(shownOn(item)!==item.date?' <span class="cal-ev-moved">↪</span>':'')+'</span></button>'+sponsorTag(item,sp);
+ return '<button class="calendar-event cal-'+st+'" type="button" draggable="true" data-edit-date="'+item.date+'" title="'+esc(tooltip(item))+'">'+(isUntitled(item)?'<span class="cal-ev-title cal-untitled">+ Add title</span>':'<span class="cal-ev-title">'+esc(shortTitle(item,sp&&sp.name))+'</span>')+'<span class="cal-ev-meta">'+meta+(shownOn(item)!==item.date?' <span class="cal-ev-moved">↪</span>':'')+'</span></button>'+sponsorTag(item,sp);
 }
 function sponsorTag(item,sp){
  if(!sp)return'';
@@ -72,7 +73,7 @@ function renderAgenda(list,extras){
    const e=r.e,st=stateOf(e),sp=sponsorOf(e),y=e.yt,moved=r.date!==e.date;
    const sub=[y&&y.title&&y.title.toLowerCase()!==String(e.text).toLowerCase()?'YouTube: '+y.title:'',moved?'Planned '+fmtDay(e.date):''].filter(Boolean).join(' · ');
    const deal=sp?(sp.saved?'<span class="cal-deal '+statusClass(sp.status)+'">'+esc(sp.status||'No status')+'</span>':'<span class="cal-deal sp-suggested">Confirm?</span>'):'';
-   return '<tr data-edit-date="'+e.date+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(r.date))+'</td><td><strong>'+esc(shortTitle(e,sp&&sp.name))+'</strong>'+(sub?'<small>'+esc(sub)+'</small>':'')+'</td><td>'+pillFor(st)+'</td><td class="num">'+(y?compact(y.views):'<span class="muted">—</span>')+'</td><td>'+(sp?'<span class="cal-a-sponsor'+(sp.saved?'':' suggested')+'" data-sponsor-date="'+e.date+'">◆ '+esc(sp.name)+'</span>':'<span class="muted">—</span>')+'</td><td>'+deal+'</td></tr>';
+   return '<tr data-edit-date="'+e.date+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(r.date))+'</td><td>'+(isUntitled(e)?'<strong class="cal-untitled">+ Add title</strong>':'<strong>'+esc(shortTitle(e,sp&&sp.name))+'</strong>')+(sub?'<small>'+esc(sub)+'</small>':'')+'</td><td>'+pillFor(st)+'</td><td class="num">'+(y?compact(y.views):'<span class="muted">—</span>')+'</td><td>'+(sp?'<span class="cal-a-sponsor'+(sp.saved?'':' suggested')+'" data-sponsor-date="'+e.date+'">◆ '+esc(sp.name)+'</span>':'<span class="muted">—</span>')+'</td><td>'+deal+'</td></tr>';
   }).join('')+'</tbody></table></div>';
 }
 function renderSummary(list){
@@ -151,6 +152,7 @@ async function showEditor(date=null,extra=null){
  $('calendarSponsorHint').textContent='';
  renderYt(existing);
  $('calendarDelete').hidden=!existing;$('calendarOverlay').hidden=false;document.body.style.overflow='hidden';$('calendarText').focus();
+ if(existing&&isUntitled(existing))$('calendarText').select();
  const brands=await loadBrands();
  $('calendarSponsorOptions').innerHTML=brands.map(b=>'<option value="'+esc(b)+'"></option>').join('');
  if(existing&&!existing.sponsor&&state.editing===existing){const s=suggestSponsor(existing.text,brands);if(s){$('calendarSponsor').value=s;$('calendarSponsorStatus').value=$('calendarSponsorStatus').value||'In progress';$('calendarSponsorHint').textContent='Suggested from the title — clear it if that\'s wrong.';}}

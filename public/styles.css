@@ -347,3 +347,6 @@ body.local-demo-mode .connection-btn{background:#ffe1df;border-color:#95252e;col
 .cal-ev-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;overflow:hidden;text-overflow:clip;overflow-wrap:normal;word-break:normal;hyphens:auto;-webkit-hyphens:auto;font-size:9.5px;line-height:1.18}
 .cal-sponsor{padding:2px 4px 2px 5px}
 @media(max-width:1380px){.calendar-day{padding:3px 2px 5px}.calendar-event,.cal-sponsor{padding-left:4px;padding-right:3px;border-left-width:2px}.cal-ev-title{font-size:9px}.cal-ev-meta,.cal-sponsor-name{font-size:8.5px}}
+
+.cal-untitled{color:#8a6d00;font-style:italic}
+.cal-agenda strong.cal-untitled{font-weight:800}
