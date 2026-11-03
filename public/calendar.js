@@ -139,6 +139,27 @@ function renderYt(e){
   '<p class="cal-yt-match">'+(y.matchedBy==='link'?'Linked by the YouTube link below.':y.matchedBy==='date'?'Matched automatically: published on this date.':y.matchedBy==='title'?'Matched by topic: planned for '+esc(fmtDay(e.date))+', went out '+esc(fmtDay(y.date))+'. Wrong video? Paste the right link below.':'Matched automatically: published within 3 days of this date. Wrong video? Paste the right link below.')+'</p>'+
   (y.date!==e.date&&y.date.startsWith('2026-')?'<button type="button" class="quiet-btn cal-move-live" data-move-from="'+esc(e.date)+'" data-move-to="'+esc(y.date)+'">Move this entry to '+esc(fmtDay(y.date))+' in the sheet</button>':'');
 }
+const LINK_DAYS=14;
+const daysApart=(a,b)=>Math.abs(Math.round((new Date(a+'T12:00:00')-new Date(b+'T12:00:00'))/86400000));
+/* Manual pairing when titles share nothing: an unmatched plan entry ↔ an unplanned upload within 14 days. */
+function renderLinkOptions(existing,extra){
+ const box=$('calendarLink');let html='';
+ if(existing&&!existing.yt&&state.youtube.configured){
+  const c=state.extras.filter(v=>daysApart(v.date,existing.date)<=LINK_DAYS).sort((a,b)=>daysApart(a.date,existing.date)-daysApart(b.date,existing.date));
+  if(c.length)html='<p class="cal-link-q">Did this go out as one of these?</p>'+c.map(v=>'<button type="button" class="cal-link-opt" data-link-entry="'+esc(existing.date)+'" data-link-video="'+esc(v.id)+'"><span><strong>'+esc(v.title)+'</strong><small>'+esc(fmtDay(v.date))+' · '+compact(v.views)+' views</small></span><b>This is it ↗</b></button>').join('');
+ }
+ if(extra){
+  const c=state.events.filter(e=>!e.yt&&daysApart(e.date,extra.date)<=LINK_DAYS).sort((a,b)=>daysApart(a.date,extra.date)-daysApart(b.date,extra.date));
+  if(c.length)html='<p class="cal-link-q">Is this one of your planned videos?</p>'+c.map(e=>'<button type="button" class="cal-link-opt" data-link-entry="'+esc(e.date)+'" data-link-video="'+esc(extra.id)+'"><span><strong>'+esc(shortTitle(e,sponsorOf(e)?.name))+'</strong><small>Planned '+esc(fmtDay(e.date))+' · '+esc(STATE_LABEL[stateOf(e)])+'</small></span><b>Link it ↗</b></button>').join('')+'<p class="cal-link-q small">Otherwise, fill in the form below to add it to the plan as a new entry.</p>';
+ }
+ box.innerHTML=html;box.hidden=!html;
+}
+async function linkVideo(entryDate,videoId){
+ const item=state.events.find(x=>x.date===entryDate),v=state.extras.find(x=>x.id===videoId);
+ if(!item||!v)return;
+ if(state.bridgeVersion<2){notice('Linking needs the updated Apps Script: paste the new Code.gs into Studio bridge and deploy a new version.',true);return}
+ await save({action:'save',from:item.date,previousText:item.text,date:item.date,text:item.text,metrics:{...metricsOf(item),youtubeUrl:v.url}});
+}
 async function showEditor(date=null,extra=null){
  const existing=date?state.events.find(e=>e.date===date):null;
  state.editing=existing||null;state.from=existing?.date||null;state.previousText=existing?.text||'';
@@ -150,7 +171,7 @@ async function showEditor(date=null,extra=null){
  $('calendarSponsor').value=existing?.sponsor||'';$('calendarSponsorStatus').value=existing?.sponsorStatus||'';
  $('calendarYoutube').value=existing?.youtubeUrl||(extra?extra.url:'');
  $('calendarSponsorHint').textContent='';
- renderYt(existing);
+ renderYt(existing);renderLinkOptions(existing,extra);
  $('calendarDelete').hidden=!existing;$('calendarOverlay').hidden=false;document.body.style.overflow='hidden';$('calendarText').focus();
  if(existing&&isUntitled(existing))$('calendarText').select();
  const brands=await loadBrands();
@@ -186,7 +207,7 @@ function boot(){
  const onPick=e=>{const edit=e.target.closest('[data-edit-date]'),add=e.target.closest('[data-add-date]'),ext=e.target.closest('[data-extra]');
   const spon=e.target.closest('[data-sponsor-date]');
   if(spon){showEditor(spon.dataset.sponsorDate).then(()=>{$('calendarSponsorStatus').scrollIntoView({block:'center'});$('calendarSponsorStatus').focus()});return}
-  if(edit)showEditor(edit.dataset.editDate);else if(ext){const v=state.extras.find(x=>x.id===ext.dataset.extra);if(v&&state.events.some(x=>x.date===v.date)){window.open(v.url,'_blank','noopener');}else if(v)showEditor(null,v);}else if(add)showEditor(add.dataset.addDate)};
+  if(edit)showEditor(edit.dataset.editDate);else if(ext){const v=state.extras.find(x=>x.id===ext.dataset.extra);if(v)showEditor(null,v);}else if(add)showEditor(add.dataset.addDate)};
  $('calendarGrid').addEventListener('click',onPick);$('calendarAgenda').addEventListener('click',onPick);
  $('calendarAgenda').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('tr'))onPick(e)});
  $('calendarGrid').addEventListener('dragstart',e=>{const el=e.target.closest('[data-edit-date]');if(el){e.dataTransfer.setData('text/plain',el.dataset.editDate);e.dataTransfer.effectAllowed='move';}});
@@ -198,6 +219,7 @@ function boot(){
    metrics:{views:$('calendarViews').value,ctr:$('calendarCtr').value,avd:$('calendarAvd').value,sponsor,sponsorStatus:sponsor?$('calendarSponsorStatus').value:'',youtubeUrl:$('calendarYoutube').value.trim()}})});
  $('calendarDelete').addEventListener('click',()=>{if(state.from&&confirm('Remove this publishing slot from the source spreadsheet?'))save({action:'remove',from:state.from,previousText:state.previousText})});
  $('calendarOverlay').addEventListener('click',async e=>{if(e.target.closest('[data-calendar-close]')){closeEditor();return}
+  const ln=e.target.closest('[data-link-entry]');if(ln){ln.disabled=true;await linkVideo(ln.dataset.linkEntry,ln.dataset.linkVideo);ln.disabled=false;return}
   const mv=e.target.closest('[data-move-from]');if(!mv)return;mv.disabled=true;
   try{const item=state.events.find(x=>x.date===mv.dataset.moveFrom);if(item&&!item.youtubeUrl&&item.yt)item.youtubeUrl=item.yt.url;await onMove(mv.dataset.moveFrom,mv.dataset.moveTo);closeEditor()}catch(err){notice(err.message,true);mv.disabled=false}});
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('calendarOverlay').hidden)closeEditor()});

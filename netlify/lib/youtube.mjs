@@ -44,10 +44,15 @@ export function topicWords(text) {
     .map(w => w.length > 4 && w.endsWith('ies') ? w.slice(0, -3) + 'y' : w.length > 4 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)
     .filter(w => w.length >= 3 && !STOP.has(w)));
 }
+/* Capitalised words in the plan are usually names ("Dr Mike", "Rich Piana"): one shared name is enough. */
+function planNames(text) {
+  const body = String(text || '').replace(/\([^)]*\)\s*$/, ' ');
+  return new Set([...topicWords((body.match(/\b[A-Z][a-zA-Z']{2,}\b/g) || []).join(' '))]);
+}
 export function topicScore(planText, videoTitle) {
-  const a = topicWords(planText), b = topicWords(videoTitle);
+  const a = topicWords(planText), b = topicWords(videoTitle), names = planNames(planText);
   const shared = [...a].filter(w => b.has(w));
-  return shared.length >= 2 || shared.some(w => w.length >= 5) ? shared.length : 0;
+  return shared.length >= 2 || shared.some(w => w.length >= 5 || names.has(w)) ? shared.length : 0;
 }
 const TITLE_WINDOW = { before: 14, after: 14 };
 export const londonDate = iso => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Europe/London' });

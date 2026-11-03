@@ -350,3 +350,10 @@ body.local-demo-mode .connection-btn{background:#ffe1df;border-color:#95252e;col
 
 .cal-untitled{color:#8a6d00;font-style:italic}
 .cal-agenda strong.cal-untitled{font-weight:800}
+
+.cal-link{border:2px dashed #2d7f66;border-radius:14px;padding:12px;margin:0 0 20px;background:#f3fbf7;display:grid;gap:8px}
+.cal-link-q{margin:0;font-size:12px;font-weight:900}.cal-link-q.small{font-size:11px;font-weight:750;color:var(--muted)}
+.cal-link-opt{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;border:1.6px solid var(--ink);border-radius:10px;background:var(--white);padding:9px 11px;box-shadow:2px 2px 0 var(--ink)}
+.cal-link-opt:hover{background:#e3f7ee}
+.cal-link-opt strong{display:block;font-size:13px;line-height:1.3}.cal-link-opt small{display:block;font-size:11px;color:var(--muted);font-weight:750;margin-top:2px}
+.cal-link-opt b{flex:none;font-size:11px;background:var(--mint);border:1.4px solid var(--ink);border-radius:8px;padding:5px 8px}
