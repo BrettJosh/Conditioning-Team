@@ -26,8 +26,16 @@ const REGIONS = {
   ae: { accounts: 'https://accounts.zoho.ae', mail: 'https://mail.zoho.ae' }
 };
 const FREEMAIL = new Set(['gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'hotmail.co.uk', 'live.com', 'live.co.uk', 'yahoo.com', 'yahoo.co.uk', 'icloud.com', 'me.com', 'mac.com', 'protonmail.com', 'proton.me', 'pm.me', 'aol.com', 'mail.com', 'msn.com', 'zoho.com', 'zohomail.com', 'zohomail.eu', 'ymail.com', 'gmx.com', 'fastmail.com', 'hey.com']);
-const KEYWORDS = /\b(sponsor(ship|ed|s)?|partnership|partner with|partnering|collab(oration|orate)?|brand deal|paid (promotion|partnership|collab)|integration|media kit|rate card|your rates?|influencer|creator (program|partnership|team)|campaign|ambassador|affiliate program|product seeding|gifting)\b|josh brett x|x josh brett/i;
-const AUTOMATED = /^(no-?reply|noreply|do-?not-?reply|notifications?|newsletter|mailer-daemon|postmaster|bounce|alerts?|updates?|hello@(substack|medium)|digest)/i;
+// "Brand x Josh Brett", "Josh x Subs", "Josh Brett x Brand" all count as sponsorship subjects.
+const KEYWORDS = /\b(sponsor(ship|ed|s)?|partnership|partner with|partnering|collab(oration|orate)?|brand deal|paid (promotion|partnership|collab|opportunity)|integration|media kit|rate card|your rates?|influencer|creator (program|partnership|team)|campaign|ambassador|affiliate program|product seeding|gifting)\b|\bjosh(?: brett)? x \S|\S x josh\b/i;
+const AUTOMATED = /^(no-?reply|noreply|do-?not-?reply|notifications?|newsletter|mailer-daemon|postmaster|bounce|alerts?|updates?|hello@(substack|medium)|digest|security|account-?security|verify|verification)/i;
+// Zoho's own account notices ("Backup email address…") are never sponsorship mail, even when flagged.
+const SYSTEM_DOMAIN = /(^|\.)(zoho\.(com|eu|in|jp|sa|ae|com\.au|com\.cn)|zohocorp\.com|zohomail\.(com|eu)|zohocloud\.ca|zohoaccounts\.com)$/i;
+const isAutomated = address => AUTOMATED.test(String(address || '').split('@')[0] || '') || SYSTEM_DOMAIN.test(String(address || '').split('@')[1] || '');
+/** Zoho returns flagid "flag_not_set" for unflagged mail and "info" / "important" / "followup" for the three flags. */
+export const isFlagged = message => { const f = String(message?.flagid ?? '').trim().toLowerCase(); return f !== '' && f !== 'flag_not_set' && f !== '0' && f !== 'none'; };
+const FLAG_STATE_MAX_CHARS = 7000; // keeps the whole sync state well inside the sheet's 20,000-character meta cell
+const FLAG_CATCHUP_DAYS = 21;
 const PAGE_SIZE = 200;
 const OVERLAP = 20;
 const RECENT_LOOKBACK_MS = 6 * 60 * 60 * 1000;
@@ -116,8 +124,9 @@ export function buildIndex(ctx) {
   return index;
 }
 
-/** Decides whether a Zoho message belongs in the Email log, and to which record. Returns null to skip it. */
-export function matchMessage(message, index, threads, own) {
+/** Decides whether a Zoho message belongs in the Email log, and to which record. Returns null to skip it.
+ * options.force keeps an unmatched email even without sponsorship wording (used for flagged emails and replies to them). */
+export function matchMessage(message, index, threads, own, options = {}) {
   const from = parseAddresses(message.fromAddress)[0] || '';
   const tos = parseAddresses(message.toAddress);
   const ccs = parseAddresses(message.ccAddress === 'Not Provided' ? '' : message.ccAddress);
@@ -132,10 +141,13 @@ export function matchMessage(message, index, threads, own) {
   const seen = new Set(); hits = hits.filter(h => { const k = h.tab + '|' + h.id; if (seen.has(k)) return false; seen.add(k); return true; });
   const hit = hits[0] || null;
   if (!hit) {
-    if (direction === 'in' && AUTOMATED.test(from.split('@')[0] || '')) return null;
-    if (!KEYWORDS.test(subject) && !KEYWORDS.test(snippet.slice(0, 160))) return null;
-    if (/unsubscribe|view (this|in) browser|manage preferences/i.test(snippet)) return null;
-    by = 'keyword';
+    if (direction === 'in' && isAutomated(from)) return null;
+    if (options.force) by = 'flagged';
+    else {
+      if (!KEYWORDS.test(subject) && !KEYWORDS.test(snippet.slice(0, 160))) return null;
+      if (/unsubscribe|view (this|in) browser|manage preferences/i.test(snippet)) return null;
+      by = 'keyword';
+    }
   }
   const ms = Number(message.receivedTime || message.sentDateInGMT || 0);
   const date = ms ? new Date(ms).toISOString() : '';
@@ -206,6 +218,40 @@ export async function runSync({ url, secret, pageBudget = 4, trigger = 'schedule
     const backfilling = !(state.backfill.inbox.done && state.backfill.sent.done);
     const sinceMs = state.lastSyncAt ? new Date(state.lastSyncAt).getTime() - RECENT_LOOKBACK_MS : horizonMs;
     const found = [];
+    const keep = hit => { found.push(hit); known.add(hit.messageId); if (hit.tab !== 'unmatched' && hit.threadId && !threads[hit.threadId]) threads[hit.threadId] = { tab: hit.tab, id: hit.recordId, name: hit.matchedTo }; };
+    const msOf = message => Number(message.receivedTime || message.sentDateInGMT || 0);
+
+    // Zoho flags = "I need to reply to this". Every run takes a fresh snapshot of the flagged Inbox emails, so clearing
+    // a flag in Zoho clears it here too. Each flagged email is logged even when it doesn't read like a sponsorship,
+    // and so are later emails in its thread and Josh's replies to that sender, which is how the app knows it was answered.
+    let flagItems = null;
+    const flagThreads = new Set(), flagSenders = new Set();
+    try {
+      const page = await zohoGet(cfg, token, '/api/accounts/' + state.accountId + '/messages/view', { folderId: state.folders.inbox, start: 1, limit: PAGE_SIZE, sortBy: 'date', sortorder: false, includeto: true, flaggedMails: true });
+      flagItems = [];
+      for (const message of (Array.isArray(page) ? page : [])) {
+        const id = String(message.messageId || ''), ms = msOf(message);
+        const from = parseAddresses(message.fromAddress)[0] || '';
+        if (!id || !isFlagged(message) || (ms && ms < horizonMs) || own.has(from) || isAutomated(from)) continue;
+        if (!known.has(id)) { const hit = matchMessage({ ...message, folderLabel: 'Inbox' }, index, threads, own, { force: true }); if (!hit) continue; keep(hit); }
+        const thread = String(message.threadId || '');
+        flagItems.push({ m: id, t: thread, a: from, f: String(message.flagid), d: ms ? new Date(ms).toISOString() : '' });
+        flagThreads.add(id); if (thread) flagThreads.add(thread); if (from) flagSenders.add(from);
+      }
+      delete state.flagError;
+    } catch (error) {
+      state.flagError = { at: new Date().toISOString(), message: String(error.message || error) }; // the normal sync still runs
+    }
+    const flagRelated = message => {
+      const thread = String(message.threadId || '');
+      if (thread && flagThreads.has(thread)) return true;
+      return parseAddresses([message.fromAddress, message.toAddress, message.ccAddress].join(',')).some(a => flagSenders.has(a));
+    };
+    // The first run that reads flags also looks back through Sent (up to three weeks) so replies already sent count.
+    const oldestFlag = (flagItems || []).reduce((min, f) => Math.min(min, f.d ? new Date(f.d).getTime() : min), Infinity);
+    const catchupMs = !backfilling && flagItems && flagItems.length && !state.flagCatchupDone ? Math.max(oldestFlag, started - FLAG_CATCHUP_DAYS * 86400000) : 0;
+    let catchupDone = !catchupMs;
+
     let pagesUsed = 0, scanned = 0;
     for (const key of ['inbox', 'sent']) {
       const folderId = state.folders[key];
@@ -213,6 +259,7 @@ export async function runSync({ url, secret, pageBudget = 4, trigger = 'schedule
       const bf = state.backfill[key];
       let start = backfilling ? (bf.done ? null : bf.start) : 1;
       if (start === null) continue;
+      const floor = backfilling ? horizonMs : (key === 'sent' && catchupMs ? Math.min(sinceMs, catchupMs) : sinceMs);
       while (pagesUsed < pageBudget) {
         if (Date.now() - started > (TIME_BUDGET_MS[trigger] || TIME_BUDGET_MS.manual)) break;
         const page = await zohoGet(cfg, token, '/api/accounts/' + state.accountId + '/messages/view', { folderId, start, limit: PAGE_SIZE, sortBy: 'date', sortorder: false, includeto: true });
@@ -221,24 +268,29 @@ export async function runSync({ url, secret, pageBudget = 4, trigger = 'schedule
         scanned += list.length;
         let stop = list.length < PAGE_SIZE;
         for (const message of list) {
-          const ms = Number(message.receivedTime || message.sentDateInGMT || 0);
-          const floor = backfilling ? horizonMs : sinceMs;
+          const ms = msOf(message);
           if (ms && ms < floor) { stop = true; break; }
           if (known.has(String(message.messageId))) continue;
-          const hit = matchMessage({ ...message, folderLabel: label }, index, threads, own);
-          if (hit) { found.push(hit); known.add(hit.messageId); if (hit.tab !== 'unmatched' && hit.threadId && !threads[hit.threadId]) threads[hit.threadId] = { tab: hit.tab, id: hit.recordId, name: hit.matchedTo }; }
+          const hit = matchMessage({ ...message, folderLabel: label }, index, threads, own, { force: flagRelated(message) });
+          if (hit) keep(hit);
         }
         if (backfilling) { bf.start = start + PAGE_SIZE - OVERLAP; if (stop) bf.done = true; }
-        if (stop) break;
+        if (stop) { if (key === 'sent') catchupDone = true; break; }
         start += PAGE_SIZE - OVERLAP;
       }
+    }
+    if (flagItems) {
+      flagItems.sort((a, b) => b.d.localeCompare(a.d));
+      while (flagItems.length && JSON.stringify(flagItems).length > FLAG_STATE_MAX_CHARS) flagItems.pop();
+      state.flags = { at: new Date().toISOString(), items: flagItems };
+      if (catchupMs && catchupDone) state.flagCatchupDone = true;
     }
     const nowBackfillDone = state.backfill.inbox.done && state.backfill.sent.done;
     // Steady state scans from the last successful run; a just-finished backfill resumes from the moment it began,
     // so mail that arrived while the history was being walked is still picked up.
     if (!backfilling) state.lastSyncAt = new Date(started).toISOString();
     else if (nowBackfillDone) state.lastSyncAt = state.backfill.startedAt || new Date(started).toISOString();
-    state.lastRun = { at: new Date().toISOString(), trigger, added: 0, scanned, pagesUsed, backfillDone: nowBackfillDone, ms: Date.now() - started };
+    state.lastRun = { at: new Date().toISOString(), trigger, added: 0, scanned, pagesUsed, backfillDone: nowBackfillDone, flagged: flagItems ? flagItems.length : null, ms: Date.now() - started };
     delete state.lastError;
     found.sort((a, b) => a.date.localeCompare(b.date));
     if (found.length > 250) { // write the rest next run: the pages are re-walked thanks to the overlap + known-id dedupe
@@ -246,7 +298,7 @@ export async function runSync({ url, secret, pageBudget = 4, trigger = 'schedule
       found.length = 250;
     }
     const result = await callScript(url, secret, { action: 'sponsorEmails', emails: found, state: { ...state, lastRun: { ...state.lastRun, added: found.length } } });
-    return { ok: true, added: result.added, skipped: result.skipped, touched: result.touched, scanned, pagesUsed, backfillDone: nowBackfillDone, backfillRemaining: nowBackfillDone ? 0 : (pagesUsed >= pageBudget ? 1 : 0), mailbox: state.mailbox, lastSyncAt: state.lastSyncAt || '' };
+    return { ok: true, added: result.added, skipped: result.skipped, touched: result.touched, scanned, pagesUsed, backfillDone: nowBackfillDone, flagged: flagItems ? flagItems.length : null, backfillRemaining: nowBackfillDone ? 0 : (pagesUsed >= pageBudget ? 1 : 0), mailbox: state.mailbox, lastSyncAt: state.lastSyncAt || '' };
   } catch (error) {
     state.lastError = { at: new Date().toISOString(), message: String(error.message || error) };
     try { await callScript(url, secret, { action: 'sponsorSyncState', state }); } catch {}

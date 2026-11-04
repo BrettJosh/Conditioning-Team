@@ -172,6 +172,7 @@ The **Sponsorships** tab is the brand-deal tracker as a live spreadsheet: every 
 What you get:
 
 - **Summary tiles** — deals signed (and agreed value), waiting on you, waiting on them, cold pitches with no reply, emails this week. Click a tile to filter.
+- **Zoho flags = Waiting on you** — flag an email in Zoho (any flag colour) and it counts as waiting on your reply until you reply to that thread or sender, or clear the flag. A tracked brand or agency with a flagged email shows **⚑ Reply needed** (its sheet status stays underneath, unchanged). A flagged email from someone not in the tracker gets its own **New sender** row with **＋ Add as brand**, **＋ Agency** or **Assign to…**; adding fills the drawer from the email and files the thread under the new row.
 - **Brands / Agencies** — sortable, searchable grids (click a column heading to sort; "most attention needed first" by default). Status pills are colour-coded: red = they're waiting on you. Each row shows who wrote last and how long ago, from the email log.
 - **Row drawer** — edit any field (Status is a dropdown of every status, including **Ignored**), add a dated note or log an email by hand, and see every matched email for that brand. Saves go straight to the sheet; a status the sheet's own dropdown doesn't know yet is added to it automatically.
 - **Action list** — the open items from the sheet's Action list tab, with a "Mark done" tick that writes back.
@@ -221,13 +222,16 @@ Every message in Inbox and Sent is compared with the email addresses in the **Co
 1. exact address match → that brand or agency;
 2. same company domain (not gmail/outlook and the like) → that brand or agency;
 3. same thread as an already-matched email → inherits;
-4. otherwise it is kept only when the subject or first line reads like a sponsorship (sponsor, partnership, collab, brand deal, media kit, rate, campaign, influencer, "x Josh Brett", …) and it isn't an automated sender or a newsletter → **Unmatched**, for you to assign or ignore.
+4. otherwise it is kept only when the subject or first line reads like a sponsorship (sponsor, partnership, collab, brand deal, media kit, rate, campaign, influencer, "x Josh Brett", "Josh x Brand", …) and it isn't an automated sender or a newsletter → **Unmatched**, for you to assign or ignore;
+5. **flagged** emails are always kept (except automated senders and Zoho's own account notices), along with later emails in the same thread and your replies to that sender — that is how the app knows a flagged email has been answered.
 
-Matched emails bump that row's **Last activity** (the sheet's "Days since" formula follows). **Status** is never changed by the sync — that stays a human decision; the "who wrote last" chip tells you when a status is stale.
+Every run also reads the list of flagged emails in the Zoho Inbox (back to the backfill date) and stores it in the sheet's hidden **Studio meta** tab, replacing the previous list, so a cleared flag disappears on the next sync. The first run after flags were added also looks back three weeks through Sent so replies you had already sent count.
+
+Matched emails bump that row's **Last activity** (the sheet's "Days since" formula follows). The **Status** column in the sheet is never changed by the sync — that stays a human decision. What the app shows as waiting on you is the sheet status *plus* your Zoho flags; the "who wrote last" chip tells you when a status is stale.
 
 ### Daily use
 
-- Red pills and the **Waiting on you** tile are the inbox. Open the row, read the thread, reply in Zoho, then update the status or tick the action.
+- Triage in Zoho: flag what needs a reply. Red pills and the **Waiting on you** tile then match your flags (after the next hourly sync, or press **Sync emails**). Reply in Zoho and it drops off on the next sync; update the status or tick the action as usual.
 - Log calls, decisions and anything that didn't happen over email from the drawer ("Log an email or note"); it goes to the top of the history.
 - The source sheet is always one click away (**↗ Source sheet**) for bulk edits; press **Refresh** afterwards.
 
