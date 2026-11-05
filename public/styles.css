@@ -438,3 +438,11 @@ body.local-demo-mode #connectionOverlay .connection-status{background:#ffe5e5;bo
 #connectionOverlay .connect-sticker{transform:none;font-size:11px}
 body:not(.local-demo-mode) #connectionOverlay .connection-status{background:#eef9f1;border:2px solid #4c9f87;color:#2f6b4a;font-size:13px}
 #connectSignedIn .secondary-btn{margin:4px 0 2px}
+
+/* Release slots: an open "+ Add title" every other Friday — drawn, not saved, until it's planned or dragged. */
+.calendar-event.cal-slot{background:#fffefa;border-style:dashed;border-color:#a88400;border-left-style:solid;opacity:.92}
+.calendar-event.cal-slot:hover{background:#fff8dc;opacity:1}
+.cal-key .k-slot{background:#fffefa;border-style:dashed;border-left:3px solid #a88400}
+.cal-sum.cal-slot,.cal-pill.cal-slot{background:#fffefa;border-style:dashed}
+.cal-agenda tr.cal-a-slot{cursor:pointer}
+.cal-agenda tr.cal-a-slot td{color:var(--muted)}

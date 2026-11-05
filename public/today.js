@@ -130,12 +130,15 @@ function calendarModel() {
   const events = c.events();
   const next = events.filter(e => c.stateOf(e) === 'scheduled' && e.date >= today && e.date <= horizon).sort((a, b) => a.date.localeCompare(b.date));
   const missed = events.filter(e => c.stateOf(e) === 'overdue' && e.date >= back).sort((a, b) => b.date.localeCompare(a.date));
-  const unsold = next.filter(e => !c.sponsorOf(e));
+  // Open release slots (every other Friday with nothing planned that fortnight) sit in the list alongside planned videos.
+  const slots = c.openSlots ? c.openSlots(today, horizon) : [];
+  const upcoming = [...next.map(e => ({ e, date: e.date })), ...slots.map(date => ({ slot: true, date }))].sort((a, b) => a.date.localeCompare(b.date));
+  const unsold = upcoming.filter(x => x.slot || !c.sponsorOf(x.e));
   // Money: sponsored videos that are live. "Live, not invoiced" = status blank or In progress; "Invoiced" = waiting to be paid.
   const live = events.filter(e => e.sponsor && c.stateOf(e) === 'published').map(e => ({ e, liveFor: Math.max(0, between(c.shownOn(e), today)) }));
   const toInvoice = live.filter(x => !x.e.sponsorStatus || x.e.sponsorStatus === 'In progress').sort((a, b) => b.liveFor - a.liveFor);
   const toBePaid = live.filter(x => x.e.sponsorStatus === 'Invoiced').sort((a, b) => b.liveFor - a.liveFor);
-  return { c, next, missed, unsold, toInvoice, toBePaid };
+  return { c, next, slots, upcoming, missed, unsold, toInvoice, toBePaid };
 }
 function calendarCard(m) {
   let body;
@@ -145,11 +148,12 @@ function calendarCard(m) {
     const { c } = m;
     const title = e => c.isUntitled(e) ? '<span class="today-untitled">+ Add a title</span>' : esc(c.shortTitle(e, c.sponsorOf(e)?.name));
     const missed = m.missed.slice(0, 3).map(e => row({ attrs: `data-today-slot="${esc(e.date)}"`, main: title(e), sub: 'Planned ' + esc(fmtDay(e.date)) + ' — not on YouTube yet', side: chip('Not live', 'late') })).join('');
-    const next = m.next.slice(0, ROWS).map(e => { const sp = c.sponsorOf(e); return row({ attrs: `data-today-slot="${esc(e.date)}"`, main: title(e), sub: esc(fmtDay(e.date)) + (sp ? ' · ◆ ' + esc(sp.name) + (sp.saved ? '' : ' (suggested)') : ''), side: (sp ? '' : chip('No sponsor', 'open')) + chip(relative(e.date), e.date === todayIso() ? 'now' : '') }); }).join('');
+    const slotRow = date => row({ attrs: `data-today-open-slot="${esc(date)}"`, main: '<span class="today-untitled">+ Add a title</span>', sub: esc(fmtDay(date)) + ' · open release slot', side: chip('Open slot', 'open') + chip(relative(date), date === todayIso() ? 'now' : '') });
+    const next = m.upcoming.slice(0, ROWS).map(({ e, slot, date }) => { if (slot) return slotRow(date); const sp = c.sponsorOf(e); return row({ attrs: `data-today-slot="${esc(e.date)}"`, main: title(e), sub: esc(fmtDay(e.date)) + (sp ? ' · ◆ ' + esc(sp.name) + (sp.saved ? '' : ' (suggested)') : ''), side: (sp ? '' : chip('No sponsor', 'open')) + chip(relative(e.date), e.date === todayIso() ? 'now' : '') }); }).join('');
     body = (missed ? `<p class="today-sub">Past their date, not live</p><ul class="today-list">${missed}</ul>` : '') +
-      (m.next.length ? `<p class="today-sub">Next 8 weeks${m.unsold.length ? ` · <b>${m.unsold.length} of ${m.next.length} without a sponsor</b>` : ' · all sponsored'}</p><ul class="today-list">${next}</ul>${more(m.next.length - ROWS, '#calendar', 'upload')}` : allClear('Nothing scheduled in the next 8 weeks — time to plan some uploads.'));
+      (m.upcoming.length ? `<p class="today-sub">Next 8 weeks${m.unsold.length ? ` · <b>${m.unsold.length} of ${m.upcoming.length} without a sponsor</b>` : ' · all sponsored'}</p><ul class="today-list">${next}</ul>${more(m.upcoming.length - ROWS, '#calendar', 'upload')}` : allClear('Nothing scheduled in the next 8 weeks — time to plan some uploads.'));
   }
-  const count = m && !m.loading && !m.error ? m.next.length : null;
+  const count = m && !m.loading && !m.error ? m.upcoming.length : null;
   return card({ id: 'todayCalendar', icon: '▦', title: 'Publishing', count, tone: m?.missed?.length ? 'late' : '', link: '#calendar', linkText: 'Calendar', body });
 }
 function moneyCard(m) {
@@ -206,7 +210,8 @@ function pulse(tasks, prod, cal, spon) {
   if (prod && !prod.loading && !prod.error) bits.push(prod.blocked ? [plural(prod.blocked, 'video') + ' blocked', 'late', 'todayProduction'] : prod.list.length ? [plural(prod.list.length, 'video') + ' need a look', 'warn', 'todayProduction'] : ['Production on track', 'ok', 'todayProduction']);
   if (cal && !cal.loading && !cal.error) {
     const n = cal.next[0];
-    bits.push(n ? ['Next upload ' + nextLabel(n.date), n.date === todayIso() ? 'now' : '', 'todayCalendar'] : ['Nothing scheduled', 'warn', 'todayCalendar']);
+    const gap = cal.slots[0];
+    bits.push(n && (!gap || n.date <= gap) ? ['Next upload ' + nextLabel(n.date), n.date === todayIso() ? 'now' : '', 'todayCalendar'] : gap ? ['Next release slot ' + nextLabel(gap) + ' has no video', 'warn', 'todayCalendar'] : ['Nothing scheduled', 'warn', 'todayCalendar']);
     const owed = cal.toInvoice.length + cal.toBePaid.length;
     if (owed) bits.push([plural(owed, 'sponsor payment') + ' to chase', 'warn', 'todayMoney']);
   }
@@ -242,6 +247,7 @@ function boot() {
     const task = e.target.closest('[data-today-task]'); if (task) { M.board()?.openTask(task.dataset.todayTask); return; }
     const video = e.target.closest('[data-today-video]'); if (video) { M.prod()?.open(video.dataset.todayVideo); return; }
     const slot = e.target.closest('[data-today-slot]'); if (slot) { M.cal()?.open(slot.dataset.todaySlot); return; }
+    const open = e.target.closest('[data-today-open-slot]'); if (open) { M.cal()?.openSlot(open.dataset.todayOpenSlot); return; }
     const deal = e.target.closest('[data-today-deal]'); if (deal) { const [tab, id] = deal.dataset.todayDeal.split('|'); M.spon()?.open(tab, id); return; }
     if (e.target.closest('[data-today-flag]')) window.Studio.show('sponsorships', { item: ['waiting-on-you'] });
   });
