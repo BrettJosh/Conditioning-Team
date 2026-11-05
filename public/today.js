@@ -1,5 +1,5 @@
 /*
- * Today — the landing screen. One page that answers "what needs us right now?" by reading what the other tabs
+ * Overview (internally the "today" tab) — the landing screen. One page that answers "what needs us right now?" by reading what the other tabs
  * already load: tasks (Notion), Production (Notion Video Projects), the content plan (Google Sheet + YouTube)
  * and the sponsorship tracker (Google Sheet + Zoho). Nothing here is stored; every row opens the real item.
  */
@@ -219,7 +219,7 @@ function render() {
   if (!window.Studio.isReady()) { $('todayPulse').innerHTML = ''; $('todayUpdated').textContent = 'Connecting…'; $('todayGrid').innerHTML = tasksCard(null) + sponsorCard(null) + productionCard(null) + calendarCard(null) + moneyCard(null); return; }
   if (!window.Studio.connected()) {
     $('todayPulse').innerHTML = ''; $('todayUpdated').textContent = '';
-    $('todayGrid').innerHTML = `<section class="today-card wide today-connect"><h3>Connect once on this device to see today’s briefing.</h3><p>Tasks due for each of you, videos that are stuck, the next uploads, sponsor replies waiting and money still to come in — all on one page. The site remembers this device after you connect, so you won’t be asked again.</p><button type="button" class="primary-btn" data-today-connect>Connect ↗</button></section>`;
+    $('todayGrid').innerHTML = `<section class="today-card wide today-connect"><h3>Connect once on this device to see the overview.</h3><p>Tasks due for each of you, videos that are stuck, the next uploads, sponsor replies waiting and money still to come in — all on one page. The site remembers this device after you connect, so you won’t be asked again.</p><button type="button" class="primary-btn" data-today-connect>Connect ↗</button></section>`;
     return;
   }
   const tasks = tasksModel(), prod = productionModel(), cal = calendarModel(), spon = sponsorModel();
@@ -234,7 +234,7 @@ function boot() {
   window.Studio.on('connection', () => { t.loadedAt = 0; if (visible()) load(false); else render(); });
   window.Studio.on('data', soon);
   $('todayRefresh').addEventListener('click', () => load(true));
-  // Back on a tab that's been sitting open a while (yesterday's Today, say): refresh quietly.
+  // Back on a tab that's been sitting open a while (yesterday's overview, say): refresh quietly.
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && visible() && t.loadedAt && Date.now() - t.loadedAt > 15 * 60000) load(true); });
   $('todayWorkspace').addEventListener('click', e => {
     const go = e.target.closest('[data-scroll]'); if (go) { $(go.dataset.scroll)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }

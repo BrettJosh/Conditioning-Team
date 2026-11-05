@@ -2,7 +2,7 @@
  * Josh Brett Studio — shared glue, loaded before the other scripts.
  *  - Auth: remembers the workspace access code on this device (or only for this browser session on a shared computer).
  *  - Router: one place that switches tabs and keeps the address bar in step, so every tab and every open item has a link:
- *      #today · #daisy · #josh · #archive · #production · #calendar · #sponsorships
+ *      #overview · #daisy · #josh · #archive · #production · #calendar · #sponsorships
  *      #josh/task/<notion id> · #production/video/<id> · #production/blocked · #calendar/2026-11-12
  *      #sponsorships/brands/<id> · #sponsorships/agencies/<id> · #sponsorships/waiting-on-you · #sponsorships/actions
  *  - Events: studio:tab (tab shown), studio:connection (connected / disconnected), studio:data (a module's data changed).
@@ -55,8 +55,9 @@ const connected = () => mode === 'notion';
 
 /* ---------- router ---------- */
 const TABS = ['today', 'weekly', 'josh', 'archive', 'production', 'calendar', 'sponsorships'];
-const SLUG = { weekly: 'daisy' };
-const fromSlug = slug => (slug === 'daisy' ? 'weekly' : TABS.includes(slug) ? slug : null);
+const SLUG = { weekly: 'daisy', today: 'overview' }; // address-bar names for internal tab ids
+const ALIAS = { daisy: 'weekly', overview: 'today' }; // #today still works for links shared before the rename
+const fromSlug = slug => ALIAS[slug] || (TABS.includes(slug) ? slug : null);
 const WORKSPACE = { today: 'todayWorkspace', weekly: 'weeklyWorkspace', josh: 'weeklyWorkspace', archive: 'weeklyWorkspace', production: 'productionWorkspace', calendar: 'calendarWorkspace', sponsorships: 'sponsorWorkspace' };
 const handlers = {}; // tab -> { open(itemParts), close() }
 let current = null, linkItem = null; // linkItem: { tab, item } for the drawer that is open now
@@ -101,7 +102,7 @@ function closeDrawers() {
 function setItem(tab, item) {
   linkItem = item && item.length ? { tab, item } : null;
   document.querySelectorAll('[data-copy-link]').forEach(b => { b.hidden = !linkItem; });
-  // The address bar follows the drawer only when it belongs to the tab on screen; a drawer opened from Today leaves #today in place.
+  // The address bar follows the drawer only when it belongs to the tab on screen; a drawer opened from the Overview leaves #overview in place.
   if (tab === current || (['weekly', 'josh', 'archive'].includes(tab) && ['weekly', 'josh', 'archive'].includes(current))) writeHash(current, linkItem ? linkItem.item : null, false);
 }
 function register(tabs, handler) { [].concat(tabs).forEach(t => { handlers[t] = handler; }); }
@@ -131,7 +132,7 @@ function boot() {
     close.replaceWith(group); group.append(btn, close);
   });
   document.querySelectorAll('[data-view-tab]').forEach(b => b.addEventListener('click', () => show(b.dataset.viewTab)));
-  // Plain #links anywhere on the page (Today uses them) go through the router too.
+  // Plain #links anywhere on the page (the Overview uses them) go through the router too.
   document.addEventListener('click', e => {
     const a = e.target.closest('a[href^="#"]'); if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
     const route = parse(a.getAttribute('href')); if (!route) return;
