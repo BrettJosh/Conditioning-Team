@@ -130,7 +130,7 @@ function calendarModel() {
   const events = c.events();
   const next = events.filter(e => c.stateOf(e) === 'scheduled' && e.date >= today && e.date <= horizon).sort((a, b) => a.date.localeCompare(b.date));
   const missed = events.filter(e => c.stateOf(e) === 'overdue' && e.date >= back).sort((a, b) => b.date.localeCompare(a.date));
-  // Open release slots (every other Friday with nothing planned that fortnight) sit in the list alongside planned videos.
+  // Open release slots (2nd/4th Fridays in months with fewer than two videos planned) sit in the list alongside planned videos.
   const slots = c.openSlots ? c.openSlots(today, horizon) : [];
   const upcoming = [...next.map(e => ({ e, date: e.date })), ...slots.map(date => ({ slot: true, date }))].sort((a, b) => a.date.localeCompare(b.date));
   const unsold = upcoming.filter(x => x.slot || !c.sponsorOf(x.e));

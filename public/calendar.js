@@ -22,18 +22,24 @@ function stateOf(e){if(e.yt&&e.yt.live!=='upcoming')return'published';return e.d
 const STATE_LABEL={published:'Published',scheduled:'Upcoming',overdue:'Not live yet'};
 const statusClass=s=>'sp-'+String(s||'none').toLowerCase().replace(/\s+/g,'-');
 
-/* Release rhythm: an open "+ Add title" slot every other Friday, in step with the plan (13 Nov, 27 Nov, 11 Dec 2026…).
- * A slot stands for its fortnight: any planned video from 6 days before to 7 days after that Friday fills it, so moving a
- * release a few days either way (26 Dec instead of Christmas Day, say) doesn't leave an empty slot behind.
+/* Release rhythm: two videos a month, on the 2nd and 4th Friday — two weeks apart, in step with the plan
+ * (13 & 27 Nov, 11 Dec 2026…). A month counts its planned videos: with two or more it shows no slots; with one, that video
+ * fills the nearer Friday and the other stays open, so the pair stays roughly two weeks apart (26 Dec covers the 25th).
  * Slots are only drawn, never saved: giving one a title, or dragging it to another day, adds it to the sheet. */
-const SLOT_ANCHOR='2026-11-13',SLOT_EVERY=14,SLOT_BEFORE=6,SLOT_AFTER=7;
+const SLOT_FRIDAYS=[2,4],SLOT_LABEL='2nd and 4th Friday';
 const dayNum=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/86400000;
-const fromNum=n=>new Date(n*86400000).toISOString().slice(0,10);
+const pad2=n=>String(n).padStart(2,'0');
+function releaseFridays(y,m){const first=new Date(Date.UTC(y,m,1)).getUTCDay(),firstFri=1+(5-first+7)%7;return SLOT_FRIDAYS.map(n=>y+'-'+pad2(m+1)+'-'+pad2(firstFri+(n-1)*7));}
 function openSlots(from,to){
- const a=dayNum(SLOT_ANCHOR),start=Math.max(dayNum(from),a),end=Math.min(dayNum(to),dayNum(LAST_YEAR+'-12-31'));
- const planned=state.events.flatMap(e=>[dayNum(e.date),dayNum(shownOn(e))]);
- const out=[];
- for(let n=a+Math.ceil((start-a)/SLOT_EVERY)*SLOT_EVERY;n<=end;n+=SLOT_EVERY)if(!planned.some(p=>p>=n-SLOT_BEFORE&&p<=n+SLOT_AFTER))out.push(fromNum(n));
+ if(to>LAST_YEAR+'-12-31')to=LAST_YEAR+'-12-31';
+ const out=[],live=state.events.map(shownOn);
+ for(let y=+from.slice(0,4),m=+from.slice(5,7)-1;y+'-'+pad2(m+1)<=to.slice(0,7);m===11?(m=0,y++):m++){
+  const month=y+'-'+pad2(m+1),open=releaseFridays(y,m);
+  live.filter(d=>d.startsWith(month)).sort().forEach(d=>{ // each planned video fills the nearest open Friday
+   if(!open.length)return;let best=0;open.forEach((f,i)=>{if(Math.abs(dayNum(f)-dayNum(d))<Math.abs(dayNum(open[best])-dayNum(d)))best=i;});open.splice(best,1);
+  });
+  open.forEach(f=>{if(f>=from&&f<=to)out.push(f);});
+ }
  return out;
 }
 
@@ -86,7 +92,7 @@ function sponsorTag(item,sp){
  const label=sp.saved?(sp.status||'No status'):'Suggested — click to confirm';
  return '<button class="cal-sponsor '+(sp.saved?statusClass(sp.status):'sp-suggested')+'" type="button" data-sponsor-date="'+item.date+'" title="'+esc('Sponsor: '+sp.name+' — '+label)+'" aria-label="'+esc('Sponsor '+sp.name+', '+label)+'"><span class="cal-sponsor-name">◆ '+esc(sp.name)+(sp.saved?'':' ?')+'</span></button>';
 }
-function slotChip(date){return '<button class="calendar-event cal-slot" type="button" draggable="true" data-slot-date="'+date+'" title="Release slot — every other Friday. Click to plan a video here, or drag it to another day."><span class="cal-ev-title cal-untitled">+ Add title</span><span class="cal-ev-meta">◌ Slot</span></button>'}
+function slotChip(date){return '<button class="calendar-event cal-slot" type="button" draggable="true" data-slot-date="'+date+'" title="Release slot — two videos a month, on the '+SLOT_LABEL+'. Click to plan a video here, or drag it to another day."><span class="cal-ev-title cal-untitled">+ Add title</span><span class="cal-ev-meta">◌ Slot</span></button>'}
 function extraChip(v){return '<button class="calendar-event cal-extra" type="button" data-extra="'+esc(v.id)+'" title="'+esc(v.title+'\nOn YouTube but not in the plan · '+compact(v.views)+' views — click to add it')+'"><span class="cal-ev-title">'+esc(v.title)+'</span><span class="cal-ev-meta">✓ '+compact(v.views)+' · unplanned</span></button>'}
 
 /* The readable version: one row per video in the quarter. */
@@ -97,7 +103,7 @@ function renderAgenda(list,extras,slots=[]){
  const dayLabel=d=>new Date(d+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
  $('calendarAgenda').innerHTML='<div class="cal-agenda-head"><h3>'+(state.start===currentQuarterStart()?'This quarter':esc($('calendarRange').textContent))+'</h3><span>'+rows.length+' video'+(rows.length===1?'':'s')+' · click a row to open it</span></div><div class="cal-agenda-wrap"><table class="cal-agenda"><thead><tr><th>Date</th><th>Video</th><th>Status</th><th class="num">Views</th><th>Sponsor</th><th>Deal</th></tr></thead><tbody>'+
   rows.map(r=>{
-   if(r.kind==='slot')return '<tr class="cal-a-slot" data-slot-date="'+r.date+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(r.date))+'</td><td><strong class="cal-untitled">+ Add title</strong><small>Release slot — every other Friday</small></td><td>'+pillFor('slot')+'</td><td class="num"><span class="muted">—</span></td><td><span class="muted">—</span></td><td></td></tr>';
+   if(r.kind==='slot')return '<tr class="cal-a-slot" data-slot-date="'+r.date+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(r.date))+'</td><td><strong class="cal-untitled">+ Add title</strong><small>Release slot — '+SLOT_LABEL+'</small></td><td>'+pillFor('slot')+'</td><td class="num"><span class="muted">—</span></td><td><span class="muted">—</span></td><td></td></tr>';
    if(r.kind==='extra'){const v=r.v;return '<tr data-extra="'+esc(v.id)+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(v.date))+'</td><td><strong>'+esc(v.title)+'</strong><small>On YouTube, not in the plan</small></td><td>'+pillFor('extra')+'</td><td class="num">'+compact(v.views)+'</td><td class="muted">—</td><td></td></tr>'}
    const e=r.e,st=stateOf(e),sp=sponsorOf(e),y=e.yt,moved=r.date!==e.date;
    const sub=[y&&y.title&&y.title.toLowerCase()!==String(e.text).toLowerCase()?'YouTube: '+y.title:'',moved?'Planned '+fmtDay(e.date):''].filter(Boolean).join(' · ');
