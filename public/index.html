@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#f8f5ec" />
-  <meta name="description" content="Josh Brett Studio — a lightweight creative operations board." />
-  <title>Josh Brett Studio — Creative Board</title>
+  <meta name="description" content="Josh Brett Studio: a lightweight creative operations board." />
+  <title>Josh Brett Studio · Creative Board</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body class="local-demo-mode">
@@ -22,7 +22,7 @@
       </div>
     </header>
 
-    <div id="demoWarning" class="demo-warning" role="status"><strong>NOT CONNECTED</strong><span>You’re looking at sample data — nothing you change here is saved. Connect once and this device remembers it.</span><button id="demoConnectBtn" type="button">Connect ↗</button></div>
+    <div id="demoWarning" class="demo-warning" role="status"><strong>NOT CONNECTED</strong><span>You’re looking at sample data, so nothing you change here is saved. Connect once and this device remembers it.</span><button id="demoConnectBtn" type="button">Connect ↗</button></div>
     <main class="main-content">
       <section class="hero" aria-label="Workspace introduction">
         <div class="hero-stickers" aria-label="Studio reminders">
@@ -113,7 +113,7 @@
 <section class="workspace calendar-workspace" id="calendarWorkspace" aria-label="2026 content calendar" hidden>
   <div class="workspace-heading"><div><div class="overline">/ PUBLISHING ROADMAP</div><h2>CONTENT <span class="scribble">CALENDAR</span></h2></div>
   <div class="workspace-actions"><button class="quiet-btn" id="calendarRefresh">↻ Refresh</button><a class="quiet-btn calendar-sheet-link" href="https://docs.google.com/spreadsheets/d/1zvaFJCApnz6YFzJCXUtC9BSLW40pR58vyPM7pgSWfB4/edit" target="_blank" rel="noopener">↗ Source sheet</a></div></div>
-  <p class="calendar-intro">Your publishing plan, a quarter at a time — press Later to plan into 2027. Yellow is coming up, orange is past its date but not on YouTube yet, green is live — detected from your channel automatically. Click a video for its stats, sponsor and payment status; drag it to reschedule. Dashed “+ Add title” squares are open release slots — two a month, on the 2nd and 4th Friday — click one to plan it, or drag it to another day. The Google Sheet stays the source of truth.</p>
+  <p class="calendar-intro">Your publishing plan, a quarter at a time. Press Later to plan into 2027. Yellow is coming up, orange is past its date but not on YouTube yet, and green is live (picked up from your channel automatically). Click a video for its stats, sponsor and payment status, or drag it to reschedule. Dashed “+ Add title” squares are open release slots, two a month on the 2nd and 4th Friday. Click one to plan it, or drag it to another day. The Google Sheet stays the source of truth.</p>
   <div id="calendarNotice" class="notice" role="status" hidden></div>
   <div id="calendarSetupHelp" class="notice" hidden>
     <strong>Connect your Google Sheet to activate this calendar.</strong>
@@ -207,14 +207,14 @@
 <div id="calendarYt" class="cal-yt" hidden></div>
 <div id="calendarLink" class="cal-link" hidden></div>
 <form id="calendarForm" class="task-form">
-<label>Video title <textarea id="calendarText" rows="2" maxlength="1500" required placeholder="e.g. Rich Piana (MacroFactor) — a sponsor in brackets is picked up automatically"></textarea></label>
+<label>Video title <textarea id="calendarText" rows="2" maxlength="1500" required placeholder="e.g. Rich Piana (MacroFactor). A sponsor in brackets is picked up automatically."></textarea></label>
 <label>Scheduled publish date <input type="date" id="calendarDate" min="2026-01-01" max="2030-12-31" required></label>
 <p class="calendar-field-hint">Moving an existing video removes the old date entry. Dates already containing another entry cannot be overwritten.</p>
 <fieldset class="cal-fieldset"><legend>◆ Sponsorship</legend>
-<div class="form-row"><label>Sponsor <input id="calendarSponsor" type="text" list="calendarSponsorOptions" maxlength="120" placeholder="None — or pick a brand" autocomplete="off"><datalist id="calendarSponsorOptions"></datalist></label>
+<div class="form-row"><label>Sponsor <input id="calendarSponsor" type="text" list="calendarSponsorOptions" maxlength="120" placeholder="None, or pick a brand" autocomplete="off"><datalist id="calendarSponsorOptions"></datalist></label>
 <label>Sponsor status <select id="calendarSponsorStatus"></select></label></div>
 <p class="calendar-field-hint" id="calendarSponsorHint"></p></fieldset>
-<label>YouTube link <input id="calendarYoutube" type="url" maxlength="300" placeholder="Filled in automatically once live — paste a link to override"></label>
+<label>YouTube link <input id="calendarYoutube" type="url" maxlength="300" placeholder="Filled in automatically once live. Paste a link to override."></label>
 <fieldset class="cal-fieldset"><legend>From YouTube Studio (optional)</legend>
 <div class="form-row"><label>Views (7 days) <input id="calendarViews" type="number" min="0" step="1" placeholder="Optional"></label><label>CTR (%) <input id="calendarCtr" type="number" min="0" max="100" step="0.1" placeholder="Optional"></label></div>
 <label>Average view duration <input id="calendarAvd" type="text" maxlength="30" placeholder="e.g. 7:30"></label></fieldset>
@@ -228,11 +228,11 @@
 <div class="form-row"><label>Status <select id="sponsorStatus"></select></label><label>Last activity <input id="sponsorLastActivity" type="date"></label></div>
 <label>What's happening (one line) <textarea id="sponsorSummary" rows="2" maxlength="800"></textarea></label>
 <label data-brand-only>Next step <textarea id="sponsorNextStep" rows="2" maxlength="800" placeholder="What needs to happen next?"></textarea></label>
-<div class="form-row"><label>First contact <input id="sponsorFirstContact" type="date"></label><label data-brand-only>Initiated by <select id="sponsorInitiatedBy"><option value="">—</option><option>Josh</option><option>Brand</option><option>Agency</option></select></label><label data-agency-only>Type <input id="sponsorType" type="text" maxlength="120" placeholder="Sponsorship agency, marketplace…"></label></div>
+<div class="form-row"><label>First contact <input id="sponsorFirstContact" type="date"></label><label data-brand-only>Initiated by <select id="sponsorInitiatedBy"><option value="">Not set</option><option>Josh</option><option>Brand</option><option>Agency</option></select></label><label data-agency-only>Type <input id="sponsorType" type="text" maxlength="120" placeholder="Sponsorship agency, marketplace…"></label></div>
 <div class="form-row" data-brand-only><label>Via <input id="sponsorVia" type="text" maxlength="200" placeholder="Direct, or the agency"></label><label>Category <input id="sponsorCategory" type="text" maxlength="120"></label></div>
 <div class="form-row" data-brand-only><label>Rate discussed <input id="sponsorRate" type="text" maxlength="300"></label><label>Agreed value (USD) <input id="sponsorAgreedValue" type="number" min="0" step="1" placeholder="Only once signed"></label></div>
 <div data-agency-only class="task-form"><label>Terms / rate on file <input id="sponsorTerms" type="text" maxlength="400"></label><label>Brands brought or mentioned <input id="sponsorBrands" type="text" maxlength="400"></label></div>
-<label>Contact <textarea id="sponsorContact" rows="3" maxlength="1500" placeholder="Name, role, email — one per line. Emails here are what the Zoho sync matches on."></textarea></label>
+<label>Contact <textarea id="sponsorContact" rows="3" maxlength="1500" placeholder="Name, role and email, one per line. Emails here are what the Zoho sync matches on."></textarea></label>
 <div class="task-notes-block"><div class="task-notes-heading"><label for="sponsorHistory">Full history</label></div><textarea id="sponsorHistory" rows="7" maxlength="6000" placeholder="• 2 Nov: what happened"></textarea></div>
 <div class="form-actions"><span id="sponsorSaveStatus" class="sponsor-save-status" role="status"></span><button class="primary-btn" id="sponsorSave" type="submit">Save to Google Sheets ↗</button></div></form>
 <div class="comments-section" id="sponsorNoteBlock"><div class="comments-title"><h3>Log an email or note</h3><span class="overline">/ KEEP IT CURRENT</span></div>
@@ -246,16 +246,16 @@
     <div class="overlay-backdrop" data-close-connection></div>
     <section class="connection-dialog" role="dialog" aria-modal="true" aria-labelledby="connectTitle" aria-describedby="connectionStatus">
       <div class="drawer-top"><span class="overline">/ DATA SOURCE</span><button class="icon-close" id="closeConnectionBtn" type="button" aria-label="Close connection settings">✕</button></div>
-      <span class="connect-sticker" id="connectSticker">● NOT CONNECTED — SAMPLE DATA</span>
+      <span class="connect-sticker" id="connectSticker">● NOT CONNECTED · SAMPLE DATA</span>
       <h2 id="connectTitle">Connect to<br><span class="highlight-inline">the studio.</span></h2>
       <div id="connectSignedOut">
         <p><strong>Enter the workspace access code once.</strong> It unlocks the shared tasks, videos, content calendar and sponsorships, and this device remembers it so you won’t be asked again.</p>
         <form id="connectForm" class="connection-form">
           <label>Workspace access code <input id="accessPassword" type="password" autocomplete="off" placeholder="The team code" /></label>
-          <label class="remember-check"><input type="checkbox" id="rememberDevice" checked> <span><strong>Remember this device</strong><small>Untick on a shared or borrowed computer — it then forgets the code when the browser closes.</small></span></label>
+          <label class="remember-check"><input type="checkbox" id="rememberDevice" checked> <span><strong>Remember this device</strong><small>Untick on a shared or borrowed computer and it forgets the code when the browser closes.</small></span></label>
           <button class="primary-btn" type="submit">Connect ↗</button>
         </form>
-        <button class="text-btn" id="demoModeBtn" type="button">Just look around — sample data, nothing is saved</button>
+        <button class="text-btn" id="demoModeBtn" type="button">Just look around (sample data, nothing is saved)</button>
       </div>
       <div id="connectSignedIn" hidden>
         <p><strong>You’re connected.</strong> Everything you change here goes straight to Notion and the Google Sheets the team shares.</p>

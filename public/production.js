@@ -66,7 +66,7 @@ function openProject(id){
   $('productionDue').value=p.nextDue||'';
   $('productionBlocker').value=p.blocker||'';
   $('productionThumbnail').value=p.thumbnailStatus||'';
-  $('productionConfirmed').textContent=p.lastConfirmed?'Last confirmed '+date(p.lastConfirmed):'Never confirmed — saving marks it current.';
+  $('productionConfirmed').textContent=p.lastConfirmed?'Last confirmed '+date(p.lastConfirmed):'Never confirmed. Saving marks it current.';
   const l=$('productionNotionLink');l.href=/^https:\/\//.test(p.url)?p.url:'#';
   $('productionDrawer').hidden=false;document.body.style.overflow='hidden';
   window.Studio.setItem('production',['video',id]);
@@ -116,7 +116,7 @@ function boot(){
       if(slug){setFilter(slug[0]);return;}
       if(item[0]!=='video'||!item[1])return;
       await ensureLoaded();
-      if(!s.projects.some(p=>p.id===item[1])){window.StudioBoard?.toast('That video isn’t in the active list — it may be published or deleted in Notion.');return;}
+      if(!s.projects.some(p=>p.id===item[1])){window.StudioBoard?.toast('That video isn’t in the active list. It may be published or deleted in Notion.');return;}
       openProject(item[1]);
     },
     close:closeProject

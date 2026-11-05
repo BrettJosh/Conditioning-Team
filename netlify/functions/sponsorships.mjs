@@ -1,5 +1,5 @@
 /**
- * Josh Brett Studio — Sponsorships bridge. Runs ONLY server-side on Netlify.
+ * Josh Brett Studio - Sponsorships bridge. Runs ONLY server-side on Netlify.
  * Gated by BOARD_ACCESS_CODE like every other function. Sheet actions are proxied to the same
  * Apps Script deployment as the content calendar (STUDIO_CALENDAR_SCRIPT_URL / SECRET);
  * Zoho actions use netlify/lib/zoho-sync.mjs.

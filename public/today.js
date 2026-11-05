@@ -1,5 +1,5 @@
 /*
- * Overview (internally the "today" tab) — the landing screen. One page that answers "what needs us right now?" by reading what the other tabs
+ * Overview (internally the "today" tab) - the landing screen. One page that answers "what needs us right now?" by reading what the other tabs
  * already load: tasks (Notion), Production (Notion Video Projects), the content plan (Google Sheet + YouTube)
  * and the sponsorship tracker (Google Sheet + Zoho). Nothing here is stored; every row opens the real item.
  */
@@ -147,11 +147,11 @@ function calendarCard(m) {
   else {
     const { c } = m;
     const title = e => c.isUntitled(e) ? '<span class="today-untitled">+ Add a title</span>' : esc(c.shortTitle(e, c.sponsorOf(e)?.name));
-    const missed = m.missed.slice(0, 3).map(e => row({ attrs: `data-today-slot="${esc(e.date)}"`, main: title(e), sub: 'Planned ' + esc(fmtDay(e.date)) + ' — not on YouTube yet', side: chip('Not live', 'late') })).join('');
+    const missed = m.missed.slice(0, 3).map(e => row({ attrs: `data-today-slot="${esc(e.date)}"`, main: title(e), sub: 'Planned ' + esc(fmtDay(e.date)) + ', not on YouTube yet', side: chip('Not live', 'late') })).join('');
     const slotRow = date => row({ attrs: `data-today-open-slot="${esc(date)}"`, main: '<span class="today-untitled">+ Add a title</span>', sub: esc(fmtDay(date)) + ' · open release slot', side: chip('Open slot', 'open') + chip(relative(date), date === todayIso() ? 'now' : '') });
     const next = m.upcoming.slice(0, ROWS).map(({ e, slot, date }) => { if (slot) return slotRow(date); const sp = c.sponsorOf(e); return row({ attrs: `data-today-slot="${esc(e.date)}"`, main: title(e), sub: esc(fmtDay(e.date)) + (sp ? ' · ◆ ' + esc(sp.name) + (sp.saved ? '' : ' (suggested)') : ''), side: (sp ? '' : chip('No sponsor', 'open')) + chip(relative(e.date), e.date === todayIso() ? 'now' : '') }); }).join('');
     body = (missed ? `<p class="today-sub">Past their date, not live</p><ul class="today-list">${missed}</ul>` : '') +
-      (m.upcoming.length ? `<p class="today-sub">Next 8 weeks${m.unsold.length ? ` · <b>${m.unsold.length} of ${m.upcoming.length} without a sponsor</b>` : ' · all sponsored'}</p><ul class="today-list">${next}</ul>${more(m.upcoming.length - ROWS, '#calendar', 'upload')}` : allClear('Nothing scheduled in the next 8 weeks — time to plan some uploads.'));
+      (m.upcoming.length ? `<p class="today-sub">Next 8 weeks${m.unsold.length ? ` · <b>${m.unsold.length} of ${m.upcoming.length} without a sponsor</b>` : ' · all sponsored'}</p><ul class="today-list">${next}</ul>${more(m.upcoming.length - ROWS, '#calendar', 'upload')}` : allClear('Nothing scheduled in the next 8 weeks. Time to plan some uploads.'));
   }
   const count = m && !m.loading && !m.error ? m.upcoming.length : null;
   return card({ id: 'todayCalendar', icon: '▦', title: 'Publishing', count, tone: m?.missed?.length ? 'late' : '', link: '#calendar', linkText: 'Calendar', body });
@@ -224,7 +224,7 @@ function render() {
   if (!window.Studio.isReady()) { $('todayPulse').innerHTML = ''; $('todayUpdated').textContent = 'Connecting…'; $('todayGrid').innerHTML = tasksCard(null) + sponsorCard(null) + productionCard(null) + calendarCard(null) + moneyCard(null); return; }
   if (!window.Studio.connected()) {
     $('todayPulse').innerHTML = ''; $('todayUpdated').textContent = '';
-    $('todayGrid').innerHTML = `<section class="today-card wide today-connect"><h3>Connect once on this device to see the overview.</h3><p>Tasks due for each of you, videos that are stuck, the next uploads, sponsor replies waiting and money still to come in — all on one page. The site remembers this device after you connect, so you won’t be asked again.</p><button type="button" class="primary-btn" data-today-connect>Connect ↗</button></section>`;
+    $('todayGrid').innerHTML = `<section class="today-card wide today-connect"><h3>Connect once on this device to see the overview.</h3><p>Tasks due for each of you, videos that are stuck, the next uploads, sponsor replies waiting and money still to come in, all on one page. The site remembers this device after you connect, so you won’t be asked again.</p><button type="button" class="primary-btn" data-today-connect>Connect ↗</button></section>`;
     return;
   }
   const tasks = tasksModel(), prod = productionModel(), cal = calendarModel(), spon = sponsorModel();

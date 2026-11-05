@@ -372,7 +372,7 @@ body.local-demo-mode #connectionOverlay .connection-status{background:#ffe5e5;bo
 .cal-today-btn{margin:0 0 0 4px;padding:4px 2px}
 
 
-/* Today — the landing briefing. Built from the same pieces as the other tabs: ink outlines, offset shadows, pastel chips. */
+/* Today - the landing briefing. Built from the same pieces as the other tabs: ink outlines, offset shadows, pastel chips. */
 .today-workspace{padding-bottom:70px}
 .today-updated{font-size:11px;font-weight:800;color:var(--muted)}
 .today-pulse{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 22px;min-height:8px}
@@ -426,7 +426,7 @@ body.local-demo-mode #connectionOverlay .connection-status{background:#ffe5e5;bo
 @media(max-width:900px){.today-grid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:600px){.today-card{padding:15px 14px 13px;border-radius:15px}.today-card-head h3{font-size:17px}.today-icon{width:26px;height:26px;font-size:12px}.today-row{flex-direction:column;align-items:flex-start;gap:7px}.today-row-side{max-width:100%;justify-content:flex-start}.today-pulse-item{font-size:11px;padding:8px 11px}}
 
-/* Copy link — next to the close button on every drawer. */
+/* Copy link - next to the close button on every drawer. */
 .drawer-top-actions{display:flex;align-items:center;gap:8px}
 .copy-link-btn{height:35px;border:2px solid var(--ink);border-radius:9px;background:var(--white);box-shadow:2px 2px 0 var(--ink);font-weight:900;font-size:12px;padding:0 11px}
 .copy-link-btn:hover{background:#fff2ba}
@@ -439,7 +439,7 @@ body.local-demo-mode #connectionOverlay .connection-status{background:#ffe5e5;bo
 body:not(.local-demo-mode) #connectionOverlay .connection-status{background:#eef9f1;border:2px solid #4c9f87;color:#2f6b4a;font-size:13px}
 #connectSignedIn .secondary-btn{margin:4px 0 2px}
 
-/* Release slots: an open "+ Add title" every other Friday — drawn, not saved, until it's planned or dragged. */
+/* Release slots: an open "+ Add title" every other Friday - drawn, not saved, until it's planned or dragged. */
 .calendar-event.cal-slot{background:#fffefa;border-style:dashed;border-color:#a88400;border-left-style:solid;opacity:.92}
 .calendar-event.cal-slot:hover{background:#fff8dc;opacity:1}
 .cal-key .k-slot{background:#fffefa;border-style:dashed;border-left:3px solid #a88400}

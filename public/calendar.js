@@ -22,7 +22,7 @@ function stateOf(e){if(e.yt&&e.yt.live!=='upcoming')return'published';return e.d
 const STATE_LABEL={published:'Published',scheduled:'Upcoming',overdue:'Not live yet'};
 const statusClass=s=>'sp-'+String(s||'none').toLowerCase().replace(/\s+/g,'-');
 
-/* Release rhythm: two videos a month, on the 2nd and 4th Friday — two weeks apart, in step with the plan
+/* Release rhythm: two videos a month, on the 2nd and 4th Friday, two weeks apart, in step with the plan
  * (13 & 27 Nov, 11 Dec 2026…). A month counts its planned videos: with two or more it shows no slots; with one, that video
  * fills the nearer Friday and the other stays open, so the pair stays roughly two weeks apart (26 Dec covers the 25th).
  * Slots are only drawn, never saved: giving one a title, or dragging it to another day, adds it to the sheet. */
@@ -77,7 +77,7 @@ const sponsorOf=item=>item.sponsor?{name:item.sponsor,status:item.sponsorStatus|
 function tooltip(item){
  const st=stateOf(item),y=item.yt,sp=sponsorOf(item),lines=[item.text,STATE_LABEL[st]+(y?' · '+compact(y.views)+' views':'')];
  if(shownOn(item)!==item.date)lines.push('Planned '+fmtDay(item.date)+', went out '+fmtDay(shownOn(item)));
- if(sp)lines.push('Sponsor: '+sp.name+' — '+(sp.saved?(sp.status||'status not set'):'suggested, click to confirm'));
+ if(sp)lines.push('Sponsor: '+sp.name+', '+(sp.saved?(sp.status||'status not set'):'suggested, click to confirm'));
  return lines.join('\n');
 }
 /* Grid card: two-line title + one meta line. The sponsor is a slim tag right under it, coloured by deal status. */
@@ -89,11 +89,11 @@ function chip(item){
 }
 function sponsorTag(item,sp){
  if(!sp)return'';
- const label=sp.saved?(sp.status||'No status'):'Suggested — click to confirm';
- return '<button class="cal-sponsor '+(sp.saved?statusClass(sp.status):'sp-suggested')+'" type="button" data-sponsor-date="'+item.date+'" title="'+esc('Sponsor: '+sp.name+' — '+label)+'" aria-label="'+esc('Sponsor '+sp.name+', '+label)+'"><span class="cal-sponsor-name">◆ '+esc(sp.name)+(sp.saved?'':' ?')+'</span></button>';
+ const label=sp.saved?(sp.status||'No status'):'Suggested, click to confirm';
+ return '<button class="cal-sponsor '+(sp.saved?statusClass(sp.status):'sp-suggested')+'" type="button" data-sponsor-date="'+item.date+'" title="'+esc('Sponsor: '+sp.name+', '+label)+'" aria-label="'+esc('Sponsor '+sp.name+', '+label)+'"><span class="cal-sponsor-name">◆ '+esc(sp.name)+(sp.saved?'':' ?')+'</span></button>';
 }
-function slotChip(date){return '<button class="calendar-event cal-slot" type="button" draggable="true" data-slot-date="'+date+'" title="Release slot — two videos a month, on the '+SLOT_LABEL+'. Click to plan a video here, or drag it to another day."><span class="cal-ev-title cal-untitled">+ Add title</span><span class="cal-ev-meta">◌ Slot</span></button>'}
-function extraChip(v){return '<button class="calendar-event cal-extra" type="button" data-extra="'+esc(v.id)+'" title="'+esc(v.title+'\nOn YouTube but not in the plan · '+compact(v.views)+' views — click to add it')+'"><span class="cal-ev-title">'+esc(v.title)+'</span><span class="cal-ev-meta">✓ '+compact(v.views)+' · unplanned</span></button>'}
+function slotChip(date){return '<button class="calendar-event cal-slot" type="button" draggable="true" data-slot-date="'+date+'" title="Release slot: two videos a month, on the '+SLOT_LABEL+'. Click to plan a video here, or drag it to another day."><span class="cal-ev-title cal-untitled">+ Add title</span><span class="cal-ev-meta">◌ Slot</span></button>'}
+function extraChip(v){return '<button class="calendar-event cal-extra" type="button" data-extra="'+esc(v.id)+'" title="'+esc(v.title+'\nOn YouTube but not in the plan · '+compact(v.views)+' views. Click to add it.')+'"><span class="cal-ev-title">'+esc(v.title)+'</span><span class="cal-ev-meta">✓ '+compact(v.views)+' · unplanned</span></button>'}
 
 /* The readable version: one row per video in the quarter. */
 const pillFor=st=>'<span class="cal-pill cal-'+st+'">'+(st==='published'?'✓ Published':st==='overdue'?'! Not live yet':st==='extra'?'✓ Live, not planned':st==='slot'?'◌ Open slot':'◷ Upcoming')+'</span>';
@@ -103,12 +103,12 @@ function renderAgenda(list,extras,slots=[]){
  const dayLabel=d=>new Date(d+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
  $('calendarAgenda').innerHTML='<div class="cal-agenda-head"><h3>'+(state.start===currentQuarterStart()?'This quarter':esc($('calendarRange').textContent))+'</h3><span>'+rows.length+' video'+(rows.length===1?'':'s')+' · click a row to open it</span></div><div class="cal-agenda-wrap"><table class="cal-agenda"><thead><tr><th>Date</th><th>Video</th><th>Status</th><th class="num">Views</th><th>Sponsor</th><th>Deal</th></tr></thead><tbody>'+
   rows.map(r=>{
-   if(r.kind==='slot')return '<tr class="cal-a-slot" data-slot-date="'+r.date+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(r.date))+'</td><td><strong class="cal-untitled">+ Add title</strong><small>Release slot — '+SLOT_LABEL+'</small></td><td>'+pillFor('slot')+'</td><td class="num"><span class="muted">—</span></td><td><span class="muted">—</span></td><td></td></tr>';
-   if(r.kind==='extra'){const v=r.v;return '<tr data-extra="'+esc(v.id)+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(v.date))+'</td><td><strong>'+esc(v.title)+'</strong><small>On YouTube, not in the plan</small></td><td>'+pillFor('extra')+'</td><td class="num">'+compact(v.views)+'</td><td class="muted">—</td><td></td></tr>'}
+   if(r.kind==='slot')return '<tr class="cal-a-slot" data-slot-date="'+r.date+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(r.date))+'</td><td><strong class="cal-untitled">+ Add title</strong><small>Release slot, '+SLOT_LABEL+'</small></td><td>'+pillFor('slot')+'</td><td class="num"><span class="muted">–</span></td><td><span class="muted">–</span></td><td></td></tr>';
+   if(r.kind==='extra'){const v=r.v;return '<tr data-extra="'+esc(v.id)+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(v.date))+'</td><td><strong>'+esc(v.title)+'</strong><small>On YouTube, not in the plan</small></td><td>'+pillFor('extra')+'</td><td class="num">'+compact(v.views)+'</td><td class="muted">–</td><td></td></tr>'}
    const e=r.e,st=stateOf(e),sp=sponsorOf(e),y=e.yt,moved=r.date!==e.date;
    const sub=[y&&y.title&&y.title.toLowerCase()!==String(e.text).toLowerCase()?'YouTube: '+y.title:'',moved?'Planned '+fmtDay(e.date):''].filter(Boolean).join(' · ');
    const deal=sp?(sp.saved?'<span class="cal-deal '+statusClass(sp.status)+'">'+esc(sp.status||'No status')+'</span>':'<span class="cal-deal sp-suggested">Confirm?</span>'):'';
-   return '<tr data-edit-date="'+e.date+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(r.date))+'</td><td>'+(isUntitled(e)?'<strong class="cal-untitled">+ Add title</strong>':'<strong>'+esc(shortTitle(e,sp&&sp.name))+'</strong>')+(sub?'<small>'+esc(sub)+'</small>':'')+'</td><td>'+pillFor(st)+'</td><td class="num">'+(y?compact(y.views):'<span class="muted">—</span>')+'</td><td>'+(sp?'<span class="cal-a-sponsor'+(sp.saved?'':' suggested')+'" data-sponsor-date="'+e.date+'">◆ '+esc(sp.name)+'</span>':'<span class="muted">—</span>')+'</td><td>'+deal+'</td></tr>';
+   return '<tr data-edit-date="'+e.date+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(r.date))+'</td><td>'+(isUntitled(e)?'<strong class="cal-untitled">+ Add title</strong>':'<strong>'+esc(shortTitle(e,sp&&sp.name))+'</strong>')+(sub?'<small>'+esc(sub)+'</small>':'')+'</td><td>'+pillFor(st)+'</td><td class="num">'+(y?compact(y.views):'<span class="muted">–</span>')+'</td><td>'+(sp?'<span class="cal-a-sponsor'+(sp.saved?'':' suggested')+'" data-sponsor-date="'+e.date+'">◆ '+esc(sp.name)+'</span>':'<span class="muted">–</span>')+'</td><td>'+deal+'</td></tr>';
   }).join('')+'</tbody></table></div>';
 }
 function renderSummary(list,slots=[]){
@@ -121,10 +121,10 @@ function renderSummary(list,slots=[]){
   '<span class="cal-sum cal-scheduled">◷ '+up.length+' upcoming</span>',
   late.length?'<span class="cal-sum cal-overdue">! '+late.length+' not live yet</span>':'',
   slots.length?'<span class="cal-sum cal-slot">◌ '+slots.length+' open release slot'+(slots.length===1?'':'s')+'</span>':'',
-  sp.length?'<span class="cal-sum cal-sponsored">◆ '+sp.length+' sponsored'+(by('Paid')||by('Invoiced')||by('In progress')?' — '+[by('Paid')&&by('Paid')+' paid',by('Invoiced')&&by('Invoiced')+' invoiced',by('In progress')&&by('In progress')+' in progress'].filter(Boolean).join(', '):'')+'</span>':''
+  sp.length?'<span class="cal-sum cal-sponsored">◆ '+sp.length+' sponsored'+(by('Paid')||by('Invoiced')||by('In progress')?': '+[by('Paid')&&by('Paid')+' paid',by('Invoiced')&&by('Invoiced')+' invoiced',by('In progress')&&by('In progress')+' in progress'].filter(Boolean).join(', '):'')+'</span>':''
  ].join('');
  const y=state.youtube||{};
- const ytLine=!y.configured?'<span class="cal-yt-note">Connect YouTube to mark videos published automatically — see the README (“YouTube on the calendar”).</span>'
+ const ytLine=!y.configured?'<span class="cal-yt-note">Connect YouTube to mark videos published automatically. See the README (“YouTube on the calendar”).</span>'
   :y.error?'<span class="cal-yt-note error">YouTube: '+esc(y.error)+'</span>'
   :'<span class="cal-yt-note">YouTube: '+esc(y.channel?.title||'')+' · '+compact(y.channel?.subscribers)+' subscribers · updated on Refresh</span>';
  const key='<span class="cal-key"><b>Key</b><i class="k-scheduled"></i>Upcoming<i class="k-overdue"></i>Not live yet<i class="k-published"></i>Published<i class="k-slot"></i>Release slot<span class="cal-key-sep"></span><b>◆ Sponsor deal</b><i class="k-in-progress"></i>In progress<i class="k-invoiced"></i>Invoiced<i class="k-paid"></i>Paid<i class="k-suggested"></i>Suggested</span>';
@@ -170,7 +170,7 @@ function suggestSponsor(text,brands){
 }
 function renderYt(e){
  const box=$('calendarYt'),y=e&&e.yt;
- if(!y){box.hidden=!e;box.innerHTML=e?'<p class="cal-yt-empty">'+(state.youtube.configured?(stateOf(e)==='overdue'?'No video found on the channel within 3 days of this date. If it went out, paste its link below.':'Not live yet — this turns green automatically once the video is published on the channel.'):'Connect YouTube to see live stats here.')+'</p>':'';return}
+ if(!y){box.hidden=!e;box.innerHTML=e?'<p class="cal-yt-empty">'+(state.youtube.configured?(stateOf(e)==='overdue'?'No video found on the channel within 3 days of this date. If it went out, paste its link below.':'Not live yet. This turns green automatically once the video is published on the channel.'):'Connect YouTube to see live stats here.')+'</p>':'';return}
  const age=Math.max(0,Math.round((Date.now()-new Date(y.publishedAt).getTime())/86400000));
  box.hidden=false;
  box.innerHTML='<a class="cal-yt-card" href="'+esc(y.url)+'" target="_blank" rel="noopener noreferrer">'+(y.thumb?'<img src="'+esc(y.thumb)+'" alt="" loading="lazy">':'')+'<span><strong>'+esc(y.title)+'</strong><small>Published '+esc(fmtDay(y.date))+' · '+age+' day'+(age===1?'':'s')+' live · '+esc(dur(y.seconds))+'</small></span></a>'+
@@ -216,7 +216,7 @@ async function showEditor(date=null,extra=null){
  if(existing&&isUntitled(existing))$('calendarText').select();
  const brands=await loadBrands();
  $('calendarSponsorOptions').innerHTML=brands.map(b=>'<option value="'+esc(b)+'"></option>').join('');
- if(existing&&!existing.sponsor&&state.editing===existing){const s=suggestSponsor(existing.text,brands);if(s){$('calendarSponsor').value=s;$('calendarSponsorStatus').value=$('calendarSponsorStatus').value||'In progress';$('calendarSponsorHint').textContent='Suggested from the title — clear it if that\'s wrong.';}}
+ if(existing&&!existing.sponsor&&state.editing===existing){const s=suggestSponsor(existing.text,brands);if(s){$('calendarSponsor').value=s;$('calendarSponsorStatus').value=$('calendarSponsorStatus').value||'In progress';$('calendarSponsorHint').textContent='Suggested from the title. Clear it if that\'s wrong.';}}
 }
 function closeEditor(){if($('calendarOverlay').hidden)return;$('calendarOverlay').hidden=true;document.body.style.overflow='';state.editing=null;window.Studio.setItem('calendar',null)}
 function show(tab){
@@ -227,7 +227,7 @@ async function openDate(date){
  if(!/^\d{4}-\d\d-\d\d$/.test(String(date||'')))return;
  await ensureLoaded();if(!state.loaded)return;
  const a=absOf(date);if(a>=0&&a<=MAX_START+2){state.start=Math.min(MAX_START,a-a%3);render();}
- if(!state.events.some(e=>e.date===date)){window.StudioBoard?.toast('Nothing is planned on '+fmtDay(date)+' any more — it may have been moved.');return;}
+ if(!state.events.some(e=>e.date===date)){window.StudioBoard?.toast('Nothing is planned on '+fmtDay(date)+' any more. It may have been moved.');return;}
  await showEditor(date);
 }
 async function save(payload){
@@ -243,7 +243,7 @@ async function placeSlot(slot,date){
  if(slot===date)return;
  if(state.events.some(x=>x.date===date)){notice('That day already has a plan. Drop the slot on an empty day, or edit the video that\'s there.',true);return}
  await save({action:'save',from:null,previousText:'',date,text:'Publish video',metrics:{...EMPTY_METRICS}});
- if(state.events.some(x=>x.date===date))notice('Release slot moved to '+fmtDay(date)+' — it\'s in the sheet now as an untitled video. Click it to add the title.');
+ if(state.events.some(x=>x.date===date))notice('Release slot moved to '+fmtDay(date)+'. It\'s in the sheet now as an untitled video. Click it to add the title.');
 }
 /* Open the "Schedule a video" drawer for an open slot (from a link or the Overview). */
 async function openSlot(date){

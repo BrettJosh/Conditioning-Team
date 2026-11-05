@@ -2,11 +2,11 @@
  * Zoho Mail → Sponsorships "Email log" sync. Server-side only (Netlify functions).
  *
  * Environment variables (Netlify → Project configuration → Environment variables):
- *   ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET  — from the Self Client in the Zoho API console
- *   ZOHO_REFRESH_TOKEN                  — produced once by the "Connect Zoho Mail" step in the app
- *   ZOHO_REGION                         — data centre of the mailbox: eu (default), com, in, com.au, jp, ca, sa, com.cn, ae
- *   ZOHO_OWN_ADDRESSES (optional)       — extra comma-separated addresses that count as "Josh"
- *   STUDIO_CALENDAR_SCRIPT_URL / STUDIO_CALENDAR_SCRIPT_SECRET — the existing Apps Script bridge
+ *   ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET  - from the Self Client in the Zoho API console
+ *   ZOHO_REFRESH_TOKEN                  - produced once by the "Connect Zoho Mail" step in the app
+ *   ZOHO_REGION                         - data centre of the mailbox: eu (default), com, in, com.au, jp, ca, sa, com.cn, ae
+ *   ZOHO_OWN_ADDRESSES (optional)       - extra comma-separated addresses that count as "Josh"
+ *   STUDIO_CALENDAR_SCRIPT_URL / STUDIO_CALENDAR_SCRIPT_SECRET - the existing Apps Script bridge
  *
  * How it works: every run lists the newest messages in Inbox and Sent, matches each one to a brand
  * or agency in the tracker (by contact address, company domain, or an already-matched thread), and
@@ -71,7 +71,7 @@ async function tokenRequest(cfg, params) {
   const body = new URLSearchParams(params);
   const res = await fetch(cfg.accounts + '/oauth/v2/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body, signal: AbortSignal.timeout(12000) });
   let data; try { data = await res.json(); } catch { throw new Error('Zoho accounts server returned an unreadable response.'); }
-  if (!res.ok || data.error) throw new Error('Zoho OAuth: ' + (data.error_description || data.error || res.status) + (data.error === 'invalid_code' ? ' (the code expires in minutes — generate a fresh one)' : ''));
+  if (!res.ok || data.error) throw new Error('Zoho OAuth: ' + (data.error_description || data.error || res.status) + (data.error === 'invalid_code' ? ' (the code expires in minutes, so generate a fresh one)' : ''));
   return data;
 }
 

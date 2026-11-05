@@ -1,5 +1,5 @@
 /*
- * Josh Brett Studio — shared glue, loaded before the other scripts.
+ * Josh Brett Studio - shared glue, loaded before the other scripts.
  *  - Auth: remembers the workspace access code on this device (or only for this browser session on a shared computer).
  *  - Router: one place that switches tabs and keeps the address bar in step, so every tab and every open item has a link:
  *      #overview · #daisy · #josh · #archive · #production · #calendar · #sponsorships
@@ -117,7 +117,7 @@ function fromLocation(force) {
 async function copyLink() {
   if (!linkItem) return;
   const url = link(linkItem.tab, linkItem.item);
-  try { await navigator.clipboard.writeText(url); window.StudioBoard?.toast('Link copied — paste it anywhere to open this.'); }
+  try { await navigator.clipboard.writeText(url); window.StudioBoard?.toast('Link copied. Paste it anywhere to open this.'); }
   catch { window.prompt('Copy this link:', url); }
 }
 

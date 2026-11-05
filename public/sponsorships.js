@@ -24,9 +24,9 @@ const GROUP_ORDER = { you: 0, them: 1, live: 2, won: 3, cold: 4, quiet: 5, lost:
 const DEMO = {
   brands: [
     { id: 'demo-b1', name: 'MacroFactor', status: 'Deal signed', summary: 'Renewed: 6 videos, signed 22 Sep. Nov–Feb schedule being confirmed.', nextStep: 'Confirm rescheduled dates to Katie.', lastActivity: '2026-10-25', firstContact: '2026-09-11', via: 'Direct', contact: 'Katie\nGrowth Marketing Manager\nkatie@example.com', initiatedBy: 'Josh', category: 'Nutrition app', rate: '$36,000 for 6 videos (renewal)', agreedValue: 36000, history: '• 22 Sep: renewal signed\n• 11 Sep: Josh pitched the renewal' },
-    { id: 'demo-b2', name: 'Yesoul Fitness — T5 MAX treadmill', status: 'Awaiting their reply', summary: 'Quoted $7.5k + free treadmill on 19 Oct; chased 22 Oct.', nextStep: 'Chase again if nothing by ~5 Nov.', lastActivity: '2026-10-22', firstContact: '2026-10-09', via: 'Direct', contact: 'Katherine\nMarketing Team\nkatherine@example.com', initiatedBy: 'Brand', category: 'Fitness equipment', rate: '$7,500 USD + treadmill supplied free', agreedValue: '', history: '• 22 Oct: Josh chased\n• 19 Oct: Josh quoted $7.5k\n• 9 Oct: Katherine asked for rates + media kit' },
-    { id: 'demo-b3', name: 'Garmin', status: 'No reply', summary: 'Pitch went to the media-only inbox — auto-reply says sponsorships go through the web form.', nextStep: 'Re-submit via the sponsorship web form.', lastActivity: '2026-10-26', firstContact: '2026-10-26', via: 'Direct', contact: 'media@example.com', initiatedBy: 'Josh', category: 'Wearables', rate: '', agreedValue: '', history: '• 26 Oct: pitch → auto-reply' },
-    { id: 'demo-b4', name: 'Filmora 15 (verify sender)', status: "Awaiting Josh's reply", summary: 'Paid collab offer — but sent from an unofficial-looking domain.', nextStep: 'Verify the sender before replying.', lastActivity: '2026-10-31', firstContact: '2026-10-31', via: 'Direct (unverified)', contact: 'contact@example.com', initiatedBy: 'Brand', category: 'Tech / software', rate: 'Guaranteed payment + free licence', agreedValue: '', history: '• 31 Oct: single pitch' }
+    { id: 'demo-b2', name: 'Yesoul Fitness (T5 MAX treadmill)', status: 'Awaiting their reply', summary: 'Quoted $7.5k + free treadmill on 19 Oct; chased 22 Oct.', nextStep: 'Chase again if nothing by ~5 Nov.', lastActivity: '2026-10-22', firstContact: '2026-10-09', via: 'Direct', contact: 'Katherine\nMarketing Team\nkatherine@example.com', initiatedBy: 'Brand', category: 'Fitness equipment', rate: '$7,500 USD + treadmill supplied free', agreedValue: '', history: '• 22 Oct: Josh chased\n• 19 Oct: Josh quoted $7.5k\n• 9 Oct: Katherine asked for rates + media kit' },
+    { id: 'demo-b3', name: 'Garmin', status: 'No reply', summary: 'Pitch went to the media-only inbox. The auto-reply says sponsorships go through the web form.', nextStep: 'Re-submit via the sponsorship web form.', lastActivity: '2026-10-26', firstContact: '2026-10-26', via: 'Direct', contact: 'media@example.com', initiatedBy: 'Josh', category: 'Wearables', rate: '', agreedValue: '', history: '• 26 Oct: pitch → auto-reply' },
+    { id: 'demo-b4', name: 'Filmora 15 (verify sender)', status: "Awaiting Josh's reply", summary: 'Paid collab offer, but sent from an unofficial-looking domain.', nextStep: 'Verify the sender before replying.', lastActivity: '2026-10-31', firstContact: '2026-10-31', via: 'Direct (unverified)', contact: 'contact@example.com', initiatedBy: 'Brand', category: 'Tech / software', rate: 'Guaranteed payment + free licence', agreedValue: '', history: '• 31 Oct: single pitch' }
   ],
   agencies: [
     { id: 'demo-a1', name: 'Verda Talent', status: 'Active – deal done', summary: 'Delivered ExpressVPN ($4k + rev share); previously Incogni.', lastActivity: '2026-10-29', firstContact: '2026-08-07', contact: 'Chris\nDirector\nchris@example.com', type: 'Sponsorship agency', terms: 'Brought ExpressVPN at $4,000 flat + 20% rev share', brands: 'ExpressVPN (signed); Incogni (previous)', history: '• 29 Oct: campaign live' },
@@ -39,10 +39,10 @@ const DEMO = {
   completed: [{ row: 15, who: 'Shokz', what: 'Invoice sent', date: '2026-11-02' }],
   emails: [
     { date: '2026-11-02T09:12:00Z', direction: 'in', matchedTo: 'Peak Partners', tab: 'agencies', recordId: 'demo-a2', from: 'Abdullah <abdullah@example.com>', to: 'josh', subject: 'Re: Peak Partners x Josh Brett', snippet: 'Just following up on my note from yesterday…', messageId: 'demo-m1', threadId: 't1', folder: 'Inbox', matchedBy: 'address' },
-    { date: '2026-10-25T16:40:00Z', direction: 'out', matchedTo: 'MacroFactor', tab: 'brands', recordId: 'demo-b1', from: 'Josh', to: 'katie@example.com', subject: 'Re: MacroFactor x Josh Brett — Nov–Feb schedule', snippet: 'Here are the dates that work on our side…', messageId: 'demo-m2', threadId: 't2', folder: 'Sent', matchedBy: 'address' },
-    { date: '2026-10-24T11:05:00Z', direction: 'in', matchedTo: '', tab: 'unmatched', recordId: '', from: 'Redouan <redouan@example.com>', to: 'josh', subject: 'Sponsorship opportunity — Primalfluence', snippet: 'We put creators forward to brands like…', messageId: 'demo-m3', threadId: 't3', folder: 'Inbox', matchedBy: 'keyword' },
-    { date: '2026-11-03T15:20:00Z', direction: 'in', matchedTo: '', tab: 'unmatched', recordId: '', from: 'Tim Stokely <tim@northwind.example>', to: 'josh', subject: 'Josh x Northwind', snippet: 'Loved the last video — we would like to talk about a paid integration in December…', messageId: 'demo-m4', threadId: 't4', folder: 'Inbox', matchedBy: 'flagged' },
-    { date: '2026-11-03T17:41:00Z', direction: 'in', matchedTo: 'Verda Talent', tab: 'agencies', recordId: 'demo-a1', from: 'Chris <chris@example.com>', to: 'josh', subject: 'Re: ExpressVPN — round two?', snippet: 'They want to book a second slot for January, can you share dates?', messageId: 'demo-m5', threadId: 't5', folder: 'Inbox', matchedBy: 'address' }
+    { date: '2026-10-25T16:40:00Z', direction: 'out', matchedTo: 'MacroFactor', tab: 'brands', recordId: 'demo-b1', from: 'Josh', to: 'katie@example.com', subject: 'Re: MacroFactor x Josh Brett, Nov–Feb schedule', snippet: 'Here are the dates that work on our side…', messageId: 'demo-m2', threadId: 't2', folder: 'Sent', matchedBy: 'address' },
+    { date: '2026-10-24T11:05:00Z', direction: 'in', matchedTo: '', tab: 'unmatched', recordId: '', from: 'Redouan <redouan@example.com>', to: 'josh', subject: 'Sponsorship opportunity with Primalfluence', snippet: 'We put creators forward to brands like…', messageId: 'demo-m3', threadId: 't3', folder: 'Inbox', matchedBy: 'keyword' },
+    { date: '2026-11-03T15:20:00Z', direction: 'in', matchedTo: '', tab: 'unmatched', recordId: '', from: 'Tim Stokely <tim@northwind.example>', to: 'josh', subject: 'Josh x Northwind', snippet: 'Loved the last video. We would like to talk about a paid integration in December…', messageId: 'demo-m4', threadId: 't4', folder: 'Inbox', matchedBy: 'flagged' },
+    { date: '2026-11-03T17:41:00Z', direction: 'in', matchedTo: 'Verda Talent', tab: 'agencies', recordId: 'demo-a1', from: 'Chris <chris@example.com>', to: 'josh', subject: 'Re: ExpressVPN round two?', snippet: 'They want to book a second slot for January, can you share dates?', messageId: 'demo-m5', threadId: 't5', folder: 'Inbox', matchedBy: 'address' }
   ],
   sync: { flags: { at: '2026-11-04T09:00:00Z', items: [
     { m: 'demo-m4', t: 't4', a: 'tim@northwind.example', f: 'important', d: '2026-11-03T15:20:00.000Z' },
@@ -58,7 +58,7 @@ async function api(payload) {
   const board = B()?.getState();
   if (!board || board.mode !== 'notion') throw Error('Connect your workspace (top right) to use the shared sponsorship tracker.');
   const resp = await fetch('/.netlify/functions/sponsorships', { method: 'POST', headers: { 'content-type': 'application/json', 'x-board-key': board.code }, body: JSON.stringify(payload), cache: 'no-store' });
-  const text = await resp.text(); let data; try { data = JSON.parse(text); } catch { throw Error(resp.status === 502 || resp.status === 504 ? 'The server took too long — press Sync emails again; each run picks up where the last stopped.' : 'Sponsorships server returned an unexpected response.'); }
+  const text = await resp.text(); let data; try { data = JSON.parse(text); } catch { throw Error(resp.status === 502 || resp.status === 504 ? 'The server took too long. Press Sync emails again; each run picks up where the last stopped.' : 'Sponsorships server returned an unexpected response.'); }
   if (!resp.ok || data.ok === false) throw Error(data.error || 'Sponsorships request failed.');
   return data;
 }
@@ -71,7 +71,7 @@ function applyPayload(data) {
 }
 function loadDemo() { s.demo = true; applyPayload({ ...DEMO, sheetUrl: '' }); }
 function refresh(quiet = false) {
-  if (!connected()) { loadDemo(); notice('Sample rows — connect your workspace (top right) to load the shared tracker.'); return Promise.resolve(); }
+  if (!connected()) { loadDemo(); notice('Sample rows. Connect your workspace (top right) to load the shared tracker.'); return Promise.resolve(); }
   if (s.loading) return s.loading;
   if (s.busy) return Promise.resolve();
   s.busy = true; $('sponsorRefresh').disabled = true;
@@ -92,7 +92,7 @@ const ensureLoaded = () => (s.loaded && !(s.demo && connected()) ? Promise.resol
 
 /* ---------- derived data ---------- */
 const days = iso => { if (!iso) return null; const d = new Date(iso + 'T12:00:00'); if (Number.isNaN(d.getTime())) return null; return Math.floor((new Date(TODAY() + 'T12:00:00').getTime() - d.getTime()) / 86400000); };
-const fmtDate = iso => iso ? new Date(iso.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
+const fmtDate = iso => iso ? new Date(iso.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '–';
 const fmtDateTime = iso => { if (!iso) return ''; const d = new Date(iso); if (Number.isNaN(d.getTime())) return iso; return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); };
 const money = n => (n === '' || n == null || Number.isNaN(Number(n))) ? '' : '$' + Number(n).toLocaleString('en-US');
 function group(status) {
@@ -194,13 +194,13 @@ function cmp(a, b, key, dir) {
 }
 
 /* ---------- rendering ---------- */
-const pill = status => `<span class="sponsor-pill sponsor-pill-${group(status)}">${esc(status || '—')}</span>`;
-/** Status cell: a row with a flagged, unanswered email reads "Reply needed" — the sheet's own status stays underneath. */
+const pill = status => `<span class="sponsor-pill sponsor-pill-${group(status)}">${esc(status || 'No status')}</span>`;
+/** Status cell: a row with a flagged, unanswered email reads "Reply needed" - the sheet's own status stays underneath. */
 function statusCell(r) {
   if (!r.flags) return pill(r.status);
   const latest = r.flags.reduce((a, b) => ((b.d || '') > (a.d || '') ? b : a));
-  const title = r.flags.length + ' flagged email' + (r.flags.length === 1 ? '' : 's') + ' in Zoho, not answered yet' + (latest.email ? ' — latest: ' + latest.email.subject : '');
-  return `<span class="sponsor-pill sponsor-pill-you" title="${esc(title)}">⚑ Reply needed${r.flags.length > 1 ? ' · ' + r.flags.length : ''}</span><small class="sponsor-sheet-status">Sheet: ${esc(r.status || '—')}</small>`;
+  const title = r.flags.length + ' flagged email' + (r.flags.length === 1 ? '' : 's') + ' in Zoho, not answered yet' + (latest.email ? '. Latest: ' + latest.email.subject : '');
+  return `<span class="sponsor-pill sponsor-pill-you" title="${esc(title)}">⚑ Reply needed${r.flags.length > 1 ? ' · ' + r.flags.length : ''}</span><small class="sponsor-sheet-status">Sheet: ${esc(r.status || 'not set')}</small>`;
 }
 const flagMark = id => (s.fl.ids.has(id) ? '<span class="sponsor-flagmark" title="Flagged in Zoho">⚑</span>' : '');
 const assignOptions = () => `<option value="">Assign to…</option><optgroup label="Brands">${s.brands.map(r => `<option value="brands|${esc(r.id)}">${esc(r.name)}</option>`).join('')}</optgroup><optgroup label="Agencies">${s.agencies.map(r => `<option value="agencies|${esc(r.id)}">${esc(r.name)}</option>`).join('')}</optgroup>`;
@@ -216,7 +216,7 @@ function lastChip(r) {
   const warn = r.last.direction === 'in' && r.group !== 'won' && r.group !== 'lost';
   return `<span class="sponsor-last ${r.last.direction}${warn ? ' warn' : ''}" title="${esc(r.last.subject)}">${r.last.direction === 'in' ? '↙' : '↗'} ${who} · ${d === 0 ? 'today' : d + 'd ago'}</span>`;
 }
-function daysBadge(r) { if (r.days == null) return '<span class="sponsor-days muted">—</span>'; const hot = r.group === 'you' && r.days >= 3; return `<span class="sponsor-days${hot ? ' hot' : ''}">${r.days}d</span>`; }
+function daysBadge(r) { if (r.days == null) return '<span class="sponsor-days muted">–</span>'; const hot = r.group === 'you' && r.days >= 3; return `<span class="sponsor-days${hot ? ' hot' : ''}">${r.days}d</span>`; }
 function th(label, key, cls = '') { const active = s.sort.key === key; return `<th class="${cls}"><button type="button" class="sponsor-sort${active ? ' active' : ''}" data-sort="${esc(key)}">${esc(label)}<span>${active ? (s.sort.dir > 0 ? ' ↑' : ' ↓') : ''}</span></button></th>`; }
 const tp = label => `<th><span class="sponsor-th">${esc(label)}</span></th>`;
 const clamp = (text, n = 140) => { const t = String(text || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
@@ -267,7 +267,7 @@ function renderTable() {
     const done = s.filter === 'done';
     table.innerHTML = `<thead><tr>${done ? tp('Who') + tp('What was done') + th('Date', 'date', 'num') : th('Priority', 'priority') + th('Who', 'who') + tp('What to do') + tp('Why / context') + th('They last wrote', 'lastWrote', 'num') + th('Waiting', 'daysWaiting', 'num') + tp('Done')}</tr></thead><tbody>` +
       list.map(a => done ? `<tr><td class="sponsor-name"><strong>${esc(a.who)}</strong></td><td class="sponsor-text">${esc(a.what)}</td><td class="num"><span class="sponsor-date">${esc(fmtDate(a.date))}</span></td></tr>`
-        : `<tr class="${String(a.done).toLowerCase() === 'yes' ? 'is-done' : ''}"><td><span class="sponsor-priority ${esc(String(a.priority).toLowerCase())}">${esc(a.priority)}</span></td><td class="sponsor-name"><strong>${esc(a.who)}</strong><small>${esc(a.tab || '')}</small></td><td class="sponsor-text"><strong>${esc(a.what)}</strong></td><td class="sponsor-text">${esc(clamp(a.why, 160))}</td><td class="num"><span class="sponsor-date">${esc(fmtDate(a.lastWrote))}</span></td><td class="num">${a.daysWaiting === '' || a.daysWaiting == null ? '—' : esc(a.daysWaiting) + 'd'}</td><td><label class="sponsor-check"><input type="checkbox" data-action-row="${a.row}" data-action-what="${esc(a.what)}" ${String(a.done).toLowerCase() === 'yes' ? 'checked' : ''}> ${String(a.done).toLowerCase() === 'yes' ? 'Done' : 'Mark done'}</label></td></tr>`).join('') + '</tbody>';
+        : `<tr class="${String(a.done).toLowerCase() === 'yes' ? 'is-done' : ''}"><td><span class="sponsor-priority ${esc(String(a.priority).toLowerCase())}">${esc(a.priority)}</span></td><td class="sponsor-name"><strong>${esc(a.who)}</strong><small>${esc(a.tab || '')}</small></td><td class="sponsor-text"><strong>${esc(a.what)}</strong></td><td class="sponsor-text">${esc(clamp(a.why, 160))}</td><td class="num"><span class="sponsor-date">${esc(fmtDate(a.lastWrote))}</span></td><td class="num">${a.daysWaiting === '' || a.daysWaiting == null ? '–' : esc(a.daysWaiting) + 'd'}</td><td><label class="sponsor-check"><input type="checkbox" data-action-row="${a.row}" data-action-what="${esc(a.what)}" ${String(a.done).toLowerCase() === 'yes' ? 'checked' : ''}> ${String(a.done).toLowerCase() === 'yes' ? 'Done' : 'Mark done'}</label></td></tr>`).join('') + '</tbody>';
   } else {
     const options = assignOptions();
     table.innerHTML = `<thead><tr>${th('Date', 'date', 'num')}<th></th>${th('Matched to', 'matchedTo')}${th('From / to', 'from')}${th('Subject', 'subject')}${tp("Snippet")}</tr></thead><tbody>` +
@@ -310,7 +310,7 @@ function addFromFlag(messageId, tab) {
   const r = s.fl.loose.find(x => x.flag.m === messageId); if (!r) { toast('That email is no longer flagged. Try refreshing.'); return; }
   const e = r.email, day = r.lastActivity || TODAY();
   const contact = [r.display, r.address].filter(Boolean).join('\n');
-  const prefill = { messageId, name: r.name, status: "Awaiting Josh's reply", summary: e ? clamp(e.subject, 200) : '', lastActivity: day, firstContact: day, contact, history: e ? '• ' + fmtDate(day) + ': They wrote — ' + clamp(e.subject, 200) : '' };
+  const prefill = { messageId, name: r.name, status: "Awaiting Josh's reply", summary: e ? clamp(e.subject, 200) : '', lastActivity: day, firstContact: day, contact, history: e ? '• ' + fmtDate(day) + ': They wrote (' + clamp(e.subject, 200) + ')' : '' };
   if (tab === 'brands') Object.assign(prefill, { initiatedBy: 'Brand', via: 'Direct', nextStep: 'Reply to their email.' });
   openRecord(tab, null, prefill);
 }
@@ -332,7 +332,7 @@ async function saveRecord(e) {
   e.preventDefault(); if (s.busy) return;
   const tab = $('sponsorTab').value, id = $('sponsorId').value, patch = readForm();
   if (!patch.name) { toast('Give it a name.'); return; }
-  if (!connected()) { toast('Local demo — connect your workspace to save to the sheet.'); return; }
+  if (!connected()) { toast('Sample data. Connect your workspace to save to the sheet.'); return; }
   s.busy = true; $('sponsorSave').disabled = true; $('sponsorSaveStatus').textContent = 'Saving…';
   const pending = !id && s.pendingAssign && s.pendingAssign.tab === tab ? s.pendingAssign : null;
   const before = new Set(records(tab).map(r => r.id));
@@ -349,21 +349,21 @@ async function saveRecord(e) {
 async function addNote(e) {
   e.preventDefault(); if (s.busy || !s.selected?.id) return;
   const text = $('sponsorNoteText').value.trim(); if (!text) { toast('Write what happened first.'); return; }
-  if (!connected()) { toast('Local demo — connect your workspace to log this.'); return; }
+  if (!connected()) { toast('Sample data. Connect your workspace to log this.'); return; }
   s.busy = true; const btn = $('sponsorNoteForm').querySelector('button'); btn.disabled = true;
   try { const data = await api({ action: 'sponsorNote', tab: s.selected.tab, id: s.selected.id, text, date: $('sponsorNoteDate').value || TODAY(), direction: $('sponsorNoteDirection').value }); applyPayload(data); const r = records(s.selected.tab).find(x => x.id === s.selected.id); if (r) { $('sponsorHistory').value = r.history || ''; $('sponsorLastActivity').value = r.lastActivity || ''; renderDrawerEmails(s.selected.tab, s.selected.id); } $('sponsorNoteText').value = ''; toast('Added to the history.'); }
   catch (err) { toast('Not logged: ' + err.message); }
   finally { s.busy = false; btn.disabled = false; }
 }
 async function toggleAction(input) {
-  if (!connected()) { input.checked = !input.checked; toast('Local demo — connect your workspace to update the action list.'); return; }
+  if (!connected()) { input.checked = !input.checked; toast('Sample data. Connect your workspace to update the action list.'); return; }
   input.disabled = true;
   try { const data = await api({ action: 'sponsorAction', row: Number(input.dataset.actionRow), what: input.dataset.actionWhat, done: input.checked }); applyPayload(data); toast(input.checked ? 'Marked done in the sheet.' : 'Reopened.'); }
   catch (err) { input.checked = !input.checked; input.disabled = false; toast('Not updated: ' + err.message); }
 }
 async function assignEmail(select) {
   const value = select.value; if (!value) return;
-  if (!connected()) { select.value = ''; toast('Local demo — connect your workspace to assign emails.'); return; }
+  if (!connected()) { select.value = ''; toast('Sample data. Connect your workspace to assign emails.'); return; }
   const [tab, id] = value.split('|'); select.disabled = true;
   try { await api({ action: 'sponsorAssign', tab, id, messageId: select.dataset.message, saveContact: select.dataset.contact || '' }); toast('Email assigned. Future emails from that address will match automatically.'); await refresh(true); }
   catch (err) { select.disabled = false; select.value = ''; toast('Not assigned: ' + err.message); }
@@ -379,7 +379,7 @@ async function openZoho() {
 }
 function closeZoho() { $('zohoOverlay').hidden = true; document.body.style.overflow = ''; }
 function renderZoho(z) {
-  $('zohoSticker').textContent = z.configured ? '● CONNECTED — HOURLY SYNC' : '● NOT CONNECTED';
+  $('zohoSticker').textContent = z.configured ? '● CONNECTED · HOURLY SYNC' : '● NOT CONNECTED';
   $('zohoSticker').classList.toggle('on', Boolean(z.configured));
   const readme = '<a href="https://github.com/BrettJosh/Conditioning-Team/blob/main/README.md#sponsorships-tab-brand-deals-with-a-live-email-log-from-zoho-mail" target="_blank" rel="noopener noreferrer">the README steps</a>';
   if (z.demo) { $('zohoBody').innerHTML = '<p class="zoho-copy">Connect your workspace (top right) first. Zoho Mail syncing runs on the server and needs the shared connection.</p>'; return; }
@@ -388,15 +388,15 @@ function renderZoho(z) {
     const run = s.sync?.lastRun, bf = s.sync?.backfill, err = s.sync?.lastError, flags = s.sync?.flags, flagErr = s.sync?.flagError;
     const waiting = Object.values(s.fl.byRecord).reduce((n, list) => n + list.length, 0) + s.fl.loose.reduce((n, r) => n + (r.flag.count || 1), 0);
     $('zohoBody').innerHTML = `<p class="zoho-copy">Mailbox <strong>${esc(s.sync?.mailbox || 'connected')}</strong> · region <strong>${esc(z.region)}</strong>. Emails to and from everyone in the tracker are logged automatically once an hour; new senders are kept when the subject looks like a sponsorship so you can assign them.</p>
-      <p class="zoho-copy"><strong>⚑ Flags drive “Waiting on you”.</strong> Flag an email in Zoho and it shows here as needing your reply until you reply to it or clear the flag — even if the sender isn’t in the tracker yet.</p>
-      <div class="connection-status">${run ? `Last run ${esc(fmtDateTime(run.at))}: ${run.added} new email${run.added === 1 ? '' : 's'} from ${run.scanned} scanned.` : 'No sync has run yet.'}${flags ? `<br>Flagged in the Inbox: ${flags.items?.length || 0} · still waiting on your reply: ${waiting}.` : '<br>Flags: not read yet — press Sync now.'}${flagErr ? `<br><strong>Could not read flags:</strong> ${esc(flagErr.message)}` : ''}${bf && !(bf.inbox?.done && bf.sent?.done) ? `<br>Still catching up on history back to ${esc(fmtDate(bf.horizon))} — run Sync now a few more times or wait for the hourly runs.` : ''}${err ? `<br><strong>Last error:</strong> ${esc(err.message)} (${esc(fmtDateTime(err.at))})` : ''}</div>
+      <p class="zoho-copy"><strong>⚑ Flags drive “Waiting on you”.</strong> Flag an email in Zoho and it shows here as needing your reply until you reply to it or clear the flag, even if the sender isn’t in the tracker yet.</p>
+      <div class="connection-status">${run ? `Last run ${esc(fmtDateTime(run.at))}: ${run.added} new email${run.added === 1 ? '' : 's'} from ${run.scanned} scanned.` : 'No sync has run yet.'}${flags ? `<br>Flagged in the Inbox: ${flags.items?.length || 0} · still waiting on your reply: ${waiting}.` : '<br>Flags: not read yet. Press Sync now.'}${flagErr ? `<br><strong>Could not read flags:</strong> ${esc(flagErr.message)}` : ''}${bf && !(bf.inbox?.done && bf.sent?.done) ? `<br>Still catching up on history back to ${esc(fmtDate(bf.horizon))}. Run Sync now a few more times or wait for the hourly runs.` : ''}${err ? `<br><strong>Last error:</strong> ${esc(err.message)} (${esc(fmtDateTime(err.at))})` : ''}</div>
       <button class="primary-btn" type="button" id="zohoSyncNow">⇣ Sync now</button>
       <p class="helper-copy">To reconnect a different mailbox, remove <code>ZOHO_REFRESH_TOKEN</code> in Netlify and come back here.</p>`;
     $('zohoSyncNow').addEventListener('click', () => { closeZoho(); runSync(); });
     return;
   }
   if (!z.canExchange) {
-    $('zohoBody').innerHTML = `<p class="zoho-copy"><strong>Step 1 of 2.</strong> In Netlify, add <code>ZOHO_CLIENT_ID</code>, <code>ZOHO_CLIENT_SECRET</code> and <code>ZOHO_REGION</code> from your Zoho API console Self Client, then redeploy. Follow ${readme} — about five minutes.</p><div class="connection-status">Missing in Netlify: ${esc((z.missing || []).join(', '))}</div>`;
+    $('zohoBody').innerHTML = `<p class="zoho-copy"><strong>Step 1 of 2.</strong> In Netlify, add <code>ZOHO_CLIENT_ID</code>, <code>ZOHO_CLIENT_SECRET</code> and <code>ZOHO_REGION</code> from your Zoho API console Self Client, then redeploy. Follow ${readme}. It takes about five minutes.</p><div class="connection-status">Missing in Netlify: ${esc((z.missing || []).join(', '))}</div>`;
     return;
   }
   $('zohoBody').innerHTML = `<p class="zoho-copy"><strong>Step 2 of 2.</strong> In the Zoho API console, open your Self Client → <em>Generate Code</em> with scope <code>ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.messages.READ</code>, duration 10 minutes, then paste the code here. It is exchanged on the server for a long-lived token that you add to Netlify. <strong>Never paste your Zoho password.</strong></p>
@@ -405,7 +405,7 @@ function renderZoho(z) {
     e.preventDefault(); const btn = e.target.querySelector('button'); btn.disabled = true; $('zohoResult').innerHTML = '<div class="connection-status">Talking to Zoho…</div>';
     try {
       const r = await api({ action: 'zohoSetup', code: $('zohoCode').value });
-      $('zohoResult').innerHTML = `<div class="connection-status">Done. Add this in Netlify as <code>ZOHO_REFRESH_TOKEN</code> (mark it sensitive), redeploy, then press Sync emails.</div><label class="zoho-token-label">Refresh token<textarea id="zohoToken" rows="3" readonly>${esc(r.refreshToken)}</textarea></label><button class="secondary-btn" type="button" id="zohoCopy">Copy token</button>${r.apiDomain && !regionMatches(r.apiDomain, z.region) ? `<p class="helper-copy">Zoho says your API domain is <code>${esc(r.apiDomain)}</code> — set <code>ZOHO_REGION</code> to match (currently <code>${esc(z.region)}</code>).</p>` : ''}`;
+      $('zohoResult').innerHTML = `<div class="connection-status">Done. Add this in Netlify as <code>ZOHO_REFRESH_TOKEN</code> (mark it sensitive), redeploy, then press Sync emails.</div><label class="zoho-token-label">Refresh token<textarea id="zohoToken" rows="3" readonly>${esc(r.refreshToken)}</textarea></label><button class="secondary-btn" type="button" id="zohoCopy">Copy token</button>${r.apiDomain && !regionMatches(r.apiDomain, z.region) ? `<p class="helper-copy">Zoho says your API domain is <code>${esc(r.apiDomain)}</code>. Set <code>ZOHO_REGION</code> to match (currently <code>${esc(z.region)}</code>).</p>` : ''}`;
       $('zohoCopy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(r.refreshToken); toast('Token copied.'); } catch { $('zohoToken').select(); } });
     } catch (err) { $('zohoResult').innerHTML = `<div class="connection-status">${esc(err.message)}</div>`; }
     finally { btn.disabled = false; }
@@ -414,12 +414,12 @@ function renderZoho(z) {
 const regionMatches = (apiDomain, region) => { try { return new URL(apiDomain).hostname.endsWith('.' + region); } catch { return true; } };
 async function runSync() {
   if (!connected()) { openZoho(); return; }
-  if (s.busy) return; s.busy = true; const btn = $('sponsorSyncBtn'); btn.disabled = true; notice('Syncing Zoho Mail — this takes a few seconds…');
+  if (s.busy) return; s.busy = true; const btn = $('sponsorSyncBtn'); btn.disabled = true; notice('Syncing Zoho Mail. This takes a few seconds…');
   let result = null;
   try {
     result = await api({ action: 'zohoSync', pages: 2 });
     notice('');
-    toast(`${result.added} new email${result.added === 1 ? '' : 's'} logged (${result.scanned} scanned)${result.flagged != null ? ` · ${result.flagged} flagged in Zoho` : ''}.${result.backfillDone ? '' : ' Still catching up on history — sync again in a moment.'}`);
+    toast(`${result.added} new email${result.added === 1 ? '' : 's'} logged (${result.scanned} scanned)${result.flagged != null ? ` · ${result.flagged} flagged in Zoho` : ''}.${result.backfillDone ? '' : ' Still catching up on history, so sync again in a moment.'}`);
   } catch (err) {
     notice('Sync failed: ' + err.message, true);
     if (/not connected yet|Missing:/i.test(err.message)) openZoho();
@@ -481,7 +481,7 @@ function boot() {
       if (!['brands', 'agencies'].includes(what) || !id) return;
       await ensureLoaded();
       if (s.demo) return;
-      if (!records(what).some(r => r.id === id)) { toast('That row isn’t in the tracker any more — it may have been removed from the sheet.'); return; }
+      if (!records(what).some(r => r.id === id)) { toast('That row isn’t in the tracker any more. It may have been removed from the sheet.'); return; }
       openRecord(what, id);
     },
     close: closeRecord

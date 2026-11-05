@@ -30,12 +30,12 @@
     document.body.classList.toggle('local-demo-mode',!on);byId('demoWarning').hidden=on;
     byId('connectionText').textContent=on?'Connected':'Sample data';byId('connectionDot').className='connection-dot'+(on?' connected':'');
     byId('connectSignedOut').hidden=on;byId('connectSignedIn').hidden=!on;
-    byId('connectSticker').textContent=on?(remembered?'● CONNECTED — REMEMBERED ON THIS DEVICE':'● CONNECTED — THIS BROWSER SESSION'):'● NOT CONNECTED — SAMPLE DATA';
+    byId('connectSticker').textContent=on?(remembered?'● CONNECTED · REMEMBERED ON THIS DEVICE':'● CONNECTED FOR THIS BROWSER SESSION'):'● NOT CONNECTED · SAMPLE DATA';
     byId('connectSticker').classList.toggle('off',!on);
     byId('connectionStatus').textContent=on?(remembered?'This device remembers the workspace code, so it opens connected every time. Forget it on a shared or borrowed computer.':'Connected until this browser is closed. Tick “Remember this device” next time to stay connected.')+(state.taskError?' Notion tasks could not load: '+state.taskError:''):'Sample data only. Nothing you change here is saved or shared.';
   }
   /* Sample mode is look-only: an edit that would only ever live in this browser is the easiest way to lose work. */
-  function requireConnection(){if(state.mode==='notion')return true;toast('This is sample data — connect to make changes.');openConnection();return false;}
+  function requireConnection(){if(state.mode==='notion')return true;toast('This is sample data. Connect to make changes.');openConnection();return false;}
   /* The tab a task's link should open: the board it belongs on. */
   function tabForTask(task){const here=window.Studio.current();if(['weekly','josh','archive'].includes(here))return here;if(task&&ARCHIVED.includes(task.status))return 'archive';return String(task?.owner||'').toLowerCase()==='josh'?'josh':'weekly';}
   function projectClass(project) {const p=(project||'').toLowerCase();return p.includes('skinny')||p.includes('product')?'product':p.includes('doc')||p.includes('video')?'doc':p.includes('ai')||p.includes('system')?'ai':p.includes('sponsor')?'sponsor':'';}
@@ -159,13 +159,13 @@
     state.code=code.trim();
     byId('connectForm').querySelector('button').disabled=true;
     try{
-      const result=await api('list');state.mode='notion';state.tasks=result.tasks;state.tasksLoaded=true;state.taskError='';state.filter='All';Auth().set(state.code,remember);byId('accessPassword').value='';renderBoard();updateConnection();closeConnection();notice('');window.StudioWeekly?.onSynced();window.Studio.setMode(state.mode);toast(remember?'Connected — this device will remember it.':'Connected for this browser session.');
+      const result=await api('list');state.mode='notion';state.tasks=result.tasks;state.tasksLoaded=true;state.taskError='';state.filter='All';Auth().set(state.code,remember);byId('accessPassword').value='';renderBoard();updateConnection();closeConnection();notice('');window.StudioWeekly?.onSynced();window.Studio.setMode(state.mode);toast(remember?'Connected. This device will remember it.':'Connected for this browser session.');
     }catch(err){state.mode='demo';state.code='';updateConnection();byId('connectionStatus').textContent=err.message;toast(err.status===401?'That code didn’t work. Check it and try again.':'Connection failed. Check the setup and access code.');}
     finally{byId('connectForm').querySelector('button').disabled=false;}
   }
   function closeConnection(){byId('connectionOverlay').hidden=true;document.body.style.overflow='';}
   function openConnection(){updateConnection();byId('connectionOverlay').hidden=false;document.body.style.overflow='hidden';}
-  function switchDemo(message='Sample data — have a look around. Nothing you change is saved.'){state.mode='demo';state.code='';state.tasksLoaded=false;state.taskError='';Auth().clear();state.tasks=loadDemo();state.filter='All';renderBoard();updateConnection();closeConnection();notice('');window.Studio.setMode(state.mode);toast(message);}
+  function switchDemo(message='Sample data: have a look around. Nothing you change is saved.'){state.mode='demo';state.code='';state.tasksLoaded=false;state.taskError='';Auth().clear();state.tasks=loadDemo();state.filter='All';renderBoard();updateConnection();closeConnection();notice('');window.Studio.setMode(state.mode);toast(message);}
   function forgetDevice(){if(!confirm('Forget the workspace code on this device? You will need to enter it again next time.'))return;switchDemo('This device has forgotten the workspace code.');}
   async function saveTask(ev){
     ev.preventDefault();if(state.saving)return;
@@ -251,7 +251,7 @@
   }
   window.StudioBoard={getState:()=>state,renderBoard,toast,api,changeStatus,openTask,closeTask,saveDemo,refreshNotion,updateConnection,requireConnection,openConnection};
   window.Studio.register(['weekly','josh','archive'],{
-    open(item){if(item[0]!=='task'||!item[1])return;if(state.mode!=='notion'){openConnection();return;}if(!state.tasks.some(t=>t.id===item[1])){toast('That task isn’t on the board any more — it may have been deleted in Notion.');return;}openTask(item[1]);},
+    open(item){if(item[0]!=='task'||!item[1])return;if(state.mode!=='notion'){openConnection();return;}if(!state.tasks.some(t=>t.id===item[1])){toast('That task isn’t on the board any more. It may have been deleted in Notion.');return;}openTask(item[1]);},
     close:closeTask
   });
   async function boot(){state.tasks=loadDemo();attachEvents();renderBoard();updateConnection();
@@ -261,7 +261,7 @@
       catch(err){
         if(err.status===401){state.code='';Auth().clear();updateConnection();notice('The workspace code has changed. Enter the new one to reconnect.',true);openConnection();}
         // Anything else (Notion having a moment, a slow network) keeps the code: the other tabs still work and Refresh retries.
-        else{state.mode='notion';state.tasks=[];state.taskError=err.message;renderBoard();updateConnection();notice(`Notion tasks could not load: ${err.message} — press Refresh to try again.`,true);}
+        else{state.mode='notion';state.tasks=[];state.taskError=err.message;renderBoard();updateConnection();notice(`Notion tasks could not load (${err.message}). Press Refresh to try again.`,true);}
       }}
     else openConnection();
     window.Studio.setMode(state.mode);
