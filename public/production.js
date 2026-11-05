@@ -5,14 +5,15 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const stages=['Research/Planning','Scripting','Filming','Editing','Published'];
 const owners=['Josh','Tristan','Daisy','Rachit','Thumbnail designer','Unassigned'];
 const thumbs=['Not started','Concepts','Revising','Approved'];
-const s={projects:[],loaded:false,loading:false,selected:null,filter:'all',search:'',saving:false};
+const s={projects:[],loaded:false,loading:null,error:'',selected:null,filter:'all',search:'',saving:false};
+const FILTER_SLUG={stale:'needs-update',blocked:'blocked'};
 const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
 const stale=p=>!p.lastConfirmed||((Date.now()-new Date(p.lastConfirmed+'T12:00:00').getTime())/86400000)>7;
 const date=v=>v?new Date(v+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'No date';
 function notice(text,error=false){const el=$('productionNotice');el.textContent=text;el.hidden=!text;el.classList.toggle('error',error);}
 async function api(action,payload={}){
-  let code;try{code=sessionStorage.getItem('josh-brett-studio-access-code');}catch{}
-  if(!code)throw new Error('Connect your Notion workspace in the top-right corner first.');
+  const board=window.StudioBoard?.getState(),code=board&&board.mode==='notion'?board.code:'';
+  if(!code)throw new Error('Connect your workspace in the top-right corner first.');
   const res=await fetch('/.netlify/functions/production',{method:'POST',headers:{'content-type':'application/json','x-board-key':code},body:JSON.stringify({action,...payload}),cache:'no-store'});
   let data;try{data=await res.json();}catch{throw new Error('Netlify production function unavailable.');}
   if(!res.ok)throw new Error(data.error||'Notion request failed.');
@@ -43,13 +44,17 @@ function render(){
   $('productionGrid').innerHTML=list.length?list.map(card).join(''):'<div class="production-empty">No videos match this view.</div>';
   document.querySelectorAll('[data-production-filter]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.productionFilter===s.filter)));
 }
-async function refresh(){
-  if(s.loading)return;s.loading=true;$('productionRefresh').disabled=true;
-  notice('Loading your Video Projects from Notion…');
-  try{const data=await api('list');s.projects=data.projects||[];s.loaded=true;render();notice(data.limited?'Showing first 500 active projects.':'');}
-  catch(e){notice('Production not connected: '+e.message,true);}
-  finally{s.loading=false;$('productionRefresh').disabled=false;}
+function refresh(){
+  if(s.loading)return s.loading;
+  s.loading=(async()=>{
+    $('productionRefresh').disabled=true;notice('Loading your Video Projects from Notion…');
+    try{const data=await api('list');s.projects=data.projects||[];s.loaded=true;s.error='';render();notice(data.limited?'Showing first 500 active projects.':'');}
+    catch(e){s.error=e.message;notice('Production not connected: '+e.message,true);}
+    finally{$('productionRefresh').disabled=false;window.Studio.emit('data',{source:'production'});}
+  })().finally(()=>{s.loading=null;});
+  return s.loading;
 }
+const ensureLoaded=()=>s.loaded?Promise.resolve():refresh();
 
 function openProject(id){
   const p=s.projects.find(x=>x.id===id);if(!p)return;
@@ -64,8 +69,9 @@ function openProject(id){
   $('productionConfirmed').textContent=p.lastConfirmed?'Last confirmed '+date(p.lastConfirmed):'Never confirmed — saving marks it current.';
   const l=$('productionNotionLink');l.href=/^https:\/\//.test(p.url)?p.url:'#';
   $('productionDrawer').hidden=false;document.body.style.overflow='hidden';
+  window.Studio.setItem('production',['video',id]);
 }
-function closeProject(){$('productionDrawer').hidden=true;s.selected=null;document.body.style.overflow='';}
+function closeProject(){if($('productionDrawer').hidden)return;$('productionDrawer').hidden=true;s.selected=null;document.body.style.overflow='';window.Studio.setItem('production',null);}
 async function save(e){
   e.preventDefault();if(s.saving||!s.selected)return;
   const patch={
@@ -79,24 +85,24 @@ async function save(e){
     const result=await api('update',{id:s.selected,patch});
     s.projects=s.projects.filter(p=>p.id!==s.selected);
     if(result.project?.stage!=='Published')s.projects.push(result.project);
-    closeProject();render();notice('');
+    closeProject();render();notice('');window.Studio.emit('data',{source:'production'});
   }catch(err){notice('Could not save: '+err.message,true);}
   finally{s.saving=false;$('productionSave').disabled=false;}
 }
+function setFilter(filter){
+  s.filter=filter;render();
+  if(window.Studio.current()==='production'&&!s.selected)window.Studio.setItem('production',FILTER_SLUG[filter]?[FILTER_SLUG[filter]]:null);
+}
 function show(tab){
-  const prod=tab==='production';
-  $('weeklyWorkspace').hidden=prod;
-  $('productionWorkspace').hidden=!prod;
-  document.querySelectorAll('[data-view-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.viewTab===tab)));
-  try{sessionStorage.setItem('studio-active-tab',tab);}catch{}
-  if(prod&&!s.loaded)refresh();
+  if(tab==='production')window.Studio.ready.then(ensureLoaded);
 }
 function boot(){
   $('productionStage').innerHTML=stages.map(n=>'<option>'+esc(n)+'</option>').join('');
   $('productionOwner').innerHTML='<option value="">Not set</option>'+owners.map(n=>'<option>'+esc(n)+'</option>').join('');
   $('productionThumbnail').innerHTML='<option value="">Not set</option>'+thumbs.map(n=>'<option>'+esc(n)+'</option>').join('');
-  document.querySelectorAll('[data-view-tab]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.viewTab)));
-  document.querySelectorAll('[data-production-filter]').forEach(b=>b.addEventListener('click',()=>{s.filter=b.dataset.productionFilter;render();}));
+  window.Studio.on('tab',({tab})=>show(tab));
+  window.Studio.on('connection',()=>{s.loaded=false;s.projects=[];if(window.Studio.current()==='production')refresh();});
+  document.querySelectorAll('[data-production-filter]').forEach(b=>b.addEventListener('click',()=>setFilter(b.dataset.productionFilter)));
   $('productionSearch').addEventListener('input',e=>{s.search=e.target.value.trim();render();});
   $('productionRefresh').addEventListener('click',refresh);
   $('productionGrid').addEventListener('click',e=>{const card=e.target.closest('[data-video]');if(card)openProject(card.dataset.video);});
@@ -104,9 +110,18 @@ function boot(){
   $('productionDrawer').addEventListener('click',e=>{if(e.target.hasAttribute('data-close-production'))closeProject();});
   $('productionForm').addEventListener('submit',save);
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('productionDrawer').hidden)closeProject();});
-  let tab='weekly';try{tab=sessionStorage.getItem('studio-active-tab')||'weekly';}catch{}
-  show(tab==='production'?'production':'weekly');
-  try{sessionStorage.setItem('studio-active-tab',tab);}catch{} // keep the saved tab for the calendar/sponsorship scripts, which restore their own views
+  window.Studio.register('production',{
+    async open(item){
+      const slug=Object.entries(FILTER_SLUG).find(([,v])=>v===item[0]);
+      if(slug){setFilter(slug[0]);return;}
+      if(item[0]!=='video'||!item[1])return;
+      await ensureLoaded();
+      if(!s.projects.some(p=>p.id===item[1])){window.StudioBoard?.toast('That video isn’t in the active list — it may be published or deleted in Notion.');return;}
+      openProject(item[1]);
+    },
+    close:closeProject
+  });
 }
+window.StudioProduction={ensureLoaded,refresh,projects:()=>s.projects,loaded:()=>s.loaded,error:()=>s.error,isStale:stale,open:openProject};
 boot();
 })();

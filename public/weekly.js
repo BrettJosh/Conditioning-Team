@@ -43,13 +43,14 @@ function updateView(){
 }
 async function loadPlan(){
  const seq=++stage.loadSeq,board=B();if(!board)return;
- applyPlan(fromCache());$('planSaveStatus').textContent=board.getState().mode==='notion'?'Loading shared plan…':'Local demo • not shared';
+ applyPlan(fromCache());$('planSaveStatus').textContent=board.getState().mode==='notion'?'Loading shared plan…':'Sample data • connect to save';
  if(board.getState().mode!=='notion'||stage.archive)return;
  try{const data=await board.api('planLoad',{owner:stage.owner,week:stage.week});if(seq!==stage.loadSeq)return;applyPlan(data.plan);saveCache(data.plan);$('planSaveStatus').textContent='Saved in Notion';}
  catch(e){if(seq===stage.loadSeq)$('planSaveStatus').textContent='Could not sync plan: '+e.message;}
 }
 async function savePlan(e){
  e.preventDefault();const plan=inputs(),board=B();if(!board)return;
+ if(!board.requireConnection())return;
  $('weeklySaveBtn').disabled=true;$('planSaveStatus').textContent='Saving…';
  try{
   if(board.getState().mode==='notion')await board.api('planSave',{owner:stage.owner,week:stage.week,plan});
@@ -58,14 +59,14 @@ async function savePlan(e){
  finally{$('weeklySaveBtn').disabled=false;}
 }
 function handleTab(tab){
- if(tab==='production')return;
+ if(!['weekly','josh','archive'].includes(tab))return;
  stage.archive=tab==='archive';stage.owner=tab==='josh'?'Josh':'Daisy';stage.expanded={};
  updateView();if(!stage.archive)loadPlan();
 }
 function toggleExpanded(status){stage.expanded[status]=!stage.expanded[status];B().renderBoard();}
 function onSynced(){loadPlan();updateView();}
 function boot(){
- document.querySelectorAll('[data-view-tab]').forEach(button=>button.addEventListener('click',()=>handleTab(button.dataset.viewTab)));
+ window.Studio.on('tab',({tab})=>handleTab(tab));
  $('weekPrev').addEventListener('click',()=>{stage.week=shiftWeek(-7);updateView();loadPlan();});
  $('weekNext').addEventListener('click',()=>{stage.week=shiftWeek(7);updateView();loadPlan();});
  $('weekCurrent').addEventListener('click',()=>{stage.week=currentWeek();updateView();loadPlan();});

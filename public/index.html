@@ -22,7 +22,7 @@
       </div>
     </header>
 
-    <div id="demoWarning" class="demo-warning" role="status"><strong>NOT CONNECTED TO NOTION</strong><span>Local demo — changes are only saved on this device, not shared with Daisy.</span><button id="demoConnectBtn" type="button">Connect to Notion ↗</button></div>
+    <div id="demoWarning" class="demo-warning" role="status"><strong>NOT CONNECTED</strong><span>You’re looking at sample data — nothing you change here is saved. Connect once and this device remembers it.</span><button id="demoConnectBtn" type="button">Connect ↗</button></div>
     <main class="main-content">
       <section class="hero" aria-label="Workspace introduction">
         <div class="hero-stickers" aria-label="Studio reminders">
@@ -35,14 +35,21 @@
       </section>
 
       <nav class="studio-tabs" role="tablist" aria-label="Studio workspace views">
-  <button class="studio-tab" data-view-tab="weekly" role="tab" aria-selected="true">✳ Daisy</button>
+  <button class="studio-tab" data-view-tab="today" role="tab" aria-selected="true">◉ Today</button>
+  <button class="studio-tab" data-view-tab="weekly" role="tab" aria-selected="false">✳ Daisy</button>
   <button class="studio-tab" data-view-tab="josh" role="tab" aria-selected="false">✳ Josh</button>
   <button class="studio-tab" data-view-tab="archive" role="tab" aria-selected="false">◷ Archives</button>
   <button class="studio-tab" data-view-tab="production" role="tab" aria-selected="false">▣ Production</button>
   <button class="studio-tab" data-view-tab="calendar" role="tab" aria-selected="false">▦ Content calendar</button>
   <button class="studio-tab" data-view-tab="sponsorships" role="tab" aria-selected="false">✦ Sponsorships</button>
 </nav>
-<section class="workspace" id="weeklyWorkspace" aria-label="Project task board">
+<section class="workspace today-workspace" id="todayWorkspace" aria-label="Today's briefing">
+  <div class="workspace-heading"><div><div class="overline" id="todayDate">/ TODAY</div><h2>TODAY’S <span class="scribble">BRIEFING</span></h2></div>
+    <div class="workspace-actions"><span class="today-updated" id="todayUpdated" role="status"></span><button class="quiet-btn" id="todayRefresh" type="button" title="Reload tasks, videos, the calendar and sponsorships">↻ <span>Refresh all</span></button></div></div>
+  <div class="today-pulse" id="todayPulse" aria-label="At a glance"></div>
+  <div class="today-grid" id="todayGrid"></div>
+</section>
+<section class="workspace" id="weeklyWorkspace" aria-label="Project task board" hidden>
         <div class="workspace-heading">
           <div>
             <div class="overline">/ YOUR WORKSPACE</div>
@@ -239,20 +246,27 @@
     <div class="overlay-backdrop" data-close-connection></div>
     <section class="connection-dialog" role="dialog" aria-modal="true" aria-labelledby="connectTitle" aria-describedby="connectionStatus">
       <div class="drawer-top"><span class="overline">/ DATA SOURCE</span><button class="icon-close" id="closeConnectionBtn" type="button" aria-label="Close connection settings">✕</button></div>
-      <span class="connect-sticker">● NOT CONNECTED — LOCAL DEMO</span>
-      <h2 id="connectTitle">Connect to<br><span class="highlight-inline">Notion.</span></h2>
-      <p><strong>You are not logged in.</strong> The tasks behind this window are local demo data. Enter your workspace access code to load your shared Notion tasks and collaborate with Daisy.</p>
-      <div id="connectionStatus" class="connection-status">Local demo: changes stay in this browser.</div>
-      <form id="connectForm" class="connection-form">
-        <label>Workspace access code <input id="accessPassword" type="password" autocomplete="off" placeholder="Enter the code configured in Netlify" /></label>
-        <button class="primary-btn" type="submit">Connect to Notion ↗</button>
-      </form>
-      <button class="text-btn" id="demoModeBtn" type="button">Continue in local demo — not shared</button>
-      <div class="helper-copy">Setup first: Notion integration + database access + three Netlify environment variables. Full instructions are in the included README. <strong>Never paste a Notion API token into this screen.</strong></div>
+      <span class="connect-sticker" id="connectSticker">● NOT CONNECTED — SAMPLE DATA</span>
+      <h2 id="connectTitle">Connect to<br><span class="highlight-inline">the studio.</span></h2>
+      <div id="connectSignedOut">
+        <p><strong>Enter the workspace access code once.</strong> It unlocks the shared tasks, videos, content calendar and sponsorships, and this device remembers it so you won’t be asked again.</p>
+        <form id="connectForm" class="connection-form">
+          <label>Workspace access code <input id="accessPassword" type="password" autocomplete="off" placeholder="The team code" /></label>
+          <label class="remember-check"><input type="checkbox" id="rememberDevice" checked> <span><strong>Remember this device</strong><small>Untick on a shared or borrowed computer — it then forgets the code when the browser closes.</small></span></label>
+          <button class="primary-btn" type="submit">Connect ↗</button>
+        </form>
+        <button class="text-btn" id="demoModeBtn" type="button">Just look around — sample data, nothing is saved</button>
+      </div>
+      <div id="connectSignedIn" hidden>
+        <p><strong>You’re connected.</strong> Everything you change here goes straight to Notion and the Google Sheets the team shares.</p>
+        <button class="secondary-btn" id="forgetDeviceBtn" type="button">Forget this device</button>
+      </div>
+      <div id="connectionStatus" class="connection-status">Sample data only. Nothing you change here is saved or shared.</div>
+      <div class="helper-copy">The code is the <code>BOARD_ACCESS_CODE</code> set in Netlify. <strong>Never paste a Notion, Google or Zoho token into this screen.</strong></div>
     </section>
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="./app.js" defer></script><script src="./weekly.js" defer></script><script src="./production.js" defer></script><script src="./calendar.js" defer></script><script src="./sponsorships.js" defer></script>
+  <script src="./studio.js" defer></script><script src="./app.js" defer></script><script src="./weekly.js" defer></script><script src="./production.js" defer></script><script src="./calendar.js" defer></script><script src="./sponsorships.js" defer></script><script src="./today.js" defer></script>
 </body>
 </html>

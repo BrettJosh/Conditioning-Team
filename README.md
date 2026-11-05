@@ -51,7 +51,7 @@ Go to **Netlify → conditioningteam → Project configuration → Environment v
 
 Optional: `NOTION_DATA_SOURCE_ID` can be set instead of `NOTION_DATABASE_ID` for a specific data source. The backend uses Notion API version `2025-09-03` and resolves a database's first data source by default.
 
-**Redeploy after setting environment variables.** Netlify functions read values during deployment. In the app, click `Local demo` (top right) and enter **only your `BOARD_ACCESS_CODE`**. You'll see `Notion connected` when it can list your real tasks.
+**Redeploy after setting environment variables.** Netlify functions read values during deployment. In the app, click `Sample data` (top right) and enter **only your `BOARD_ACCESS_CODE`**. You'll see `Connected` when it can list your real tasks. The device remembers the code from then on (see *Today, links and remembered devices* below).
 
 **Access note:** The Notion API is protected by the code, but the HTML app itself may remain publicly accessible until you configure proper visitor restrictions on Netlify. An access code shared with Daisy is **shared-password access**, not identity-based account authentication: anyone who learns the code could access/change those Notion tasks. For access truly restricted to specific individual accounts, set up Netlify visitor authentication or add a real user login. Avoid private personal/client records and health information in this simple version.
 
@@ -71,8 +71,8 @@ The app updates when you press **Refresh** or reconnect. It does **not** provide
 - Notion status mappings work for conventional options; custom options may require editing the database in Notion.
 - Optional fields absent from the database won't persist on Notion updates; the app doesn't auto-create properties.
 - Notion page comments appear under the integration identity when sent via an integration token.
-- Shared-code gate is *not* per-person authentication; Notion token stays server-side.
-- The static-only preview is offline/local-browser demo mode, not Notion-synced.
+- Shared-code gate is *not* per-person authentication; Notion token stays server-side. The code is remembered per device until someone presses *Forget this device*.
+- The static-only preview shows sample data only and saves nothing.
 - No drag-and-drop order sorting inside each column; drag task cards between columns or change status in task details.
 - No client health or sensitive info should be placed in the public demo data.
 
@@ -97,6 +97,27 @@ netlify/
 google-apps-script/
   Code.gs              # ONE file: content calendar + sponsorship tracker + studioSelfTest()
 ```
+
+The browser scripts load in this order: `studio.js` (remembered code, tab switching and links), `app.js` (task boards), `weekly.js`, `production.js`, `calendar.js`, `sponsorships.js`, `today.js`.
+
+
+## Today, links and remembered devices
+
+**Today** is the first tab and the page the site opens on. It reads what the other tabs already load and shows, on one screen:
+
+- **Due this week**: active Notion tasks due before next Monday, for Josh and Daisy (unassigned tasks sit with Daisy, as on her board), overdue first.
+- **Replies waiting on you**: sponsorship rows flagged in Zoho or with the status *Awaiting Josh's reply*, plus flagged emails from new senders, longest wait first; and the open Action list count.
+- **Production needs**: videos that are blocked, past their next due date, not updated for 7 days, or due within a week.
+- **Publishing**: entries past their date that aren't on YouTube yet (last 30 days), and the next 8 weeks of uploads, marking the ones without a sponsor.
+- **Sponsor money**: sponsored videos that are live but still *In progress* (invoice them), and *Invoiced* ones waiting to be paid with how long the video has been live (45+ days says *Chase*). It goes by each entry's sponsor status in the calendar, so set it to *Paid* when the money lands.
+
+Every row opens the real item in its drawer, right there on Today. **Refresh all** reloads everything (and fresh YouTube numbers); otherwise Today reuses the server's 10-minute YouTube cache and refreshes itself when you come back to a tab left open for 15 minutes or more. If one source fails (the Google approval lapsing, say), that card shows the error and the rest still work.
+
+**Links.** The address bar follows the tab and the open item, and every drawer has **⧉ Copy link**. Links look like `#today`, `#daisy`, `#josh`, `#archive`, `#production`, `#production/video/<id>`, `#production/blocked`, `#production/needs-update`, `#calendar/2026-11-12`, `#sponsorships/brands/<id>`, `#sponsorships/agencies/<id>`, `#sponsorships/waiting-on-you`, `#sponsorships/actions` and `#josh/task/<id>`. Browser Back moves between tabs. A link to something that has since moved or been deleted says so instead of failing silently.
+
+**Remembered devices.** Connecting stores the workspace code on that device (browser `localStorage`), so it opens connected every time. Untick *Remember this device* on a shared or borrowed computer and it is forgotten when the browser closes. The top-right button → **Forget this device** removes it. Anyone already connected under the old version is carried over automatically. If the code is changed in Netlify, devices with the old one are asked for the new one; any other error (Notion having a moment, say) keeps the code and shows the problem instead.
+
+**Sample data is look-only.** Without the code the site shows sample data and won't save task, comment or weekly-plan edits (it opens the connect box instead), so nothing can end up stored in one browser by mistake. Tasks saved that way under the old version still show in that browser's sample data.
 
 No `npm install` required, no third-party UI frameworks or asset CDNs. JavaScript and CSS are plain, easy to maintain, and Netlify functions run with Node's built-in `fetch`.
 

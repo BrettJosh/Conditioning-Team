@@ -1,7 +1,7 @@
 (()=>{
 'use strict';
 const $=id=>document.getElementById(id);
-const state={events:[],extras:[],youtube:{},bridgeVersion:0,start:null,loaded:false,busy:false,from:null,previousText:'',brands:null,editing:null};
+const state={events:[],extras:[],youtube:{},bridgeVersion:0,start:null,loaded:false,busy:false,loading:null,error:'',from:null,previousText:'',brands:null,editing:null};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /* Months are counted from January 2026 (0) so the quarter view can run on into later years; one sheet tab per year. */
 const FIRST_YEAR=2026,LAST_YEAR=2030,MAX_START=(LAST_YEAR-FIRST_YEAR)*12+9;
@@ -28,14 +28,21 @@ async function api(payload){
  const text=await resp.text();let data;try{data=JSON.parse(text)}catch{throw Error(resp.status===502||resp.status===504?'The calendar took too long to answer. Press Refresh.':'Calendar server returned an unexpected response.')}
  if(!resp.ok||!data.ok)throw Error(data.error||'Calendar request failed.');return data;
 }
-function apply(data){state.events=data.events||[];state.youtube=data.youtube||{};state.extras=data.youtube?.extras||[];state.bridgeVersion=Number(data.bridgeVersion)||0;state.loaded=true;render();
- if(!state.brands)loadBrands().then(b=>{if(b&&b.length)render()})}
-async function refresh(){
- if(state.busy)return;state.busy=true;$('calendarRefresh').disabled=true;notice('Loading the content plan from Google Sheets…');
- try{const r=await api({action:'list',fresh:true});apply(r);notice(state.bridgeVersion<3?'Sponsor details, YouTube links and planning into 2027 need the updated Apps Script: paste the new Code.gs into Studio bridge and deploy a new version.':'');$('calendarSetupHelp').hidden=true;}
- catch(e){notice(e.message,true);const needsSetup=/not configured|calendar readme|apps script url|connection is not configured/i.test(e.message);$('calendarSetupHelp').hidden=!needsSetup;if(!state.loaded){$('calendarGrid').innerHTML='<div class="calendar-empty">Your content plan is still safely stored in Google Sheets. Connect the calendar integration to view and edit it here.</div>';}}
- finally{state.busy=false;$('calendarRefresh').disabled=false}
+function apply(data){state.events=data.events||[];state.youtube=data.youtube||{};state.extras=data.youtube?.extras||[];state.bridgeVersion=Number(data.bridgeVersion)||0;state.loaded=true;state.error='';render();window.Studio.emit('data',{source:'calendar'});
+ if(!state.brands)loadBrands().then(b=>{if(b&&b.length){render();window.Studio.emit('data',{source:'calendar'})}})}
+/* fresh=true asks YouTube for new numbers (the Refresh button); Today's quiet load reuses the server's 10-minute cache. */
+function refresh(fresh=true){
+ if(state.loading)return state.loading;
+ if(state.busy)return Promise.resolve();
+ state.loading=(async()=>{
+  $('calendarRefresh').disabled=true;notice('Loading the content plan from Google Sheets…');
+  try{const r=await api({action:'list',fresh:Boolean(fresh)});apply(r);notice(state.bridgeVersion<3?'Sponsor details, YouTube links and planning into 2027 need the updated Apps Script: paste the new Code.gs into Studio bridge and deploy a new version.':'');$('calendarSetupHelp').hidden=true;}
+  catch(e){state.error=e.message;notice(e.message,true);const needsSetup=/not configured|calendar readme|apps script url|connection is not configured/i.test(e.message);$('calendarSetupHelp').hidden=!needsSetup;if(!state.loaded){$('calendarGrid').innerHTML='<div class="calendar-empty">Your content plan is still safely stored in Google Sheets. Connect the calendar integration to view and edit it here.</div>';}window.Studio.emit('data',{source:'calendar'});}
+  finally{$('calendarRefresh').disabled=false}
+ })().finally(()=>{state.loading=null;});
+ return state.loading;
 }
+const ensureLoaded=()=>state.loaded?Promise.resolve():refresh(false);
 
 /* ---------- rendering ---------- */
 /* Short display title: drop the "Publish video -" habit, and the "(Sponsor)" bit when the sponsor tag shows it anyway. */
@@ -180,16 +187,23 @@ async function showEditor(date=null,extra=null){
  $('calendarSponsorHint').textContent='';
  renderYt(existing);renderLinkOptions(existing,extra);
  $('calendarDelete').hidden=!existing;$('calendarOverlay').hidden=false;document.body.style.overflow='hidden';$('calendarText').focus();
+ window.Studio.setItem('calendar',existing?[existing.date]:null);
  if(existing&&isUntitled(existing))$('calendarText').select();
  const brands=await loadBrands();
  $('calendarSponsorOptions').innerHTML=brands.map(b=>'<option value="'+esc(b)+'"></option>').join('');
  if(existing&&!existing.sponsor&&state.editing===existing){const s=suggestSponsor(existing.text,brands);if(s){$('calendarSponsor').value=s;$('calendarSponsorStatus').value=$('calendarSponsorStatus').value||'In progress';$('calendarSponsorHint').textContent='Suggested from the title — clear it if that\'s wrong.';}}
 }
-function closeEditor(){$('calendarOverlay').hidden=true;document.body.style.overflow='';state.editing=null}
+function closeEditor(){if($('calendarOverlay').hidden)return;$('calendarOverlay').hidden=true;document.body.style.overflow='';state.editing=null;window.Studio.setItem('calendar',null)}
 function show(tab){
- const isCalendar=tab==='calendar';
- $('calendarWorkspace').hidden=!isCalendar;
- if(isCalendar){$('weeklyWorkspace').hidden=true;$('productionWorkspace').hidden=true;$('sponsorWorkspace')&&($('sponsorWorkspace').hidden=true);if(!state.loaded)refresh();}
+ if(tab==='calendar')window.Studio.ready.then(()=>state.loaded?null:refresh());
+}
+/* Open a slot by its planned date (links and Today). The grid jumps to that quarter behind the drawer. */
+async function openDate(date){
+ if(!/^\d{4}-\d\d-\d\d$/.test(String(date||'')))return;
+ await ensureLoaded();if(!state.loaded)return;
+ const a=absOf(date);if(a>=0&&a<=MAX_START+2){state.start=Math.min(MAX_START,a-a%3);render();}
+ if(!state.events.some(e=>e.date===date)){window.StudioBoard?.toast('Nothing is planned on '+fmtDay(date)+' any more — it may have been moved.');return;}
+ await showEditor(date);
 }
 async function save(payload){
  if(state.busy)return;
@@ -207,8 +221,9 @@ async function onMove(from,date){
 }
 function boot(){
  $('calendarSponsorStatus').innerHTML='<option value="">No sponsor status</option>'+SPONSOR_STATUSES.map(s=>'<option>'+s+'</option>').join('');
- document.querySelectorAll('[data-view-tab]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.viewTab)));
- $('calendarRefresh').addEventListener('click',refresh);
+ window.Studio.on('tab',({tab})=>show(tab));
+ window.Studio.on('connection',()=>{state.loaded=false;state.events=[];state.extras=[];state.brands=null;if(window.Studio.current()==='calendar')refresh();});
+ $('calendarRefresh').addEventListener('click',()=>refresh(true));
  $('calendarPrevious').addEventListener('click',()=>{state.start=Math.max(0,state.start-3);render()});
  $('calendarNext').addEventListener('click',()=>{state.start=Math.min(MAX_START,state.start+3);render()});
  $('calendarThisQuarter').addEventListener('click',()=>{state.start=currentQuarterStart();render()});
@@ -232,7 +247,8 @@ function boot(){
   const mv=e.target.closest('[data-move-from]');if(!mv)return;mv.disabled=true;
   try{const item=state.events.find(x=>x.date===mv.dataset.moveFrom);if(item&&!item.youtubeUrl&&item.yt)item.youtubeUrl=item.yt.url;await onMove(mv.dataset.moveFrom,mv.dataset.moveTo);closeEditor()}catch(err){notice(err.message,true);mv.disabled=false}});
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('calendarOverlay').hidden)closeEditor()});
- const previous=sessionStorage.getItem('studio-active-tab');show(previous==='calendar'?'calendar':'weekly');if(previous==='calendar'){$('weeklyWorkspace').hidden=true;$('productionWorkspace').hidden=true;}
+ window.Studio.register('calendar',{open:item=>openDate(item[0]),close:closeEditor});
 }
+window.StudioCalendar={ensureLoaded,refresh,loaded:()=>state.loaded,error:()=>state.error,events:()=>state.events,stateOf,shownOn,sponsorOf,shortTitle,isUntitled,youtube:()=>state.youtube,open:openDate};
 boot();
 })();

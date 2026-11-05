@@ -1,7 +1,6 @@
 (() => {
   'use strict';
   const STORAGE_KEY = 'josh-brett-studio-board-demo-v2';
-  const SESSION_CODE_KEY = 'josh-brett-studio-access-code';
   const columns = [
     {id:'todo',label:'To do',icon:'◫'},
     {id:'doing',label:'In progress',icon:'↗'},
@@ -18,16 +17,27 @@
   ];
   const archivedColumns=[{id:'onhold',label:'On hold',icon:'◷'},{id:'background',label:'Background',icon:'◌'}];
   const byId = id => document.getElementById(id);
-  const sessionGet = key => { try { return sessionStorage.getItem(key); } catch { return null; } };
-  const sessionSet = (key,value) => { try { sessionStorage.setItem(key,value); } catch {} };
-  const sessionRemove = key => { try { sessionStorage.removeItem(key); } catch {} };
-  const state = {mode:'demo',code:'',tasks:[],filter:'All',search:'',selected:null,saving:false,loading:false};
+  const Auth = () => window.Studio.Auth;
+  const state = {mode:'demo',code:'',tasks:[],filter:'All',search:'',selected:null,saving:false,loading:false,tasksLoaded:false,taskError:''};
+  const ARCHIVED=['onhold','background'];
   const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function loadDemo() { try { const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)); return Array.isArray(stored) ? stored : structuredClone(demoTasks); } catch { return structuredClone(demoTasks); } }
   function saveDemo() { try {localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tasks));} catch {toast('Browser storage unavailable. Changes may not persist.');} }
   function toast(message) {const el=byId('toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),3400);}
   function notice(message,error=false) {const el=byId('notice');el.textContent=message;el.classList.toggle('error',error);el.hidden=!message;}
-  function updateConnection() {document.body.classList.toggle('local-demo-mode',state.mode!=='notion');byId('demoWarning').hidden=state.mode==='notion';byId('connectionText').textContent=state.mode==='notion'?'Notion connected':'Local demo';byId('connectionDot').className='connection-dot'+(state.mode==='notion'?' connected':'');byId('connectionStatus').textContent=state.mode==='notion'?'Connected to Notion. Task and comment changes sync with your existing database.':'Local demo only: changes are saved to this browser, not shared with Daisy.';}
+  function updateConnection() {
+    const on=state.mode==='notion',remembered=on&&Auth().remembered();
+    document.body.classList.toggle('local-demo-mode',!on);byId('demoWarning').hidden=on;
+    byId('connectionText').textContent=on?'Connected':'Sample data';byId('connectionDot').className='connection-dot'+(on?' connected':'');
+    byId('connectSignedOut').hidden=on;byId('connectSignedIn').hidden=!on;
+    byId('connectSticker').textContent=on?(remembered?'● CONNECTED — REMEMBERED ON THIS DEVICE':'● CONNECTED — THIS BROWSER SESSION'):'● NOT CONNECTED — SAMPLE DATA';
+    byId('connectSticker').classList.toggle('off',!on);
+    byId('connectionStatus').textContent=on?(remembered?'This device remembers the workspace code, so it opens connected every time. Forget it on a shared or borrowed computer.':'Connected until this browser is closed. Tick “Remember this device” next time to stay connected.')+(state.taskError?' Notion tasks could not load: '+state.taskError:''):'Sample data only. Nothing you change here is saved or shared.';
+  }
+  /* Sample mode is look-only: an edit that would only ever live in this browser is the easiest way to lose work. */
+  function requireConnection(){if(state.mode==='notion')return true;toast('This is sample data — connect to make changes.');openConnection();return false;}
+  /* The tab a task's link should open: the board it belongs on. */
+  function tabForTask(task){const here=window.Studio.current();if(['weekly','josh','archive'].includes(here))return here;if(task&&ARCHIVED.includes(task.status))return 'archive';return String(task?.owner||'').toLowerCase()==='josh'?'josh':'weekly';}
   function projectClass(project) {const p=(project||'').toLowerCase();return p.includes('skinny')||p.includes('product')?'product':p.includes('doc')||p.includes('video')?'doc':p.includes('ai')||p.includes('system')?'ai':p.includes('sponsor')?'sponsor':'';}
   function filteredTasks() {const tasks=state.tasks.filter(task=>(state.filter==='All'||(task.project||'General')===state.filter)&&(!state.search||`${task.title} ${task.project} ${task.description}`.toLowerCase().includes(state.search)));return window.StudioWeekly?window.StudioWeekly.filterTasks(tasks):tasks;}
   function formatDate(value) {if(!value)return '';const date=new Date(value+'T12:00:00');return Number.isNaN(date.getTime())?value:date.toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
@@ -52,6 +62,7 @@
     return `<button type="button" class="task-card" data-id="${escapeHtml(t.id)}" draggable="true" aria-label="Edit task: ${escapeHtml(t.title)}"><div class="card-top"><span class="project-pill ${projectClass(t.project)}">${escapeHtml(t.project||'General')}</span><span class="priority-dot ${escapeHtml(t.priority||'normal')}" title="${escapeHtml(t.priority||'Normal')} priority"></span></div><div class="task-title">${escapeHtml(t.title)}</div><div class="task-bottom"><div class="task-meta">${due}<span>${count?'☏ '+count:'↗ Details'}</span></div><span class="task-arrow">↗</span></div></button>`;
   }
   function renderBoard() {
+    window.Studio.emit('data',{source:'tasks'});
     renderTabs();
     const t=filteredTasks();
     byId('totalCount').textContent=t.length;
@@ -116,8 +127,9 @@
     byId('taskOverlay').hidden=false; document.body.style.overflow='hidden';
     resizeTaskNotes();
     if(task)loadComments(task);setTimeout(()=>byId('taskTitle').focus(),30);
+    state.linkTab=tabForTask(task);window.Studio.setItem(state.linkTab,task?['task',task.id]:null);
   }
-  function closeTask() {byId('taskOverlay').hidden=true;state.selected=null;document.body.style.overflow='';}
+  function closeTask() {if(byId('taskOverlay').hidden)return;byId('taskOverlay').hidden=true;state.selected=null;document.body.style.overflow='';window.Studio.setItem(state.linkTab||'weekly',null);}
   function renderComments(comments) {
     byId('commentCount').textContent=comments.length;
     byId('commentsList').innerHTML=comments.length?comments.map(c=>`<div class="comment"><div class="comment-by"><strong>${escapeHtml(c.name||'Notion')}</strong><span>${escapeHtml(c.date?new Date(c.date).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'')}</span></div><p>${escapeHtml(c.text)}</p></div>`).join(''):'<p class="comment-empty">No comments yet. Leave the first note.</p>';
@@ -132,33 +144,35 @@
   async function api(action,payload={}) {
     const response=await fetch('/.netlify/functions/notion',{method:'POST',headers:{'content-type':'application/json','x-board-key':state.code},body:JSON.stringify({action,...payload}),cache:'no-store'});
     let data;try{data=await response.json();}catch{throw new Error('Netlify function unavailable. Deploy the complete GitHub project (not just the static files).');}
-    if(!response.ok)throw new Error(data.error||`Notion request failed (${response.status}).`);
+    if(!response.ok)throw Object.assign(new Error(data.error||`Notion request failed (${response.status}).`),{status:response.status});
     return data;
   }
   async function refreshNotion() {
     if(state.mode!=='notion')return;
     byId('refreshBtn').disabled=true;
-    try{const result=await api('list');state.tasks=result.tasks;renderBoard();window.StudioWeekly?.onSynced();notice(result.limited?'Notion currently returned a limited number of tasks.': '');}
-    catch(err){notice(`Notion sync failed: ${err.message}`,true);toast('Could not refresh.');}
+    try{const result=await api('list');state.tasks=result.tasks;state.tasksLoaded=true;state.taskError='';renderBoard();window.StudioWeekly?.onSynced();notice(result.limited?'Notion currently returned a limited number of tasks.': '');}
+    catch(err){state.taskError=err.message;notice(`Notion sync failed: ${err.message}`,true);toast('Could not refresh.');renderBoard();}
     finally{byId('refreshBtn').disabled=false;}
   }
-  async function connectNotion(code) {
+  async function connectNotion(code,remember=true) {
     if(!code.trim()){toast('Enter the workspace access code.');return;}
     state.code=code.trim();
     byId('connectForm').querySelector('button').disabled=true;
     try{
-      const result=await api('list');state.mode='notion';state.tasks=result.tasks;state.filter='All';sessionSet(SESSION_CODE_KEY,state.code);renderBoard();updateConnection();closeConnection();notice('');window.StudioWeekly?.onSynced();toast('Notion connected. Your board is now shared.');
-    }catch(err){state.mode='demo';state.code='';sessionRemove(SESSION_CODE_KEY);updateConnection();byId('connectionStatus').textContent=err.message;toast('Connection failed. Check the setup and access code.');}
+      const result=await api('list');state.mode='notion';state.tasks=result.tasks;state.tasksLoaded=true;state.taskError='';state.filter='All';Auth().set(state.code,remember);byId('accessPassword').value='';renderBoard();updateConnection();closeConnection();notice('');window.StudioWeekly?.onSynced();window.Studio.setMode(state.mode);toast(remember?'Connected — this device will remember it.':'Connected for this browser session.');
+    }catch(err){state.mode='demo';state.code='';updateConnection();byId('connectionStatus').textContent=err.message;toast(err.status===401?'That code didn’t work. Check it and try again.':'Connection failed. Check the setup and access code.');}
     finally{byId('connectForm').querySelector('button').disabled=false;}
   }
   function closeConnection(){byId('connectionOverlay').hidden=true;document.body.style.overflow='';}
   function openConnection(){updateConnection();byId('connectionOverlay').hidden=false;document.body.style.overflow='hidden';}
-  function switchDemo(){state.mode='demo';state.code='';sessionRemove(SESSION_CODE_KEY);state.tasks=loadDemo();state.filter='All';renderBoard();updateConnection();closeConnection();toast('Local demo mode. Changes only save in this browser.');}
+  function switchDemo(message='Sample data — have a look around. Nothing you change is saved.'){state.mode='demo';state.code='';state.tasksLoaded=false;state.taskError='';Auth().clear();state.tasks=loadDemo();state.filter='All';renderBoard();updateConnection();closeConnection();notice('');window.Studio.setMode(state.mode);toast(message);}
+  function forgetDevice(){if(!confirm('Forget the workspace code on this device? You will need to enter it again next time.'))return;switchDemo('This device has forgotten the workspace code.');}
   async function saveTask(ev){
     ev.preventDefault();if(state.saving)return;
     const id=byId('taskId').value;
     const patch={title:byId('taskTitle').value.trim(),status:byId('taskStatus').value,project:byId('taskProject').value.trim()||'General',priority:byId('taskPriority').value,owner:byId('taskOwner').value,due:byId('taskDue').value,description:byId('taskDescription').value.trim()};
     if(!patch.title){toast('Give the task a name.');return;}
+    if(!requireConnection())return;
     state.saving=true;byId('saveTaskBtn').disabled=true;
     try{
       if(state.mode==='notion'){
@@ -173,6 +187,7 @@
   }
   async function changeStatus(id,status){
     const task=state.tasks.find(x=>x.id===id);if(!task)return false;
+    if(!requireConnection())return false;
     const old={status:task.status,due:task.due};
     let patch;
     if(status==='overdue'){
@@ -205,6 +220,7 @@
   }
   async function postComment(ev){
     ev.preventDefault();const text=byId('commentText').value.trim();const task=state.tasks.find(t=>t.id===state.selected);if(!text||!task)return;
+    if(!requireConnection())return;
     const btn=byId('commentForm').querySelector('button');btn.disabled=true;
     try{
       if(state.mode==='notion'){
@@ -228,16 +244,27 @@
     byId('refreshBtn').addEventListener('click',()=>{if(state.mode==='notion')refreshNotion();else toast('Demo data is stored locally. Connect Notion to sync.');});
     byId('connectionBtn').addEventListener('click',openConnection);byId('demoConnectBtn').addEventListener('click',openConnection);byId('closeConnectionBtn').addEventListener('click',closeConnection);
     byId('connectionOverlay').addEventListener('click',e=>{if(e.target.hasAttribute('data-close-connection'))closeConnection();});
-    byId('connectForm').addEventListener('submit',e=>{e.preventDefault();connectNotion(byId('accessPassword').value);});
-    byId('demoModeBtn').addEventListener('click',switchDemo);
+    byId('connectForm').addEventListener('submit',e=>{e.preventDefault();connectNotion(byId('accessPassword').value,byId('rememberDevice').checked);});
+    byId('demoModeBtn').addEventListener('click',()=>switchDemo());
+    byId('forgetDeviceBtn').addEventListener('click',forgetDevice);
     document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!byId('taskOverlay').hidden)closeTask();else if(!byId('connectionOverlay').hidden)closeConnection();}});
   }
-  window.StudioBoard={getState:()=>state,renderBoard,toast,api,changeStatus,openTask,saveDemo,refreshNotion,updateConnection};
+  window.StudioBoard={getState:()=>state,renderBoard,toast,api,changeStatus,openTask,closeTask,saveDemo,refreshNotion,updateConnection,requireConnection,openConnection};
+  window.Studio.register(['weekly','josh','archive'],{
+    open(item){if(item[0]!=='task'||!item[1])return;if(state.mode!=='notion'){openConnection();return;}if(!state.tasks.some(t=>t.id===item[1])){toast('That task isn’t on the board any more — it may have been deleted in Notion.');return;}openTask(item[1]);},
+    close:closeTask
+  });
   async function boot(){state.tasks=loadDemo();attachEvents();renderBoard();updateConnection();
-    const saved=sessionGet(SESSION_CODE_KEY);
-    if(saved){state.code=saved;try{const result=await api('list');state.mode='notion';state.tasks=result.tasks;renderBoard();updateConnection();window.StudioWeekly?.onSynced();}
-      catch{state.code='';sessionRemove(SESSION_CODE_KEY);updateConnection();notice('Notion session expired. Reconnect using the button at the top.',true);openConnection();}}
+    const saved=Auth().get();
+    if(saved){state.code=saved;
+      try{const result=await api('list');state.mode='notion';state.tasks=result.tasks;state.tasksLoaded=true;renderBoard();updateConnection();window.StudioWeekly?.onSynced();}
+      catch(err){
+        if(err.status===401){state.code='';Auth().clear();updateConnection();notice('The workspace code has changed. Enter the new one to reconnect.',true);openConnection();}
+        // Anything else (Notion having a moment, a slow network) keeps the code: the other tabs still work and Refresh retries.
+        else{state.mode='notion';state.tasks=[];state.taskError=err.message;renderBoard();updateConnection();notice(`Notion tasks could not load: ${err.message} — press Refresh to try again.`,true);}
+      }}
     else openConnection();
+    window.Studio.setMode(state.mode);
   }
   boot();
 })();

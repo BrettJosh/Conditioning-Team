@@ -49,7 +49,7 @@ const DEMO = {
     { m: 'demo-m5', t: 't5', a: 'chris@example.com', f: 'important', d: '2026-11-03T17:41:00.000Z' }
   ] } }
 };
-const s = { brands: [], agencies: [], actions: [], completed: [], emails: [], sheetUrl: '', sync: {}, fl: { byRecord: {}, loose: [], ids: new Set() }, view: 'all', filter: 'all', search: '', sort: { key: '', dir: 1 }, loaded: false, busy: false, demo: true, selected: null, zoho: null, pendingAssign: null };
+const s = { brands: [], agencies: [], actions: [], completed: [], emails: [], sheetUrl: '', sync: {}, fl: { byRecord: {}, loose: [], ids: new Set() }, view: 'all', filter: 'all', search: '', sort: { key: '', dir: 1 }, loaded: false, busy: false, loading: null, error: '', demo: true, selected: null, zoho: null, pendingAssign: null };
 
 const connected = () => { const b = B()?.getState(); return Boolean(b && b.mode === 'notion'); };
 function notice(text, error = false) { const el = $('sponsorNotice'); el.hidden = !text; el.textContent = text; el.classList.toggle('error', error); }
@@ -67,20 +67,28 @@ function applyPayload(data) {
   s.emails = data.emails || []; s.sheetUrl = data.sheetUrl || ''; s.sync = data.sync || {};
   s.fl = flagState();
   s.loaded = true; render();
+  window.Studio.emit('data', { source: 'sponsorships' });
 }
 function loadDemo() { s.demo = true; applyPayload({ ...DEMO, sheetUrl: '' }); }
-async function refresh(quiet = false) {
-  if (!connected()) { loadDemo(); notice('Local demo — sample rows. Connect your workspace to load the shared tracker.'); return; }
-  if (s.busy) return; s.busy = true; $('sponsorRefresh').disabled = true;
+function refresh(quiet = false) {
+  if (!connected()) { loadDemo(); notice('Sample rows — connect your workspace (top right) to load the shared tracker.'); return Promise.resolve(); }
+  if (s.loading) return s.loading;
+  if (s.busy) return Promise.resolve();
+  s.busy = true; $('sponsorRefresh').disabled = true;
   if (!quiet) notice('Loading the sponsorship tracker from Google Sheets…');
-  try { const r = await api({ action: 'sponsorList' }); s.demo = false; applyPayload(r); notice(''); $('sponsorSetupHelp').hidden = true; }
-  catch (e) {
-    notice(e.message, true);
-    const needsSetup = /not configured|readme|apps script|sheet not found|sponsorships\.gs|unexpected response/i.test(e.message);
-    $('sponsorSetupHelp').hidden = !needsSetup;
-    if (!s.loaded) loadDemo();
-  } finally { s.busy = false; $('sponsorRefresh').disabled = false; }
+  s.loading = (async () => {
+    try { const r = await api({ action: 'sponsorList' }); s.demo = false; s.error = ''; applyPayload(r); notice(''); $('sponsorSetupHelp').hidden = true; }
+    catch (e) {
+      s.error = e.message;
+      notice(e.message, true);
+      const needsSetup = /not configured|readme|apps script|sheet not found|sponsorships\.gs|unexpected response/i.test(e.message);
+      $('sponsorSetupHelp').hidden = !needsSetup;
+      if (!s.loaded) loadDemo(); else window.Studio.emit('data', { source: 'sponsorships' });
+    } finally { s.busy = false; $('sponsorRefresh').disabled = false; }
+  })().finally(() => { s.loading = null; });
+  return s.loading;
 }
+const ensureLoaded = () => (s.loaded && !(s.demo && connected()) ? Promise.resolve() : refresh(true));
 
 /* ---------- derived data ---------- */
 const days = iso => { if (!iso) return null; const d = new Date(iso + 'T12:00:00'); if (Number.isNaN(d.getTime())) return null; return Math.floor((new Date(TODAY() + 'T12:00:00').getTime() - d.getTime()) / 86400000); };
@@ -295,6 +303,7 @@ function openRecord(tab, id, prefill = null) {
   if (record) renderDrawerEmails(tab, id);
   $('sponsorOverlay').hidden = false; document.body.style.overflow = 'hidden';
   setTimeout(() => $(record ? 'sponsorStatus' : 'sponsorName').focus(), 30);
+  window.Studio.setItem('sponsorships', record && !s.demo ? [tab, id] : null);
 }
 /** "Add as brand / agency" on a flagged email from someone new: the drawer opens filled in from the email. */
 function addFromFlag(messageId, tab) {
@@ -311,7 +320,7 @@ function renderDrawerEmails(tab, id) {
   $('sponsorEmailCount').textContent = list.length;
   $('sponsorEmailList').innerHTML = list.length ? list.slice(0, 40).map(e => `<div class="comment sponsor-email ${esc(e.direction)}"><div class="comment-by"><strong>${flagMark(e.messageId)}${e.direction === 'in' ? '↙ ' + esc(clamp(e.from, 60)) : '↗ To ' + esc(clamp(e.to, 60))}</strong><span>${esc(fmtDateTime(e.date))}</span></div><p><b>${esc(e.subject || '(no subject)')}</b>${e.snippet ? '<br>' + esc(clamp(e.snippet, 220)) : ''}</p></div>`).join('') : '<p class="comment-empty">No emails matched yet. They appear here after a Zoho sync, or when you log one above.</p>';
 }
-function closeRecord() { $('sponsorOverlay').hidden = true; s.selected = null; s.pendingAssign = null; document.body.style.overflow = ''; }
+function closeRecord() { if ($('sponsorOverlay').hidden) return; $('sponsorOverlay').hidden = true; s.selected = null; s.pendingAssign = null; document.body.style.overflow = ''; window.Studio.setItem('sponsorships', null); }
 function readForm() {
   const brand = $('sponsorTab').value === 'brands';
   const v = id => $(id).value.trim();
@@ -418,15 +427,30 @@ async function runSync() {
   if (result) await refresh(true);
 }
 
+/* ---------- for Today ---------- */
+/** Everything that needs Josh's reply: flagged emails (tracked or new senders) and rows whose status says so, longest wait first. */
+function waitingOnYou() {
+  const last = lastEmails();
+  const rows = ['brands', 'agencies'].flatMap(tab => records(tab).map(r => {
+    const flags = flagsFor(tab, r.id), l = last[tab + '|' + r.id] || null;
+    if (!flags && group(r.status) !== 'you') return null;
+    const latestFlag = flags ? flags.reduce((a, b) => ((b.d || '') > (a.d || '') ? b : a)) : null;
+    const since = latestFlag ? (latestFlag.d || '').slice(0, 10) : l && l.direction === 'in' ? l.date.slice(0, 10) : r.lastActivity;
+    return { kind: 'record', tab, id: r.id, name: r.name, status: r.status, flags, subject: latestFlag?.email?.subject || (l && l.direction === 'in' ? l.subject : '') || r.nextStep || r.summary || '', days: days(since) };
+  }).filter(Boolean));
+  const loose = s.fl.loose.map(r => ({ kind: 'flag', tab: 'flag', id: r.flag.m, name: r.name, status: 'New sender', flags: [r.flag], subject: r.summary, days: r.days }));
+  return [...rows, ...loose].sort((a, b) => (b.days ?? -1) - (a.days ?? -1) || a.name.localeCompare(b.name));
+}
+function setView(view, filter = 'all') { s.view = view; s.filter = filter; s.sort = { key: '', dir: 1 }; render(); }
+
 /* ---------- wiring ---------- */
 function show(tab) {
-  const on = tab === 'sponsorships';
-  $('sponsorWorkspace').hidden = !on;
-  document.querySelectorAll('[data-view-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.viewTab === tab)));
-  if (on) { $('weeklyWorkspace').hidden = true; $('productionWorkspace').hidden = true; $('calendarWorkspace').hidden = true; if (!s.loaded) refresh(); }
+  if (tab === 'sponsorships') window.Studio.ready.then(ensureLoaded);
 }
 function boot() {
-  document.querySelectorAll('[data-view-tab]').forEach(b => b.addEventListener('click', () => show(b.dataset.viewTab)));
+  window.Studio.on('tab', ({ tab }) => show(tab));
+  // Reload when the workspace connection flips (connect / forget this device).
+  window.Studio.on('connection', () => { s.loaded = false; s.brands = []; s.agencies = []; if (window.Studio.current() === 'sponsorships') refresh(true); });
   $('sponsorRefresh').addEventListener('click', () => refresh());
   $('sponsorSyncBtn').addEventListener('click', runSync);
   $('sponsorAddBtn').addEventListener('click', () => openRecord(s.view === 'agencies' ? 'agencies' : 'brands', null));
@@ -449,12 +473,20 @@ function boot() {
   $('sponsorOverlay').addEventListener('click', e => { if (e.target.closest('[data-sponsor-close]')) closeRecord(); });
   $('zohoOverlay').addEventListener('click', e => { if (e.target.closest('[data-zoho-close]')) closeZoho(); });
   document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (!$('zohoOverlay').hidden) closeZoho(); else if (!$('sponsorOverlay').hidden) closeRecord(); });
-  let tab = 'weekly'; try { tab = sessionStorage.getItem('studio-active-tab') || 'weekly'; } catch {}
-  show(tab === 'sponsorships' ? 'sponsorships' : 'weekly');
-  // Reload when the workspace connection flips (connect / switch to demo) while this tab is open.
-  let wasConnected = connected();
-  setInterval(() => { const now = connected(); if (now === wasConnected) return; wasConnected = now; s.loaded = false; if (!$('sponsorWorkspace').hidden) refresh(true); }, 1000);
+  window.Studio.register('sponsorships', {
+    async open(item) {
+      const [what, id] = item;
+      if (what === 'waiting-on-you') { await ensureLoaded(); setView('all', 'you'); return; }
+      if (['actions', 'emails', 'brands', 'agencies'].includes(what) && !id) { await ensureLoaded(); setView(what); return; }
+      if (!['brands', 'agencies'].includes(what) || !id) return;
+      await ensureLoaded();
+      if (s.demo) return;
+      if (!records(what).some(r => r.id === id)) { toast('That row isn’t in the tracker any more — it may have been removed from the sheet.'); return; }
+      openRecord(what, id);
+    },
+    close: closeRecord
+  });
 }
-window.StudioSponsorships = { refresh, runSync, brandNames: () => (s.loaded && !s.demo ? s.brands.slice().sort((a, b) => (group(a.status) === 'won' ? 0 : 1) - (group(b.status) === 'won' ? 0 : 1) || a.name.localeCompare(b.name)).map(b => b.name) : null) };
+window.StudioSponsorships = { refresh, runSync, ensureLoaded, loaded: () => s.loaded && !s.demo, error: () => s.error, waitingOnYou, actions: () => s.actions, open: openRecord, brandNames: () => (s.loaded && !s.demo ? s.brands.slice().sort((a, b) => (group(a.status) === 'won' ? 0 : 1) - (group(b.status) === 'won' ? 0 : 1) || a.name.localeCompare(b.name)).map(b => b.name) : null) };
 boot();
 })();
