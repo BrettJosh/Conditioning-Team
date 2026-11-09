@@ -3,7 +3,7 @@
  *  - Auth: remembers the workspace access code on this device (or only for this browser session on a shared computer).
  *  - Router: one place that switches tabs and keeps the address bar in step, so every tab and every open item has a link:
  *      #overview · #daisy · #josh · #archive · #production · #calendar · #sponsorships
- *      #josh/task/<notion id> · #production/video/<id> · #production/blocked · #calendar/2026-11-12
+ *      #josh/task/<notion id> · #production/video/<id> · #production/blocked · #calendar/2026-11-12 · #calendar/sponsors
  *      #sponsorships/brands/<id> · #sponsorships/agencies/<id> · #sponsorships/waiting-on-you · #sponsorships/actions
  *  - Events: studio:tab (tab shown), studio:connection (connected / disconnected), studio:data (a module's data changed).
  */

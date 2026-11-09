@@ -1,7 +1,8 @@
 (()=>{
 'use strict';
 const $=id=>document.getElementById(id);
-const state={events:[],extras:[],youtube:{},bridgeVersion:0,start:null,loaded:false,busy:false,loading:null,error:'',from:null,previousText:'',brands:null,editing:null};
+const state={events:[],extras:[],youtube:{},bridgeVersion:0,start:null,loaded:false,busy:false,loading:null,error:'',from:null,previousText:'',brands:null,brandRecords:null,editing:null,
+ history:{videos:[],channel:null,loaded:false,loading:null,error:'',view:'brands',q:''}}; // every upload on the channel, for the sponsor history
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /* Months are counted from January 2026 (0) so the quarter view can run on into later years; one sheet tab per year. */
 const FIRST_YEAR=2026,LAST_YEAR=2030,MAX_START=(LAST_YEAR-FIRST_YEAR)*12+9;
@@ -57,7 +58,8 @@ function refresh(fresh=true){
  if(state.busy)return Promise.resolve();
  state.loading=(async()=>{
   $('calendarRefresh').disabled=true;notice('Loading the content plan from Google Sheets…');
-  try{const r=await api({action:'list',fresh:Boolean(fresh)});apply(r);notice(state.bridgeVersion<3?'Sponsor details, YouTube links and planning into 2027 need the updated Apps Script: paste the new Code.gs into Studio bridge and deploy a new version.':'');$('calendarSetupHelp').hidden=true;}
+  try{const r=await api({action:'list',fresh:Boolean(fresh)});apply(r);notice(state.bridgeVersion<3?'Sponsor details, YouTube links and planning into 2027 need the updated Apps Script: paste the new Code.gs into Studio bridge and deploy a new version.':'');$('calendarSetupHelp').hidden=true;
+   if(window.Studio.current()==='calendar'&&(fresh||!state.history.loaded))loadHistory(fresh);}
   catch(e){state.error=e.message;notice(e.message,true);const needsSetup=/not configured|calendar readme|apps script url|connection is not configured/i.test(e.message);$('calendarSetupHelp').hidden=!needsSetup;if(!state.loaded){$('calendarGrid').innerHTML='<div class="calendar-empty">Your content plan is still safely stored in Google Sheets. Connect the calendar integration to view and edit it here.</div>';}window.Studio.emit('data',{source:'calendar'});}
   finally{$('calendarRefresh').disabled=false}
  })().finally(()=>{state.loading=null;});
@@ -73,11 +75,22 @@ function shortTitle(item,sponsorName){
  if(!t||/^video$/i.test(t))t='Untitled video';
  return t.charAt(0).toUpperCase()+t.slice(1);
 }
-const sponsorOf=item=>item.sponsor?{name:item.sponsor,status:item.sponsorStatus||'',saved:true}:(()=>{const n=suggestSponsor(item.text,state.brands||[]);return n?{name:n,status:'',saved:false}:null})();
+/* The sponsor shown on an entry: saved in the sheet; else suggested from "(Brand)" in the title; else from the link at the top of the
+ * YouTube description once the video is live (matched to a brand in the Sponsorship tracker when it can be). */
+function sponsorOf(item){
+ if(item.sponsor)return{name:item.sponsor,status:item.sponsorStatus||'',saved:true};
+ const fromTitle=suggestSponsor(item.text,state.brands||[]);
+ if(fromTitle)return{name:fromTitle,status:'',saved:false,source:'title'};
+ const d=linkSponsor(item.yt&&item.yt.sponsor);
+ return d&&d.name?{name:d.name,status:'',saved:false,source:'description',line:d.line,url:d.url,domain:d.domain,brand:d.brand}:null;
+}
+const lineText=l=>String(l||'').replace(/https?:\/\/\S+|www\.\S+/g,'').replace(/\s+/g,' ').replace(/[\s:;,-]+$/,'').trim();
+const suggestedLabel=sp=>sp.source==='description'?'From the video description, click to confirm':'Suggested, click to confirm';
 function tooltip(item){
  const st=stateOf(item),y=item.yt,sp=sponsorOf(item),lines=[item.text,STATE_LABEL[st]+(y?' · '+compact(y.views)+' views':'')];
  if(shownOn(item)!==item.date)lines.push('Planned '+fmtDay(item.date)+', went out '+fmtDay(shownOn(item)));
- if(sp)lines.push('Sponsor: '+sp.name+', '+(sp.saved?(sp.status||'status not set'):'suggested, click to confirm'));
+ if(sp)lines.push('Sponsor: '+sp.name+', '+(sp.saved?(sp.status||'status not set'):sp.source==='description'?'suggested from the description, click to confirm':'suggested from the title, click to confirm'));
+ if(sp&&sp.line)lines.push('Description: '+sp.line);
  return lines.join('\n');
 }
 /* Grid card: two-line title + one meta line. The sponsor is a slim tag right under it, coloured by deal status. */
@@ -89,7 +102,7 @@ function chip(item){
 }
 function sponsorTag(item,sp){
  if(!sp)return'';
- const label=sp.saved?(sp.status||'No status'):'Suggested, click to confirm';
+ const label=sp.saved?(sp.status||'No status'):suggestedLabel(sp);
  return '<button class="cal-sponsor '+(sp.saved?statusClass(sp.status):'sp-suggested')+'" type="button" data-sponsor-date="'+item.date+'" title="'+esc('Sponsor: '+sp.name+', '+label)+'" aria-label="'+esc('Sponsor '+sp.name+', '+label)+'"><span class="cal-sponsor-name">◆ '+esc(sp.name)+(sp.saved?'':' ?')+'</span></button>';
 }
 function slotChip(date){return '<button class="calendar-event cal-slot" type="button" draggable="true" data-slot-date="'+date+'" title="Release slot: two videos a month, on the '+SLOT_LABEL+'. Click to plan a video here, or drag it to another day."><span class="cal-ev-title cal-untitled">+ Add title</span><span class="cal-ev-meta">◌ Slot</span></button>'}
@@ -104,16 +117,16 @@ function renderAgenda(list,extras,slots=[]){
  $('calendarAgenda').innerHTML='<div class="cal-agenda-head"><h3>'+(state.start===currentQuarterStart()?'This quarter':esc($('calendarRange').textContent))+'</h3><span>'+rows.length+' video'+(rows.length===1?'':'s')+' · click a row to open it</span></div><div class="cal-agenda-wrap"><table class="cal-agenda"><thead><tr><th>Date</th><th>Video</th><th>Status</th><th class="num">Views</th><th>Sponsor</th><th>Deal</th></tr></thead><tbody>'+
   rows.map(r=>{
    if(r.kind==='slot')return '<tr class="cal-a-slot" data-slot-date="'+r.date+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(r.date))+'</td><td><strong class="cal-untitled">+ Add title</strong><small>Release slot, '+SLOT_LABEL+'</small></td><td>'+pillFor('slot')+'</td><td class="num"><span class="muted">–</span></td><td><span class="muted">–</span></td><td></td></tr>';
-   if(r.kind==='extra'){const v=r.v;return '<tr data-extra="'+esc(v.id)+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(v.date))+'</td><td><strong>'+esc(v.title)+'</strong><small>On YouTube, not in the plan</small></td><td>'+pillFor('extra')+'</td><td class="num">'+compact(v.views)+'</td><td class="muted">–</td><td></td></tr>'}
+   if(r.kind==='extra'){const v=r.v,d=linkSponsor(v.sponsor);return '<tr data-extra="'+esc(v.id)+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(v.date))+'</td><td><strong>'+esc(v.title)+'</strong><small>On YouTube, not in the plan</small></td><td>'+pillFor('extra')+'</td><td class="num">'+compact(v.views)+'</td><td>'+(d&&d.name?'<span class="cal-a-sponsor suggested" title="'+esc('From the video description: '+d.line)+'">◆ '+esc(d.name)+'</span>':'<span class="muted">–</span>')+'</td><td>'+(d&&d.name?'<span class="cal-deal sp-suggested">Add to plan</span>':'')+'</td></tr>'}
    const e=r.e,st=stateOf(e),sp=sponsorOf(e),y=e.yt,moved=r.date!==e.date;
    const sub=[y&&y.title&&y.title.toLowerCase()!==String(e.text).toLowerCase()?'YouTube: '+y.title:'',moved?'Planned '+fmtDay(e.date):''].filter(Boolean).join(' · ');
    const deal=sp?(sp.saved?'<span class="cal-deal '+statusClass(sp.status)+'">'+esc(sp.status||'No status')+'</span>':'<span class="cal-deal sp-suggested">Confirm?</span>'):'';
-   return '<tr data-edit-date="'+e.date+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(r.date))+'</td><td>'+(isUntitled(e)?'<strong class="cal-untitled">+ Add title</strong>':'<strong>'+esc(shortTitle(e,sp&&sp.name))+'</strong>')+(sub?'<small>'+esc(sub)+'</small>':'')+'</td><td>'+pillFor(st)+'</td><td class="num">'+(y?compact(y.views):'<span class="muted">–</span>')+'</td><td>'+(sp?'<span class="cal-a-sponsor'+(sp.saved?'':' suggested')+'" data-sponsor-date="'+e.date+'">◆ '+esc(sp.name)+'</span>':'<span class="muted">–</span>')+'</td><td>'+deal+'</td></tr>';
+   return '<tr data-edit-date="'+e.date+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(r.date))+'</td><td>'+(isUntitled(e)?'<strong class="cal-untitled">+ Add title</strong>':'<strong>'+esc(shortTitle(e,sp&&sp.name))+'</strong>')+(sub?'<small>'+esc(sub)+'</small>':'')+'</td><td>'+pillFor(st)+'</td><td class="num">'+(y?compact(y.views):'<span class="muted">–</span>')+'</td><td>'+(sp?'<span class="cal-a-sponsor'+(sp.saved?'':' suggested')+'" data-sponsor-date="'+e.date+'" title="'+esc(sp.saved?'Sponsor: '+sp.name:suggestedLabel(sp)+(sp.line?'. '+sp.line:''))+'">◆ '+esc(sp.name)+'</span>':'<span class="muted">–</span>')+'</td><td>'+deal+'</td></tr>';
   }).join('')+'</tbody></table></div>';
 }
 function renderSummary(list,slots=[]){
  const pub=list.filter(e=>stateOf(e)==='published'),up=list.filter(e=>stateOf(e)==='scheduled'),late=list.filter(e=>stateOf(e)==='overdue');
- const views=pub.reduce((n,e)=>n+(e.yt?.views||0),0),sp=list.filter(e=>e.sponsor);
+ const views=pub.reduce((n,e)=>n+(e.yt?.views||0),0),sp=list.filter(e=>e.sponsor),sug=list.filter(e=>!e.sponsor&&sponsorOf(e));
  const by=s=>sp.filter(e=>e.sponsorStatus===s).length;
  const pills=[
   '<span class="cal-sum">'+list.length+' planned</span>',
@@ -121,7 +134,8 @@ function renderSummary(list,slots=[]){
   '<span class="cal-sum cal-scheduled">◷ '+up.length+' upcoming</span>',
   late.length?'<span class="cal-sum cal-overdue">! '+late.length+' not live yet</span>':'',
   slots.length?'<span class="cal-sum cal-slot">◌ '+slots.length+' open release slot'+(slots.length===1?'':'s')+'</span>':'',
-  sp.length?'<span class="cal-sum cal-sponsored">◆ '+sp.length+' sponsored'+(by('Paid')||by('Invoiced')||by('In progress')?': '+[by('Paid')&&by('Paid')+' paid',by('Invoiced')&&by('Invoiced')+' invoiced',by('In progress')&&by('In progress')+' in progress'].filter(Boolean).join(', '):'')+'</span>':''
+  sp.length?'<span class="cal-sum cal-sponsored">◆ '+sp.length+' sponsored'+(by('Paid')||by('Invoiced')||by('In progress')?': '+[by('Paid')&&by('Paid')+' paid',by('Invoiced')&&by('Invoiced')+' invoiced',by('In progress')&&by('In progress')+' in progress'].filter(Boolean).join(', '):'')+'</span>':'',
+  sug.length?'<span class="cal-sum cal-suggested" title="Sponsors read from video titles and the top of YouTube descriptions. Click a dashed sponsor card to confirm it.">◆ '+sug.length+' suggested sponsor'+(sug.length===1?'':'s')+' to confirm</span>':''
  ].join('');
  const y=state.youtube||{};
  const ytLine=!y.configured?'<span class="cal-yt-note">Connect YouTube to mark videos published automatically. See the README (“YouTube on the calendar”).</span>'
@@ -153,14 +167,95 @@ function render(){
   return '<section class="calendar-month"><h3>'+name+' <small>'+yr+'</small></h3><div class="calendar-weekdays">'+heads+'</div><div class="calendar-days">'+blank+cells+'</div></section>';
  }).join('');
  renderAgenda(list,extras,slots);
+ renderHistory();
+}
+
+/* ---------- sponsor history: every sponsor on the channel and the video it was on ----------
+ * Calendar entries with a sponsor (saved, or suggested) come first; every other long-form upload is read from the link at the top of
+ * its description. Pre-2026 videos aren't in the sheet, so those rows are read-only. */
+function loadHistory(fresh=false){
+ const h=state.history;
+ if(h.loading)return h.loading;
+ h.loading=(async()=>{
+  try{const r=await api({action:'sponsorHistory',fresh:Boolean(fresh)});h.videos=r.videos||[];h.channel=r.channel||null;h.loaded=true;h.error='';}
+  catch(e){h.error=e.message||String(e);}
+  finally{h.loading=null;renderHistory();}
+ })();
+ renderHistory();
+ return h.loading;
+}
+const brandByName=name=>{const n=squash(String(name).replace(/\s*\(.*$/,''));return n?(state.brandRecords||[]).find(b=>squash(String(b.name).replace(/\s*\(.*$/,''))===n)||null:null};
+function historyRows(){
+ const rows=[],seen=new Set();
+ for(const e of state.events){
+  const sp=sponsorOf(e);if(!sp)continue;
+  const y=e.yt;if(y)seen.add(y.id);
+  rows.push({key:y?y.id:'plan:'+e.date,name:sp.name,brand:sp.brand||brandByName(sp.name),saved:sp.saved,source:sp.saved?'calendar':sp.source,status:sp.saved?(sp.status||'No status'):'',
+   date:shownOn(e),title:y?y.title:shortTitle(e,sp.name),views:y?y.views:null,url:y?y.url:(e.youtubeUrl||''),state:stateOf(e),editDate:e.date,extra:'',line:sp.line||(y&&y.sponsor&&y.sponsor.line)||'',domain:sp.domain||''});
+ }
+ for(const v of state.history.videos){
+  if(seen.has(v.id)||!v.sponsor)continue;
+  const d=linkSponsor(v.sponsor),inPlan=state.events.find(e=>e.yt&&e.yt.id===v.id);
+  rows.push({key:v.id,name:d.name,brand:d.brand,saved:false,source:'description',status:'',date:v.date,title:v.title,views:v.views,url:v.url,state:'published',
+   editDate:inPlan?inPlan.date:'',extra:!inPlan&&v.date>=FIRST_YEAR+'-01-01'?v.id:'',line:d.line,domain:d.domain});
+ }
+ rows.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+ return rows;
+}
+const groupKey=r=>r.brand?'brand:'+r.brand.id:r.name?'name:'+squash(r.name):'unknown';
+function dealCell(r){
+ if(r.saved)return '<span class="cal-deal '+statusClass(r.status==='No status'?'':r.status)+'">'+esc(r.status)+'</span>';
+ if(r.editDate)return '<button type="button" class="cal-deal sp-suggested cal-deal-btn" data-edit-date="'+esc(r.editDate)+'">Confirm?</button>';
+ if(r.extra)return '<button type="button" class="cal-deal sp-suggested cal-deal-btn" data-extra="'+esc(r.extra)+'">Add to plan</button>';
+ return '<span class="cal-deal sp-suggested" title="Before the 2026 plan, so it can\'t be edited here">From description</span>';
+}
+const videoCell=r=>'<td class="cal-history-video"><strong>'+(r.url?'<a href="'+esc(r.url)+'" target="_blank" rel="noopener noreferrer">'+esc(r.title)+' ↗</a>':esc(r.title))+'</strong>'+(r.line?'<small title="'+esc(r.line)+'">'+esc(r.line.replace(/https?:\/\/\S+|www\.\S+/g,'').replace(/\s+/g,' ').trim()||r.domain)+'</small>':'')+'</td>';
+const statePill=r=>r.state==='published'?'':r.state==='overdue'?pillFor('overdue'):pillFor('scheduled');
+function renderHistory(){
+ const h=state.history,body=$('calendarHistoryBody'),meta=$('calendarHistoryMeta');if(!body)return;
+ $('calendarHistory').hidden=!state.loaded&&!state.error;
+ if(!state.loaded){body.innerHTML='';meta.textContent='';return}
+ const q=h.q.trim().toLowerCase();
+ const all=historyRows(),rows=q?all.filter(r=>[r.name,r.title,r.line,r.domain].some(x=>String(x||'').toLowerCase().includes(q))):all;
+ const named=all.filter(r=>r.name),brandsN=new Set(named.map(groupKey)).size,confirmN=all.filter(r=>r.name&&!r.saved&&(r.editDate||r.extra)).length;
+ const oldest=h.videos.length?h.videos[h.videos.length-1].date:'';
+ meta.innerHTML=(h.loaded||named.length?brandsN+' brand'+(brandsN===1?'':'s')+' across '+named.length+' sponsored video'+(named.length===1?'':'s')+(confirmN?' · '+confirmN+' to confirm':''):'')+
+  (h.loading?'<span class="cal-history-note">Reading sponsor links from every video on the channel…</span>':h.error?'<span class="cal-history-note error">'+esc(h.error)+'</span>':h.loaded?'<span class="cal-history-note">Confirmed ones come from the calendar; the rest are read from the top line of each video\'s description'+(oldest?', back to '+esc(fmtDay(oldest))+' '+esc(oldest.slice(0,4)):'')+'. Press Refresh to re-read.</span>':'');
+ document.querySelectorAll('[data-history-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.historyView===h.view)));
+ if(!rows.length){body.innerHTML='<div class="calendar-empty cal-history-empty">'+(h.loading?'Loading…':q?'Nothing matches "'+esc(h.q)+'".':named.length?'':'No sponsors found yet. Add a sponsor to a calendar entry, or put the sponsor\'s link in the top line of a video description.')+'</div>';return}
+ const dayLabel=d=>d?new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'–';
+ if(h.view==='videos'){
+  body.innerHTML='<div class="cal-agenda-wrap"><table class="cal-agenda cal-history-table"><thead><tr><th>Published</th><th class="cal-history-video">Video</th><th>Sponsor</th><th>Deal</th><th class="num">Views</th></tr></thead><tbody>'+
+   rows.map(r=>'<tr><td class="cal-a-date">'+esc(dayLabel(r.date))+(statePill(r)?'<small>'+statePill(r)+'</small>':'')+'</td>'+videoCell(r)+'<td>'+(r.name?'<span class="cal-a-sponsor'+(r.saved?'':' suggested')+'">◆ '+esc(r.name)+'</span>'+(r.brand?'<small><a href="#sponsorships/brands/'+esc(r.brand.id)+'">Tracker ↗</a></small>':''):'<span class="muted">Link to '+esc(r.domain||'?')+'</span>')+'</td><td>'+dealCell(r)+'</td><td class="num">'+(r.views==null?'<span class="muted">–</span>':compact(r.views))+'</td></tr>').join('')+'</tbody></table></div>';
+  return;
+ }
+ const groups=new Map();
+ rows.forEach(r=>{const k=groupKey(r);if(!groups.has(k))groups.set(k,{key:k,name:r.brand?r.brand.name:r.name,brand:r.brand,rows:[]});groups.get(k).rows.push(r)});
+ const list=[...groups.values()].sort((a,b)=>(a.key==='unknown')-(b.key==='unknown')||String(b.rows[0].date).localeCompare(String(a.rows[0].date)));
+ body.innerHTML=list.map(g=>{
+  const views=g.rows.reduce((n,r)=>n+(r.views||0),0),saved=g.rows.filter(r=>r.saved).length,unknown=g.key==='unknown';
+  const head='<div class="cal-history-brand"><span class="cal-history-name">'+(unknown?'<span class="muted">Link not read</span>':'◆ '+esc(g.name))+'</span><span class="cal-history-stats">'+g.rows.length+' video'+(g.rows.length===1?'':'s')+(views?' · '+compact(views)+' views':'')+(saved?' · '+saved+' confirmed':'')+'</span>'+
+   (g.brand?'<a class="cal-history-link" href="#sponsorships/brands/'+esc(g.brand.id)+'">Tracker: '+esc(g.brand.status||'no status')+' ↗</a>':unknown?'<span class="cal-history-link muted">A shortened link the brand couldn\'t be read from. Open the video to check.</span>':'<span class="cal-history-link muted">Not in the Sponsorship tracker</span>')+'</div>';
+  return '<section class="cal-history-group">'+head+'<div class="cal-agenda-wrap"><table class="cal-agenda cal-history-table"><tbody>'+
+   g.rows.map(r=>'<tr><td class="cal-a-date">'+esc(dayLabel(r.date))+(statePill(r)?'<small>'+statePill(r)+'</small>':'')+'</td>'+videoCell(r)+'<td>'+dealCell(r)+'</td><td class="num">'+(r.views==null?'<span class="muted">–</span>':compact(r.views))+'</td></tr>').join('')+'</tbody></table></div></section>';
+ }).join('');
+}
+async function openSponsors(){
+ await ensureLoaded();if(!state.loaded)return;
+ if(!state.history.loaded)loadHistory(false);
+ render();
+ const el=$('calendarHistory');if(el){el.hidden=false;el.scrollIntoView({behavior:'smooth',block:'start'})}
 }
 
 /* ---------- editor ---------- */
+/* Brands from the Sponsorship tracker: names for the drawer's picker, full rows (id, status, contact emails) for matching description links. */
+const rankBrand=s=>/signed/i.test(s)?0:/their reply|josh|conversation/i.test(s)?1:2;
+function setBrands(records){state.brandRecords=(records||[]).slice().sort((a,b)=>rankBrand(a.status)-rankBrand(b.status)||String(a.name).localeCompare(String(b.name)));state.brands=state.brandRecords.map(b=>b.name).filter(Boolean);return state.brands}
 async function loadBrands(){
  if(state.brands)return state.brands;
- const fromTab=window.StudioSponsorships?.brandNames?.();if(fromTab&&fromTab.length)return(state.brands=fromTab);
+ const fromTab=window.StudioSponsorships?.brands?.();if(fromTab&&fromTab.length)return setBrands(fromTab);
  try{const board=window.StudioBoard?.getState();const r=await fetch('/.netlify/functions/sponsorships',{method:'POST',headers:{'content-type':'application/json','x-board-key':board.code},body:JSON.stringify({action:'sponsorList'})});const d=await r.json();
-  if(r.ok&&d.ok){const rank=s=>/signed/i.test(s)?0:/their reply|josh|conversation/i.test(s)?1:2;state.brands=d.brands.slice().sort((a,b)=>rank(a.status)-rank(b.status)||a.name.localeCompare(b.name)).map(b=>b.name);}}
+  if(r.ok&&d.ok)setBrands(d.brands);}
  catch{}
  return state.brands||[];
 }
@@ -168,15 +263,44 @@ function suggestSponsor(text,brands){
  const m=String(text||'').match(/\(([^)]+)\)\s*$/);if(!m)return'';const hint=m[1].trim().toLowerCase();if(hint.length<2)return'';
  return brands.find(b=>b.toLowerCase()===hint)||brands.find(b=>b.toLowerCase().includes(hint))||brands.find(b=>{const w=b.toLowerCase().split(/[\s—–-]+/)[0];return w.length>=4&&hint.includes(w)})||'';
 }
-function renderYt(e){
+/* ---------- sponsor from the link at the top of a YouTube description ---------- */
+const squash=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'');
+const rootOf=host=>{const p=String(host||'').toLowerCase().split('.').filter(Boolean);if(p.length<2)return p[0]||'';return p.length>2&&/^(co|com|org|net|ac|gov|edu)$/.test(p[p.length-2])?p[p.length-3]:p[p.length-2]};
+const emailDomains=contact=>(String(contact||'').match(/@([a-z0-9.-]+\.[a-z]{2,})/gi)||[]).map(m=>m.slice(1).toLowerCase().replace(/^www\./,''));
+const hasWord=(text,word)=>{const t=' '+String(text||'').toLowerCase().replace(/[^a-z0-9]+/g,' ')+' ',w=' '+String(word||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()+' ';return w.trim().length>=3&&t.includes(w)};
+/* Which tracker brand a description link belongs to: named in the line, the brand's email domain, the domain itself, or the server's guess. */
+function brandForLink(sp){
+ if(!sp)return null;
+ const recs=state.brandRecords||[],hosts=[sp.finalDomain,sp.domain].filter(Boolean),roots=hosts.map(rootOf).filter(r=>r.length>=3);
+ const firstWord=b=>String(b.name||'').toLowerCase().replace(/\s*\(.*$/,'').split(/[\s—–-]+/)[0]||'';
+ return recs.find(b=>hasWord(sp.line,String(b.name).replace(/\s*\(.*$/,'')))
+  ||recs.find(b=>emailDomains(b.contact).some(d=>hosts.some(h=>h===d||h.endsWith('.'+d)||d.endsWith('.'+h))))
+  ||recs.find(b=>roots.some(r=>{const n=squash(String(b.name).replace(/\s*\(.*$/,'')),w=firstWord(b);return n&&(n===r||r.startsWith(n)&&n.length>=4||n.startsWith(r)&&r.length>=5||w.length>=4&&r.startsWith(w))}))
+  ||(sp.guess?recs.find(b=>squash(String(b.name).replace(/\s*\(.*$/,''))===squash(sp.guess)||hasWord(b.name,sp.guess)):null)
+  ||null;
+}
+/* { name, brand, line, url, domain } for a video's description link, or null when there is none. name may be '' (a shortened link that couldn't be read). */
+function linkSponsor(sp){
+ if(!sp)return null;
+ const brand=brandForLink(sp);
+ return{name:brand?String(brand.name).replace(/\s*\(verify[^)]*\)\s*$/i,''):(sp.guess||''),brand:brand||null,line:sp.line||'',url:sp.url||'',domain:sp.finalDomain||sp.domain||''};
+}
+/* The link at the top of the description, shown under the stats so the sponsor suggestion is easy to check. */
+function descLine(y){
+ const sp=y&&y.sponsor;if(!sp||!sp.url)return'';
+ const shown=String(sp.line||'').replace(/https?:\/\/\S+|www\.\S+/g,'').replace(/\s+/g,' ').trim();
+ return '<p class="cal-yt-desc"><b>Description, line '+(sp.lineNo||1)+':</b> '+(shown?esc(shown)+' ':'')+'<a href="'+esc(sp.url)+'" target="_blank" rel="noopener noreferrer">'+esc((sp.finalDomain||sp.domain||'link')+(sp.finalDomain&&sp.finalDomain!==sp.domain?' (via '+sp.domain+')':''))+' ↗</a></p>';
+}
+function renderYt(e,{unplanned=false}={}){
  const box=$('calendarYt'),y=e&&e.yt;
  if(!y){box.hidden=!e;box.innerHTML=e?'<p class="cal-yt-empty">'+(state.youtube.configured?(stateOf(e)==='overdue'?'No video found on the channel within 3 days of this date. If it went out, paste its link below.':'Not live yet. This turns green automatically once the video is published on the channel.'):'Connect YouTube to see live stats here.')+'</p>':'';return}
  const age=Math.max(0,Math.round((Date.now()-new Date(y.publishedAt).getTime())/86400000));
  box.hidden=false;
  box.innerHTML='<a class="cal-yt-card" href="'+esc(y.url)+'" target="_blank" rel="noopener noreferrer">'+(y.thumb?'<img src="'+esc(y.thumb)+'" alt="" loading="lazy">':'')+'<span><strong>'+esc(y.title)+'</strong><small>Published '+esc(fmtDay(y.date))+' · '+age+' day'+(age===1?'':'s')+' live · '+esc(dur(y.seconds))+'</small></span></a>'+
   '<div class="cal-yt-stats"><span><b>'+compact(y.views)+'</b>views</span><span><b>'+compact(y.likes)+'</b>likes</span><span><b>'+compact(y.comments)+'</b>comments</span><span><b>'+compact(age?y.views/age:y.views)+'</b>views / day</span></div>'+
-  '<p class="cal-yt-match">'+(y.matchedBy==='link'?'Linked by the YouTube link below.':y.matchedBy==='date'?'Matched automatically: published on this date.':y.matchedBy==='title'?'Matched by topic: planned for '+esc(fmtDay(e.date))+', went out '+esc(fmtDay(y.date))+'. Wrong video? Paste the right link below.':'Matched automatically: published within 3 days of this date. Wrong video? Paste the right link below.')+'</p>'+
-  (y.date!==e.date&&y.date>=FIRST_YEAR+'-01-01'?'<button type="button" class="quiet-btn cal-move-live" data-move-from="'+esc(e.date)+'" data-move-to="'+esc(y.date)+'">Move this entry to '+esc(fmtDay(y.date))+' in the sheet</button>':'');
+  descLine(y)+
+  (unplanned?'<p class="cal-yt-match">On YouTube but not in the plan. Save below to add it.</p>':'<p class="cal-yt-match">'+(y.matchedBy==='link'?'Linked by the YouTube link below.':y.matchedBy==='date'?'Matched automatically: published on this date.':y.matchedBy==='title'?'Matched by topic: planned for '+esc(fmtDay(e.date))+', went out '+esc(fmtDay(y.date))+'. Wrong video? Paste the right link below.':'Matched automatically: published within 3 days of this date. Wrong video? Paste the right link below.')+'</p>'+
+  (y.date!==e.date&&y.date>=FIRST_YEAR+'-01-01'?'<button type="button" class="quiet-btn cal-move-live" data-move-from="'+esc(e.date)+'" data-move-to="'+esc(y.date)+'">Move this entry to '+esc(fmtDay(y.date))+' in the sheet</button>':''));
 }
 const LINK_DAYS=14;
 const daysApart=(a,b)=>Math.abs(Math.round((new Date(a+'T12:00:00')-new Date(b+'T12:00:00'))/86400000));
@@ -210,17 +334,26 @@ async function showEditor(date=null,extra=null){
  $('calendarSponsor').value=existing?.sponsor||'';$('calendarSponsorStatus').value=existing?.sponsorStatus||'';
  $('calendarYoutube').value=existing?.youtubeUrl||(extra?extra.url:'');
  $('calendarSponsorHint').textContent='';
- renderYt(existing);renderLinkOptions(existing,extra);
+ renderYt(existing||(extra?{yt:extra,date:extra.date}:null),{unplanned:Boolean(extra&&!existing)});renderLinkOptions(existing,extra);
  $('calendarDelete').hidden=!existing;$('calendarOverlay').hidden=false;document.body.style.overflow='hidden';$('calendarText').focus();
  window.Studio.setItem('calendar',existing?[existing.date]:null);
  if(existing&&isUntitled(existing))$('calendarText').select();
  const brands=await loadBrands();
  $('calendarSponsorOptions').innerHTML=brands.map(b=>'<option value="'+esc(b)+'"></option>').join('');
- if(existing&&!existing.sponsor&&state.editing===existing){const s=suggestSponsor(existing.text,brands);if(s){$('calendarSponsor').value=s;$('calendarSponsorStatus').value=$('calendarSponsorStatus').value||'In progress';$('calendarSponsorHint').textContent='Suggested from the title. Clear it if that\'s wrong.';}}
+ if(state.editing!==existing||(!existing&&extra&&$('calendarYoutube').value!==extra.url))return; // the drawer moved on while brands loaded
+ if(existing&&!existing.sponsor){
+  const sp=sponsorOf(existing),link=linkSponsor(existing.yt&&existing.yt.sponsor);
+  if(sp){$('calendarSponsor').value=sp.name;$('calendarSponsorStatus').value=$('calendarSponsorStatus').value||'In progress';
+   $('calendarSponsorHint').textContent=sp.source==='description'?'Suggested from the top of the YouTube description: "'+(lineText(sp.line)||sp.domain)+'". Clear it if that\'s wrong, and set the deal status.':'Suggested from the title. Clear it if that\'s wrong.';}
+  else if(link&&link.url)$('calendarSponsorHint').textContent='The description starts with a link to '+link.domain+' but the brand couldn\'t be read from it. Type the sponsor if this video has one.';
+ }else if(!existing&&extra){
+  const link=linkSponsor(extra.sponsor);
+  if(link&&link.name){$('calendarSponsor').value=link.name;$('calendarSponsorStatus').value='In progress';$('calendarSponsorHint').textContent='Suggested from the top of the YouTube description: "'+(lineText(link.line)||link.domain)+'". Clear it if that\'s wrong, and set the deal status.';}
+ }
 }
 function closeEditor(){if($('calendarOverlay').hidden)return;$('calendarOverlay').hidden=true;document.body.style.overflow='';state.editing=null;window.Studio.setItem('calendar',null)}
 function show(tab){
- if(tab==='calendar')window.Studio.ready.then(()=>state.loaded?null:refresh());
+ if(tab==='calendar')window.Studio.ready.then(()=>state.loaded?(state.history.loaded?null:loadHistory(false)):refresh());
 }
 /* Open a slot by its planned date (links and Today). The grid jumps to that quarter behind the drawer. */
 async function openDate(date){
@@ -261,7 +394,9 @@ async function onMove(from,date){
 function boot(){
  $('calendarSponsorStatus').innerHTML='<option value="">No sponsor status</option>'+SPONSOR_STATUSES.map(s=>'<option>'+s+'</option>').join('');
  window.Studio.on('tab',({tab})=>show(tab));
- window.Studio.on('connection',()=>{state.loaded=false;state.events=[];state.extras=[];state.brands=null;if(window.Studio.current()==='calendar')refresh();});
+ window.Studio.on('connection',()=>{state.loaded=false;state.events=[];state.extras=[];state.brands=null;state.brandRecords=null;Object.assign(state.history,{videos:[],channel:null,loaded:false,error:''});if(window.Studio.current()==='calendar')refresh();});
+ $('calendarHistory').addEventListener('click',e=>{const v=e.target.closest('[data-history-view]');if(v){state.history.view=v.dataset.historyView;renderHistory();}});
+ $('calendarHistorySearch').addEventListener('input',e=>{state.history.q=e.target.value;renderHistory();});
  $('calendarRefresh').addEventListener('click',()=>refresh(true));
  $('calendarPrevious').addEventListener('click',()=>{state.start=Math.max(0,state.start-3);render()});
  $('calendarNext').addEventListener('click',()=>{state.start=Math.min(MAX_START,state.start+3);render()});
@@ -273,7 +408,7 @@ function boot(){
   const slot=e.target.closest('[data-slot-date]');
   if(slot){showEditor(slot.dataset.slotDate).then(()=>{$('calendarEditorTitle').textContent='Plan this release slot.'});return}
   if(edit)showEditor(edit.dataset.editDate);else if(ext){const v=state.extras.find(x=>x.id===ext.dataset.extra);if(v)showEditor(null,v);}else if(add)showEditor(add.dataset.addDate)};
- $('calendarGrid').addEventListener('click',onPick);$('calendarAgenda').addEventListener('click',onPick);
+ $('calendarGrid').addEventListener('click',onPick);$('calendarAgenda').addEventListener('click',onPick);$('calendarHistoryBody').addEventListener('click',onPick);
  $('calendarAgenda').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('tr'))onPick(e)});
  $('calendarGrid').addEventListener('dragstart',e=>{const el=e.target.closest('[data-edit-date],[data-slot-date]');if(el){e.dataTransfer.setData('text/plain',el.dataset.editDate||'slot:'+el.dataset.slotDate);e.dataTransfer.effectAllowed='move';}});
  $('calendarGrid').addEventListener('dragover',e=>{if(e.target.closest('[data-calendar-date]'))e.preventDefault()});
@@ -288,8 +423,8 @@ function boot(){
   const mv=e.target.closest('[data-move-from]');if(!mv)return;mv.disabled=true;
   try{const item=state.events.find(x=>x.date===mv.dataset.moveFrom);if(item&&!item.youtubeUrl&&item.yt)item.youtubeUrl=item.yt.url;await onMove(mv.dataset.moveFrom,mv.dataset.moveTo);closeEditor()}catch(err){notice(err.message,true);mv.disabled=false}});
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('calendarOverlay').hidden)closeEditor()});
- window.Studio.register('calendar',{open:item=>openDate(item[0]),close:closeEditor});
+ window.Studio.register('calendar',{open:item=>item[0]==='sponsors'?openSponsors():openDate(item[0]),close:closeEditor}); // #calendar/sponsors · #calendar/2026-11-13
 }
-window.StudioCalendar={ensureLoaded,refresh,openSlots,openSlot,loaded:()=>state.loaded,error:()=>state.error,events:()=>state.events,stateOf,shownOn,sponsorOf,shortTitle,isUntitled,youtube:()=>state.youtube,open:openDate};
+window.StudioCalendar={ensureLoaded,refresh,openSlots,openSlot,openSponsors,loaded:()=>state.loaded,error:()=>state.error,events:()=>state.events,stateOf,shownOn,sponsorOf,linkSponsor,shortTitle,isUntitled,youtube:()=>state.youtube,open:openDate};
 boot();
 })();

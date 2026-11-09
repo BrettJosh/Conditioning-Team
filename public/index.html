@@ -125,12 +125,19 @@
   <div class="calendar-summary" id="calendarSummary"></div>
   <div class="calendar-grid" id="calendarGrid"></div>
   <div class="cal-agenda-box" id="calendarAgenda"></div>
+  <section class="cal-history" id="calendarHistory" aria-label="Sponsor history">
+    <div class="cal-history-head"><div><h3>Sponsor history</h3><p class="cal-history-sub" id="calendarHistoryMeta"></p></div>
+      <div class="cal-history-tools"><div class="project-tabs" role="group" aria-label="Sponsor history views"><button class="tab" type="button" data-history-view="brands" aria-pressed="true">By brand</button><button class="tab" type="button" data-history-view="videos" aria-pressed="false">By video</button></div>
+      <label class="search-box" aria-label="Search the sponsor history"><span>⌕</span><input id="calendarHistorySearch" type="search" placeholder="Find a brand or video..." autocomplete="off"></label></div></div>
+    <div id="calendarHistoryBody" class="cal-history-body"></div>
+  </section>
 </section>
 <section class="workspace sponsor-workspace" id="sponsorWorkspace" aria-label="Sponsorship pipeline" hidden>
   <div class="workspace-heading"><div><div class="overline">/ FOLLOW THE MONEY</div><h2>BRAND <span class="scribble">DEALS</span></h2></div>
     <div class="workspace-actions sponsor-actions">
       <button class="quiet-btn" id="sponsorRefresh" type="button" title="Reload from Google Sheets">↻ <span>Refresh</span></button>
       <a class="quiet-btn sponsor-sheet-link" id="sponsorSheetLink" href="#" target="_blank" rel="noopener" hidden>↗ <span>Source sheet</span></a>
+      <a class="quiet-btn" href="#calendar/sponsors" title="Every sponsor on the channel and the video it was on">◆ <span>Sponsor history</span></a>
       <button class="quiet-btn" id="sponsorZohoBtn" type="button" title="Zoho Mail connection">✉ <span>Zoho Mail</span></button>
       <button class="secondary-btn" id="sponsorSyncBtn" type="button" title="Pull new emails from Zoho Mail now">⇣ <span>Sync emails</span></button>
       <button class="primary-btn" id="sponsorAddBtn" type="button">＋ Add brand</button>

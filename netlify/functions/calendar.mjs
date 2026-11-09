@@ -1,5 +1,5 @@
 import {timingSafeEqual} from 'node:crypto';
-import {youtubeConfigured, channelVideos, enrich} from '../lib/youtube.mjs';
+import {youtubeConfigured, channelVideos, allUploads, enrich} from '../lib/youtube.mjs';
 const fail=(error,status=400)=>Response.json({error},{status,headers:{'Cache-Control':'no-store'}});
 const same=(a,b)=>{if(!a||!b)return false;const aa=Buffer.from(a),bb=Buffer.from(b);return aa.length===bb.length&&timingSafeEqual(aa,bb)};
 const METRIC_KEYS=['views','ctr','avd','sponsor','sponsorStatus','youtubeUrl'];
@@ -8,12 +8,21 @@ const UNEXPECTED='Google Sheets returned a page instead of data. Usually the scr
 export default async function handler(request){
  if(request.method!=='POST')return fail('POST required.',405);
  if(!same(request.headers.get('x-board-key'),process.env.BOARD_ACCESS_CODE))return fail('Invalid workspace access code.',401);
+ let data;try{data=await request.json();}catch{return fail('Invalid request JSON.');}
+ const action=String(data.action||'');
+ if(!['list','save','remove','sponsorHistory'].includes(action))return fail('Unsupported calendar action.');
+ // Sponsor history: every long-form upload on the channel with the sponsor link read from its description. YouTube only, no sheet round-trip.
+ if(action==='sponsorHistory'){
+  if(!youtubeConfigured())return fail('Connect YouTube first (YOUTUBE_API_KEY in Netlify, see the README) to list sponsors from video descriptions.',503);
+  try{
+   const{channel,videos}=await allUploads({fresh:Boolean(data.fresh)});
+   const slim=v=>({id:v.id,title:v.title,url:v.url,date:v.date,views:v.views,seconds:v.seconds,thumb:v.thumb,sponsor:v.sponsor?{line:v.sponsor.line,lineNo:v.sponsor.lineNo,url:v.sponsor.url,domain:v.sponsor.domain,finalDomain:v.sponsor.finalDomain||'',guess:v.sponsor.guess||''}:null});
+   return Response.json({ok:true,channel,videos:videos.filter(v=>v.long&&v.live!=='upcoming').map(slim)},{headers:{'Cache-Control':'no-store'}});
+  }catch(e){return fail('YouTube: '+String(e.message||e).replace(/^YouTube:\s*/,''),502);}
+ }
  const url=process.env.STUDIO_CALENDAR_SCRIPT_URL,secret=process.env.STUDIO_CALENDAR_SCRIPT_SECRET;
  if(!url||!secret)return fail('Calendar connection is not configured yet. Follow the calendar README to connect Google Sheets.',503);
  if(!/^https:\/\/script\.google\.com\/macros\/s\//.test(url))return fail('Invalid Apps Script URL.',503);
- let data;try{data=await request.json();}catch{return fail('Invalid request JSON.');}
- const action=String(data.action||'');
- if(!['list','save','remove'].includes(action))return fail('Unsupported calendar action.');
  const validDate=d=>typeof d==='string'&&/^20(2[6-9]|30)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(d)&&new Date(d+'T12:00:00Z').toISOString().slice(0,10)===d; // 2026–2030
  if(['save','remove'].includes(action)&&data.from&&!validDate(data.from))return fail('Invalid source date.');
  if(action==='save'&&(!validDate(data.date)||!String(data.text||'').trim()||String(data.text).length>1500))return fail('A valid date and title are required.');

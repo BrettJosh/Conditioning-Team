@@ -261,6 +261,7 @@ body.local-demo-mode #connectionOverlay .connection-status{background:#ffe5e5;bo
 .cal-sum-row{display:flex;flex-wrap:wrap;gap:8px}
 .cal-sum{border:1.5px solid var(--ink);border-radius:999px;padding:6px 11px;font-size:11px;font-weight:900;background:var(--white);color:var(--ink)}
 .cal-sum.cal-published{background:var(--mint)}.cal-sum.cal-scheduled{background:#fbe39a}.cal-sum.cal-overdue{background:#ffc98f}.cal-sum.cal-sponsored{background:var(--lilac)}
+.cal-sum.cal-suggested{border-style:dashed;background:transparent;color:var(--muted)}
 .cal-yt-note{font-size:11px;color:var(--muted);font-weight:750}.cal-yt-note.error{color:#9c2b33}
 .cal-state-badge{display:inline-block;margin:-14px 0 18px;border:1.6px solid var(--ink);border-radius:999px;padding:6px 11px;font-size:11px;font-weight:900}
 .cal-state-badge.cal-published{background:var(--mint)}.cal-state-badge.cal-scheduled{background:#fbe39a}.cal-state-badge.cal-overdue{background:#ffc98f}
@@ -273,6 +274,9 @@ body.local-demo-mode #connectionOverlay .connection-status{background:#ffe5e5;bo
 .cal-yt-stats span{background:var(--paper);border:1.5px solid var(--ink);border-radius:10px;padding:8px;font-size:10px;font-weight:850;color:var(--muted);text-align:center}
 .cal-yt-stats b{display:block;font-size:18px;color:var(--ink);letter-spacing:-.03em}
 .cal-yt-match,.cal-yt-empty{font-size:11px;color:var(--muted);font-weight:750;margin:10px 0 0;line-height:1.5}.cal-yt-empty{margin:0}
+.cal-yt-desc{margin:12px 0 0;padding:9px 11px;border:1.5px dashed #cfc7b5;border-radius:10px;background:var(--paper);font-size:11.5px;line-height:1.5;color:var(--ink);overflow-wrap:anywhere}
+.cal-yt-desc b{font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-size:9.5px;margin-right:4px}
+.cal-yt-desc a{color:var(--ink);font-weight:850;white-space:nowrap}
 .cal-fieldset{border:1.5px solid #cfc7b5;border-radius:12px;padding:12px 13px 14px;margin:0;display:grid;gap:12px;min-width:0}
 .cal-fieldset legend{font-size:11px;font-weight:950;letter-spacing:.06em;text-transform:uppercase;padding:0 6px}
 .cal-fieldset select{background:#fffefa;border:1.9px solid var(--ink);border-radius:10px;padding:11px 12px;color:var(--ink);font-size:13px;min-width:0}
@@ -334,6 +338,30 @@ body.local-demo-mode #connectionOverlay .connection-status{background:#ffe5e5;bo
 .cal-a-sponsor{font-weight:900;white-space:nowrap}.cal-a-sponsor.suggested{color:var(--muted);font-style:italic}
 .cal-deal{display:inline-block;white-space:nowrap;border-radius:6px;padding:4px 8px;font-size:10.5px;font-weight:900;border:1.2px solid rgba(0,0,0,.3);background:#ece7dc}
 .cal-deal.sp-paid{background:var(--mint)}.cal-deal.sp-invoiced{background:var(--blue)}.cal-deal.sp-in-progress{background:var(--yellow)}.cal-deal.sp-none{background:#ffd3d3}.cal-deal.sp-suggested{background:transparent;border-style:dashed;color:var(--muted)}
+/* Sponsor history: every sponsor on the channel, grouped by brand */
+.cal-history{margin-top:34px}
+.cal-history-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.cal-history-head h3{margin:0;font-size:24px;letter-spacing:-.04em}
+.cal-history-sub{margin:4px 0 0;font-size:11px;color:var(--muted);font-weight:800;line-height:1.5;max-width:720px}
+.cal-history-note{display:block;font-weight:700;margin-top:2px}.cal-history-note.error{color:#9c2b33}
+.cal-history-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cal-history-tools .search-box{min-width:200px;padding:6px 11px}
+.cal-history-body{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+.cal-history-group{min-width:0}
+.cal-history-empty{grid-column:auto}
+.cal-history-brand{display:flex;align-items:baseline;gap:8px 14px;flex-wrap:wrap;margin:0 0 8px 2px}
+.cal-history-name{font-size:17px;font-weight:1000;letter-spacing:-.03em}
+.cal-history-stats{font-size:11px;font-weight:800;color:var(--muted)}
+.cal-history-link{font-size:11px;font-weight:850;color:#1d5b4a;margin-left:auto}.cal-history-link.muted{color:#b0a898;font-weight:750}
+.cal-history-table{min-width:0}
+.cal-history-table tbody tr{cursor:default}.cal-history-table tbody tr:hover td{background:transparent}
+.cal-history-table td a{color:var(--ink);text-decoration:none}.cal-history-table td a:hover{text-decoration:underline}
+.cal-history-table td small a{color:#1d5b4a;font-weight:800}
+.cal-history-table .cal-a-date small{margin-top:4px}.cal-history-table .cal-a-date .cal-pill{font-size:9px;padding:2px 6px}
+.cal-history-table td:not(.cal-history-video),.cal-history-table th:not(.cal-history-video){width:1%;white-space:nowrap}.cal-history-table .cal-history-video{width:auto;white-space:normal}
+.cal-deal-btn{cursor:pointer;border:1.2px dashed rgba(0,0,0,.35)}.cal-deal-btn:hover{background:#fff4c9;color:var(--ink)}
+@media(max-width:680px){.cal-history-head{flex-direction:column}.cal-history-tools{width:100%}.cal-history-tools .search-box{flex:1}.cal-history-link{margin-left:0}
+ .cal-history-table td{padding:9px 8px}.cal-history-table .cal-a-date{white-space:normal;font-size:11px;max-width:64px}.cal-history-table .cal-history-video small{display:none}.cal-history-table td strong{font-size:12.5px}}
 
 /* Calendar v3.1: one-line cards in the month grids */
 .calendar-day{min-height:70px}

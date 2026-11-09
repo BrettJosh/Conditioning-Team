@@ -487,6 +487,9 @@ function boot() {
     close: closeRecord
   });
 }
-window.StudioSponsorships = { refresh, runSync, ensureLoaded, loaded: () => s.loaded && !s.demo, error: () => s.error, waitingOnYou, actions: () => s.actions, open: openRecord, brandNames: () => (s.loaded && !s.demo ? s.brands.slice().sort((a, b) => (group(a.status) === 'won' ? 0 : 1) - (group(b.status) === 'won' ? 0 : 1) || a.name.localeCompare(b.name)).map(b => b.name) : null) };
+const sortedBrands = () => s.brands.slice().sort((a, b) => (group(a.status) === 'won' ? 0 : 1) - (group(b.status) === 'won' ? 0 : 1) || a.name.localeCompare(b.name));
+window.StudioSponsorships = { refresh, runSync, ensureLoaded, loaded: () => s.loaded && !s.demo, error: () => s.error, waitingOnYou, actions: () => s.actions, open: openRecord,
+  brandNames: () => (s.loaded && !s.demo ? sortedBrands().map(b => b.name) : null),
+  brands: () => (s.loaded && !s.demo ? sortedBrands() : null) }; // full rows (id, status, contact) for the calendar's sponsor matching
 boot();
 })();
