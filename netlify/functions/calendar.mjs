@@ -16,7 +16,7 @@ export default async function handler(request){
   if(!youtubeConfigured())return fail('Connect YouTube first (YOUTUBE_API_KEY in Netlify, see the README) to list sponsors from video descriptions.',503);
   try{
    const{channel,videos}=await allUploads({fresh:Boolean(data.fresh)});
-   const slim=v=>({id:v.id,title:v.title,url:v.url,date:v.date,views:v.views,seconds:v.seconds,thumb:v.thumb,sponsor:v.sponsor?{line:v.sponsor.line,lineNo:v.sponsor.lineNo,url:v.sponsor.url,domain:v.sponsor.domain,finalDomain:v.sponsor.finalDomain||'',guess:v.sponsor.guess||''}:null});
+   const slim=v=>({id:v.id,title:v.title,url:v.url,date:v.date,views:v.views,seconds:v.seconds,thumb:v.thumb,sponsor:v.sponsor?{line:v.sponsor.line,lineNo:v.sponsor.lineNo,url:v.sponsor.url,domain:v.sponsor.domain,shortened:Boolean(v.sponsor.shortened),finalDomain:v.sponsor.finalDomain||'',guess:v.sponsor.guess||''}:null});
    return Response.json({ok:true,channel,videos:videos.filter(v=>v.long&&v.live!=='upcoming').map(slim)},{headers:{'Cache-Control':'no-store'}});
   }catch(e){return fail('YouTube: '+String(e.message||e).replace(/^YouTube:\s*/,''),502);}
  }

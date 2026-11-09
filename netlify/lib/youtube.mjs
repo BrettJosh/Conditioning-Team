@@ -45,10 +45,12 @@ export function videoIdFrom(text) {
 }
 /* ---------- the sponsor link at the top of the description ----------
  * Josh's own sites and social profiles are never sponsors. Add more in Netlify with STUDIO_OWN_DOMAINS="example.com,other.com". */
-const OWN_DOMAINS = ['brettjosh.com', 'youtube.com', 'youtu.be', 'instagram.com', 'tiktok.com', 'twitter.com', 'x.com', 'facebook.com', 'threads.net', 'threads.com', 'discord.gg', 'discord.com', 'linktr.ee', 'open.spotify.com', 'podcasts.apple.com', 'patreon.com', 'beehiiv.com', 'substack.com', 'google.com', 'docs.google.com', 'forms.gle', 'notion.so', 'notion.site'];
+const OWN_DOMAINS = ['brettjosh.com', 'joshbrett.store', 'kit.com', 'ck.page', 'convertkit.com', 'superwall.app', // Josh's sites, shop, Kit guides and training app
+  'youtube.com', 'youtu.be', 'instagram.com', 'tiktok.com', 'twitter.com', 'x.com', 'facebook.com', 'threads.net', 'threads.com', 'discord.gg', 'discord.com', 'linktr.ee', 'open.spotify.com', 'patreon.com', 'beehiiv.com', 'substack.com',
+  'google.com', 'forms.gle', 'notion.so', 'notion.site', 'apple.com']; // app-store and Google links are never the brand either
 const ownDomains = () => OWN_DOMAINS.concat(String(process.env.STUDIO_OWN_DOMAINS || '').split(',').map(d => d.trim().toLowerCase().replace(/^www\./, '')).filter(Boolean));
 /* Link shorteners and affiliate networks hide the brand: these are followed (HEAD request, up to 4 hops) to find the real domain. */
-const SHORTENERS = ['bit.ly', 'bitly.com', 'tinyurl.com', 't.co', 'geni.us', 'amzn.to', 'amzn.eu', 'prf.hn', 'rebrand.ly', 'shorturl.at', 'cutt.ly', 'go.magik.ly', 'howl.me', 'shop-links.co', 'sjv.io', 'pxf.io', 'impact.com', 'lnk.to', 'rb.gy', 'ow.ly', 'buff.ly', 'tiny.cc', 'is.gd', 't.ly', 'shrsl.com', 'shareasale.com', 'click.linksynergy.com', 'hop.clickbank.net', 'anrdoezrs.net', 'jdoqocy.com', 'kqzyfj.com', 'tkqlhce.com', 'dpbolvw.net', 'awin1.com', 'go.skimresources.com', 'zez.am', 'glnk.io', 'bit.do', 'short.io', 'tidd.ly', 'mavely.app', 'liketk.it', 'partner.bulk.com', 'tracking.bulk.com'];
+const SHORTENERS = ['onelink.to', 'app.link', 'page.link', 'smart.link', 'bit.ly', 'bitly.com', 'tinyurl.com', 't.co', 'geni.us', 'amzn.to', 'amzn.eu', 'prf.hn', 'rebrand.ly', 'shorturl.at', 'cutt.ly', 'go.magik.ly', 'howl.me', 'shop-links.co', 'sjv.io', 'pxf.io', 'impact.com', 'lnk.to', 'rb.gy', 'ow.ly', 'buff.ly', 'tiny.cc', 'is.gd', 't.ly', 'shrsl.com', 'shareasale.com', 'click.linksynergy.com', 'hop.clickbank.net', 'anrdoezrs.net', 'jdoqocy.com', 'kqzyfj.com', 'tkqlhce.com', 'dpbolvw.net', 'awin1.com', 'go.skimresources.com', 'zez.am', 'glnk.io', 'bit.do', 'short.io', 'tidd.ly', 'mavely.app', 'liketk.it', 'partner.bulk.com', 'tracking.bulk.com'];
 const TOP_LINES = 3;         // "normally the top line"; a hook sentence or two above it is tolerated
 const URL_RE = /(?:https?:\/\/|www\.)[^\s<>()[\]"']+/gi;
 export const hostOf = url => { try { return new URL(/^https?:\/\//i.test(url) ? url : 'https://' + url).hostname.toLowerCase().replace(/^www\./, ''); } catch { return ''; } };
@@ -85,7 +87,7 @@ export function brandInLine(line) {
     const tok = tokens[i].replace(/^[.'’&+\-]+|[.'’&+\-]+$/g, '').replace(/['’]s$/, '');
     const prev = (tokens[i - 1] || '').toLowerCase().replace(/[^a-z]/g, '');
     const cap = /^[A-Z0-9]/.test(tok) && /[A-Za-z]/.test(tok) && tok.length >= 2;
-    const filler = LINE_STOP.has(tok.toLowerCase()) || prev === 'code' || /^\d+%?$/.test(tok);
+    const filler = LINE_STOP.has(tok.toLowerCase()) || prev === 'code' || /^\d+%?$/.test(tok) || /^\d+[A-Za-z]{1,2}$/.test(tok); // 20%, 2Y, 4M
     if (cap && !filler) { if (run.length < 3) run.push(tok); else { flush(); run = [tok]; } }
     else flush();
   }

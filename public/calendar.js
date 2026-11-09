@@ -50,7 +50,7 @@ async function api(payload){
  const text=await resp.text();let data;try{data=JSON.parse(text)}catch{throw Error(resp.status===502||resp.status===504?'The calendar took too long to answer. Press Refresh.':'Calendar server returned an unexpected response.')}
  if(!resp.ok||!data.ok)throw Error(data.error||'Calendar request failed.');return data;
 }
-function apply(data){state.events=data.events||[];state.youtube=data.youtube||{};state.extras=data.youtube?.extras||[];state.bridgeVersion=Number(data.bridgeVersion)||0;state.loaded=true;state.error='';render();window.Studio.emit('data',{source:'calendar'});
+function apply(data){learned=null;state.events=data.events||[];state.youtube=data.youtube||{};state.extras=data.youtube?.extras||[];state.bridgeVersion=Number(data.bridgeVersion)||0;state.loaded=true;state.error='';render();window.Studio.emit('data',{source:'calendar'});
  if(!state.brands)loadBrands().then(b=>{if(b&&b.length){render();window.Studio.emit('data',{source:'calendar'})}})}
 /* fresh=true asks YouTube for new numbers (the Refresh button); Today's quiet load reuses the server's 10-minute cache. */
 function refresh(fresh=true){
@@ -279,11 +279,27 @@ function brandForLink(sp){
   ||(sp.guess?recs.find(b=>squash(String(b.name).replace(/\s*\(.*$/,''))===squash(sp.guess)||hasWord(b.name,sp.guess)):null)
   ||null;
 }
+/* Links Josh has already confirmed: once an entry with a given description link has a saved sponsor, every other video with the same
+ * link (or, for a plain brand link, the same domain) is suggested that sponsor. This is how app links like onelink.to/... get their name. */
+let learned=null;
+const normUrl=u=>String(u||'').toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').replace(/[/#?]+$/,'');
+function learnedLinks(){
+ if(learned)return learned;
+ learned=new Map();
+ for(const e of state.events){
+  const s=e.yt&&e.yt.sponsor;if(!e.sponsor||!s)continue;
+  const u=normUrl(s.url);if(u&&!learned.has('u:'+u))learned.set('u:'+u,e.sponsor);
+  const host=s.finalDomain||s.domain;if(host&&!s.shortened&&!learned.has('d:'+host))learned.set('d:'+host,e.sponsor);
+ }
+ return learned;
+}
 /* { name, brand, line, url, domain } for a video's description link, or null when there is none. name may be '' (a shortened link that couldn't be read). */
 function linkSponsor(sp){
  if(!sp)return null;
- const brand=brandForLink(sp);
- return{name:brand?String(brand.name).replace(/\s*\(verify[^)]*\)\s*$/i,''):(sp.guess||''),brand:brand||null,line:sp.line||'',url:sp.url||'',domain:sp.finalDomain||sp.domain||''};
+ let brand=brandForLink(sp),name=brand?String(brand.name).replace(/\s*\(verify[^)]*\)\s*$/i,''):'';
+ if(!name){const L=learnedLinks();name=L.get('u:'+normUrl(sp.url))||L.get('d:'+(sp.finalDomain||sp.domain))||'';if(name)brand=brandByName(name);}
+ if(!name)name=sp.guess||'';
+ return{name,brand:brand||null,line:sp.line||'',url:sp.url||'',domain:sp.finalDomain||sp.domain||''};
 }
 /* The link at the top of the description, shown under the stats so the sponsor suggestion is easy to check. */
 function descLine(y){
@@ -394,7 +410,7 @@ async function onMove(from,date){
 function boot(){
  $('calendarSponsorStatus').innerHTML='<option value="">No sponsor status</option>'+SPONSOR_STATUSES.map(s=>'<option>'+s+'</option>').join('');
  window.Studio.on('tab',({tab})=>show(tab));
- window.Studio.on('connection',()=>{state.loaded=false;state.events=[];state.extras=[];state.brands=null;state.brandRecords=null;Object.assign(state.history,{videos:[],channel:null,loaded:false,error:''});if(window.Studio.current()==='calendar')refresh();});
+ window.Studio.on('connection',()=>{state.loaded=false;state.events=[];state.extras=[];state.brands=null;state.brandRecords=null;learned=null;Object.assign(state.history,{videos:[],channel:null,loaded:false,error:''});if(window.Studio.current()==='calendar')refresh();});
  $('calendarHistory').addEventListener('click',e=>{const v=e.target.closest('[data-history-view]');if(v){state.history.view=v.dataset.historyView;renderHistory();}});
  $('calendarHistorySearch').addEventListener('input',e=>{state.history.q=e.target.value;renderHistory();});
  $('calendarRefresh').addEventListener('click',()=>refresh(true));
