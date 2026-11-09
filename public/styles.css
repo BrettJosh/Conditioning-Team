@@ -361,7 +361,7 @@ body.local-demo-mode #connectionOverlay .connection-status{background:#ffe5e5;bo
 .cal-history-table td:not(.cal-history-video),.cal-history-table th:not(.cal-history-video){width:1%;white-space:nowrap}.cal-history-table .cal-history-video{width:auto;white-space:normal}
 .cal-deal-btn{cursor:pointer;border:1.2px dashed rgba(0,0,0,.35)}.cal-deal-btn:hover{background:#fff4c9;color:var(--ink)}
 @media(max-width:680px){.cal-history-head{flex-direction:column}.cal-history-tools{width:100%}.cal-history-tools .search-box{flex:1}.cal-history-link{margin-left:0}
- .cal-history-table td{padding:9px 8px}.cal-history-table .cal-a-date{white-space:normal;font-size:11px;max-width:64px}.cal-history-table .cal-history-video small{display:none}.cal-history-table td strong{font-size:12.5px}}
+ .cal-history-table td{padding:9px 8px}.cal-history-table .cal-a-date{white-space:normal;font-size:11px}.cal-history-table .cal-a-date .cal-pill{font-size:8.5px;padding:2px 5px}.cal-history-table .cal-history-video small{display:none}.cal-history-table td strong{font-size:12.5px}}
 
 /* Calendar v3.1: one-line cards in the month grids */
 .calendar-day{min-height:70px}
