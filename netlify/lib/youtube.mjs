@@ -76,7 +76,7 @@ export function sponsorFromDescription(description) {
   return null;
 }
 /* Words that start a sponsor line but are never the brand ("Try", "Get 20% off", "Use code", "Sponsored by"). */
-const LINE_STOP = new Set('this the a an get try use check out download free code click here sign up start visit go to grab join watch my i thanks thank video videos sponsored sponsor sponsors by for with off your you first order today now at on in of and or link links below more all new best save discount promo exclusive limited offer trial weeks week month months days day year years app website program programs programme programmes full part episode subscribe like follow music source sources references reference head over learn read shop buy support channel train training workout workouts plan plans coaching book call apply percent us uk eu using when we they it are is be was were have has had just also only even still our their its from into that these those what why how who where which than then them there here make made take taken using used please dont don\'t can will would should could get got give given protein creatine supplement supplements shaker bundle gear kit'.split(' '));
+const LINE_STOP = new Set('this the a an get try use check out download free code click here sign up start visit go to grab join watch my i thanks thank video videos sponsored sponsor sponsors by for with off your you first order today now at on in of and or link links below more all new best save discount promo exclusive limited offer trial weeks week month months days day year years app website program programs programme programmes full part episode subscribe like follow music source sources references reference head over learn read shop buy support channel train training workout workouts plan plans coaching book call apply percent us uk eu using when we they it are is be was were have has had just also only even still our their its from into that these those what why how who where which than then them there here make made take taken using used please dont don\'t can will would should could get got give given protein creatine supplement supplements shaker bundle gear kit access exclusive science based science-based premium members membership community guide'.split(' '));
 /* The brand named in the line itself: the first run of capitalised words that isn't filler or the discount code ("MyProtein (Code BRETT)" -> MyProtein). */
 export function brandInLine(line) {
   const text = String(line || '').replace(URL_RE, ' ').replace(/[^\p{L}\p{N}'’&+.\- ]+/gu, ' ').replace(/\s+/g, ' ').trim();
@@ -96,12 +96,18 @@ export function brandInLine(line) {
 }
 const nice = root => root ? root.charAt(0).toUpperCase() + root.slice(1) : '';
 /* Best name for the brand: named in the line, else the domain (after following a shortened link). */
+/* A line written In Title Case ("Get Free Access To Exclusive Programs On Boostcamp!") gives capitalisation no meaning, so the domain comes first there. */
+function titleCase(line) {
+  const words = String(line || '').replace(URL_RE, ' ').match(/[A-Za-z][A-Za-z'’-]{2,}/g) || [];
+  return words.length >= 4 && words.filter(w => /^[A-Z]/.test(w)).length / words.length >= 0.6;
+}
 export function guessBrand(sp) {
   if (!sp) return '';
-  const inLine = brandInLine(sp.line);
-  if (inLine) return inLine;
   const host = sp.finalDomain || (sp.shortened ? '' : sp.domain);
-  return host && !isOwnDomain(host) && !isShortener(host) ? nice(domainRoot(host)) : '';
+  const fromDomain = host && !isOwnDomain(host) && !isShortener(host) ? nice(domainRoot(host)) : '';
+  const inLine = brandInLine(sp.line);
+  if (titleCase(sp.line)) return fromDomain || inLine;
+  return inLine || fromDomain;
 }
 /* Shortened links are followed once a day; this never throws and never slows the calendar by more than a few seconds. */
 const resolved = new Map(); // url -> { at, host }
