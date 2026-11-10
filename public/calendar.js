@@ -114,14 +114,14 @@ function renderAgenda(list,extras,slots=[]){
  const rows=[...list.map(e=>({kind:'plan',e,date:shownOn(e)})),...extras.map(v=>({kind:'extra',v,date:v.date})),...slots.map(d=>({kind:'slot',date:d}))].sort((a,b)=>a.date.localeCompare(b.date));
  if(!rows.length){$('calendarAgenda').innerHTML='';return}
  const dayLabel=d=>new Date(d+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
- $('calendarAgenda').innerHTML='<div class="cal-agenda-head"><h3>'+(state.start===currentQuarterStart()?'This quarter':esc($('calendarRange').textContent))+'</h3><span>'+rows.length+' video'+(rows.length===1?'':'s')+' · click a row to open it</span></div><div class="cal-agenda-wrap"><table class="cal-agenda"><thead><tr><th>Date</th><th>Video</th><th>Status</th><th class="num">Views</th><th>Sponsor</th><th>Deal</th></tr></thead><tbody>'+
+ $('calendarAgenda').innerHTML='<div class="cal-agenda-head"><h3>'+(state.start===currentQuarterStart()?'This quarter':esc($('calendarRange').textContent))+'</h3><span>'+rows.length+' video'+(rows.length===1?'':'s')+' · click a row to open it</span></div><div class="cal-agenda-wrap"><table class="cal-agenda"><thead><tr><th>Date</th><th>Video</th><th>Status</th><th class="num">Views</th><th>Sponsor</th><th>Deal</th><th class="num">Amount</th></tr></thead><tbody>'+
   rows.map(r=>{
-   if(r.kind==='slot')return '<tr class="cal-a-slot" data-slot-date="'+r.date+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(r.date))+'</td><td><strong class="cal-untitled">+ Add title</strong><small>Release slot, '+SLOT_LABEL+'</small></td><td>'+pillFor('slot')+'</td><td class="num"><span class="muted">–</span></td><td><span class="muted">–</span></td><td></td></tr>';
-   if(r.kind==='extra'){const v=r.v,d=linkSponsor(v.sponsor);return '<tr data-extra="'+esc(v.id)+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(v.date))+'</td><td><strong>'+esc(v.title)+'</strong><small>On YouTube, not in the plan</small></td><td>'+pillFor('extra')+'</td><td class="num">'+compact(v.views)+'</td><td>'+(d&&d.name?'<span class="cal-a-sponsor suggested" title="'+esc('From the video description: '+d.line)+'">◆ '+esc(d.name)+'</span>':'<span class="muted">–</span>')+'</td><td>'+(d&&d.name?'<span class="cal-deal sp-suggested">Add to plan</span>':'')+'</td></tr>'}
+   if(r.kind==='slot')return '<tr class="cal-a-slot" data-slot-date="'+r.date+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(r.date))+'</td><td><strong class="cal-untitled">+ Add title</strong><small>Release slot, '+SLOT_LABEL+'</small></td><td>'+pillFor('slot')+'</td><td class="num"><span class="muted">–</span></td><td><span class="muted">–</span></td><td></td><td></td></tr>';
+   if(r.kind==='extra'){const v=r.v,d=linkSponsor(v.sponsor);return '<tr data-extra="'+esc(v.id)+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(v.date))+'</td><td><strong>'+esc(v.title)+'</strong><small>On YouTube, not in the plan</small></td><td>'+pillFor('extra')+'</td><td class="num">'+compact(v.views)+'</td><td>'+(d&&d.name?'<span class="cal-a-sponsor suggested" title="'+esc('From the video description: '+d.line)+'">◆ '+esc(d.name)+'</span>':'<span class="muted">–</span>')+'</td><td>'+(d&&d.name?'<span class="cal-deal sp-suggested">Add to plan</span>':'')+'</td><td class="num">'+esc(fmtMoney(state.history.money[v.id]))+'</td></tr>'}
    const e=r.e,st=stateOf(e),sp=sponsorOf(e),y=e.yt,moved=r.date!==e.date;
    const sub=[y&&y.title&&y.title.toLowerCase()!==String(e.text).toLowerCase()?'YouTube: '+y.title:'',moved?'Planned '+fmtDay(e.date):''].filter(Boolean).join(' · ');
    const deal=sp?(sp.saved?'<span class="cal-deal '+statusClass(sp.status)+'">'+esc(sp.status||'No status')+'</span>':'<span class="cal-deal sp-suggested">Confirm?</span>'):'';
-   return '<tr data-edit-date="'+e.date+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(r.date))+'</td><td>'+(isUntitled(e)?'<strong class="cal-untitled">+ Add title</strong>':'<strong>'+esc(shortTitle(e,sp&&sp.name))+'</strong>')+(sub?'<small>'+esc(sub)+'</small>':'')+'</td><td>'+pillFor(st)+'</td><td class="num">'+(y?compact(y.views):'<span class="muted">–</span>')+'</td><td>'+(sp?'<span class="cal-a-sponsor'+(sp.saved?'':' suggested')+'" data-sponsor-date="'+e.date+'" title="'+esc(sp.saved?'Sponsor: '+sp.name:suggestedLabel(sp)+(sp.line?'. '+sp.line:''))+'">◆ '+esc(sp.name)+'</span>':'<span class="muted">–</span>')+'</td><td>'+deal+'</td></tr>';
+   return '<tr data-edit-date="'+e.date+'" tabindex="0"><td class="cal-a-date">'+esc(dayLabel(r.date))+'</td><td>'+(isUntitled(e)?'<strong class="cal-untitled">+ Add title</strong>':'<strong>'+esc(shortTitle(e,sp&&sp.name))+'</strong>')+(sub?'<small>'+esc(sub)+'</small>':'')+'</td><td>'+pillFor(st)+'</td><td class="num">'+(y?compact(y.views):'<span class="muted">–</span>')+'</td><td>'+(sp?'<span class="cal-a-sponsor'+(sp.saved?'':' suggested')+'" data-sponsor-date="'+e.date+'" title="'+esc(sp.saved?'Sponsor: '+sp.name:suggestedLabel(sp)+(sp.line?'. '+sp.line:''))+'">◆ '+esc(sp.name)+'</span>':'<span class="muted">–</span>')+'</td><td>'+deal+'</td><td class="num cal-a-money">'+(()=>{const m=state.history.money['plan:'+e.date]||(y&&state.history.money[y.id]);return m?'<span title="'+esc(m.n||'')+'">'+esc(fmtMoney(m))+'</span>':(sp?'<span class="muted">–</span>':'')})()+'</td></tr>';
   }).join('')+'</tbody></table></div>';
 }
 function renderSummary(list,slots=[]){
@@ -179,7 +179,7 @@ function loadHistory(fresh=false){
  h.loading=(async()=>{
   try{const r=await api({action:'sponsorHistory',fresh:Boolean(fresh)});h.videos=r.videos||[];h.channel=r.channel||null;h.deals=r.deals||{};h.money=r.money||{};h.moneyReady=Boolean(r.moneyReady);h.dealsError=r.dealsError||'';h.loaded=true;h.error='';}
   catch(e){h.error=e.message||String(e);}
-  finally{h.loading=null;renderHistory();}
+  finally{h.loading=null;if(state.loaded)render();else renderHistory();}
  })();
  renderHistory();
  return h.loading;
@@ -268,7 +268,7 @@ async function saveMoney(key,text){
  h.saving['money:'+key]=true;renderHistory();
  try{const r=await api({action:'videoDeals',money:{[key]:value}});h.money=r.money||h.money;notice(value?'Amount saved to the Sponsorship sheet.':'Amount removed.');}
  catch(e){if(prev)h.money[key]=prev;else delete h.money[key];notice(e.message||String(e),true);}
- finally{delete h.saving['money:'+key];renderHistory();}
+ finally{delete h.saving['money:'+key];render();}
 }
 function dealCell(r){
  if(r.editDate)return planDealSelect(r);
