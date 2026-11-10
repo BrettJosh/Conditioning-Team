@@ -478,3 +478,6 @@ body:not(.local-demo-mode) #connectionOverlay .connection-status{background:#eef
 .cal-history-hidden{font:inherit;font-weight:700;background:none;border:0;padding:0;color:inherit;text-decoration:underline;cursor:pointer}
 .cal-history-table td.cal-a-date{width:118px;min-width:118px}.cal-history-table td.num,.cal-history-table th.num{width:64px;min-width:64px}
 @media(max-width:700px){.cal-deal-select{width:108px}.cal-history-table td.cal-a-date{width:auto;min-width:0}.cal-history-table td.num,.cal-history-table th.num{width:auto;min-width:0}}
+.cal-history-table td.cal-money-cell{width:96px;min-width:96px;padding-left:4px;padding-right:4px}.cal-money{width:92px;text-align:right;font:inherit;font-size:12.5px;font-weight:800;color:var(--ink);border:1.2px solid transparent;background:transparent;border-radius:6px;padding:4px 6px}.cal-money:hover:not(:disabled),.cal-money:focus{border-color:rgba(0,0,0,.3);background:#fff;outline:none}.cal-money::placeholder{color:var(--muted);font-weight:600}.cal-money.est{color:#5d5a52;font-style:italic}.cal-money:disabled{color:var(--muted)}
+.cal-history-money{display:block;margin-top:3px;font-weight:700}.cal-history-money b{font-weight:900}
+@media(max-width:700px){.cal-history-table td.cal-money-cell{width:auto;min-width:0}.cal-money{width:76px}}

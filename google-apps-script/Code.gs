@@ -26,7 +26,7 @@ function planSheet(year,create){
 function main(){const sheet=planSheet(FIRST_YEAR,false);if(!sheet)throw Error('Content plan tab missing');return sheet}
 /** Studio Metrics tab (same spreadsheet): one row per calendar date. Columns are found by their heading, so new ones can be added. */
 const METRIC_FIELDS={views:'Views at 7 days',ctr:'CTR percent',avd:'Average view duration',sponsor:'Sponsor',sponsorStatus:'Sponsor status',youtubeUrl:'YouTube link'};
-const BRIDGE_VERSION=4;
+const BRIDGE_VERSION=5;
 function metricsSheet(){const wb=SpreadsheetApp.openById('1zvaFJCApnz6YFzJCXUtC9BSLW40pR58vyPM7pgSWfB4');let sheet=wb.getSheetByName(METRICS_SHEET);if(!sheet)sheet=wb.insertSheet(METRICS_SHEET);
  const width=Math.max(sheet.getLastColumn(),1),head=sheet.getRange(1,1,1,width).getValues()[0].map(h=>String(h||'').trim());
  if(!head[0]){head[0]='Date';sheet.getRange(1,1).setValue('Date')}
@@ -387,7 +387,7 @@ function sponsorRequest(data) {
   if (action === 'sponsorSyncState') { writeMeta(wb, { zohoSync: JSON.stringify(data.state || {}) }); return { ok: true }; }
   if (action === 'sponsorEmails') return logEmails(wb, data.emails, data.state);
   if (action === 'sponsorAssign') return assignEmail(wb, data);
-  if (action === 'sponsorVideoDeals') return videoDeals(wb, data.set);
+  if (action === 'sponsorVideoDeals') return videoDeals(wb, data.set, data.money);
   const tab = data.tab === 'agencies' ? 'agencies' : 'brands';
   if (action === 'sponsorUpdate') {
     const info = readTab(wb, tab); const record = findRow(info, String(data.id || ''));
@@ -431,10 +431,24 @@ function sponsorRequest(data) {
 /** Deal status for videos that aren't in a content-plan tab (pre-2026), keyed by YouTube video id.
  *  Stored as JSON in the hidden "Studio meta" tab under "videoDeals". "Not a sponsor" hides a wrong description link. */
 const VIDEO_DEAL_STATUSES = ['In progress', 'Invoiced', 'Paid', 'Not a sponsor'];
-function videoDeals(wb, set) {
+/** What each sponsored video paid, keyed by video id (or "plan:YYYY-MM-DD" for a content-plan entry). Meta key "videoMoney".
+ *  Value: { a: amount, c: 'USD' | 'GBP' | 'EUR', e: true when it's an estimate, n: where the figure came from }. */
+function videoDeals(wb, set, money) {
   const lock = LockService.getScriptLock(); lock.waitLock(15000);
   try {
-    let deals = {}; try { deals = JSON.parse(readMeta(wb).videoDeals || '{}') || {}; } catch (e) { deals = {}; }
+    const meta = readMeta(wb);
+    let deals = {}; try { deals = JSON.parse(meta.videoDeals || '{}') || {}; } catch (e) { deals = {}; }
+    let paid = {}; try { paid = JSON.parse(meta.videoMoney || '{}') || {}; } catch (e) { paid = {}; }
+    if (money && typeof money === 'object') {
+      Object.keys(money).forEach(key => {
+        if (!/^[A-Za-z0-9_-]{11}$/.test(key) && !/^plan:\d{4}-\d\d-\d\d$/.test(key)) return;
+        const m = money[key];
+        if (!m || m.a === '' || m.a == null) { delete paid[key]; return; }
+        const a = Number(m.a); if (!isFinite(a) || a < 0) return;
+        paid[key] = { a: Math.round(a * 100) / 100, c: ['USD', 'GBP', 'EUR'].indexOf(m.c) >= 0 ? m.c : 'USD', e: Boolean(m.e), n: clean(m.n, 300) };
+      });
+      writeMeta(wb, { videoMoney: JSON.stringify(paid) });
+    }
     if (set && typeof set === 'object') {
       Object.keys(set).forEach(id => {
         if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return;
@@ -443,7 +457,7 @@ function videoDeals(wb, set) {
       });
       writeMeta(wb, { videoDeals: JSON.stringify(deals) });
     }
-    return { ok: true, deals: deals, bridgeVersion: BRIDGE_VERSION };
+    return { ok: true, deals: deals, money: paid, bridgeVersion: BRIDGE_VERSION };
   } finally { lock.releaseLock(); }
 }
 

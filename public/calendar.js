@@ -2,7 +2,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const state={events:[],extras:[],youtube:{},bridgeVersion:0,start:null,loaded:false,busy:false,loading:null,error:'',from:null,previousText:'',brands:null,brandRecords:null,editing:null,
- history:{videos:[],channel:null,loaded:false,loading:null,error:'',view:'brands',q:'',deals:{},dealsError:'',showHidden:false,saving:{}}}; // every upload on the channel, for the sponsor history
+ history:{videos:[],channel:null,loaded:false,loading:null,error:'',view:'brands',q:'',deals:{},money:{},moneyReady:false,dealsError:'',showHidden:false,saving:{}}}; // every upload on the channel, for the sponsor history
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /* Months are counted from January 2026 (0) so the quarter view can run on into later years; one sheet tab per year. */
 const FIRST_YEAR=2026,LAST_YEAR=2030,MAX_START=(LAST_YEAR-FIRST_YEAR)*12+9;
@@ -177,7 +177,7 @@ function loadHistory(fresh=false){
  const h=state.history;
  if(h.loading)return h.loading;
  h.loading=(async()=>{
-  try{const r=await api({action:'sponsorHistory',fresh:Boolean(fresh)});h.videos=r.videos||[];h.channel=r.channel||null;h.deals=r.deals||{};h.dealsError=r.dealsError||'';h.loaded=true;h.error='';}
+  try{const r=await api({action:'sponsorHistory',fresh:Boolean(fresh)});h.videos=r.videos||[];h.channel=r.channel||null;h.deals=r.deals||{};h.money=r.money||{};h.moneyReady=Boolean(r.moneyReady);h.dealsError=r.dealsError||'';h.loaded=true;h.error='';}
   catch(e){h.error=e.message||String(e);}
   finally{h.loading=null;renderHistory();}
  })();
@@ -191,14 +191,15 @@ function historyRows(){
   const sp=sponsorOf(e);if(!sp)continue;
   const y=e.yt;if(y)seen.add(y.id);
   rows.push({key:y?y.id:'plan:'+e.date,name:sp.name,brand:sp.brand||brandByName(sp.name),saved:sp.saved,source:sp.saved?'calendar':sp.source,status:sp.saved?(sp.status||'No status'):'',
-   date:shownOn(e),title:y?y.title:shortTitle(e,sp.name),views:y?y.views:null,url:y?y.url:(e.youtubeUrl||''),state:stateOf(e),editDate:e.date,extra:'',line:sp.line||(y&&y.sponsor&&y.sponsor.line)||'',domain:sp.domain||''});
+   date:shownOn(e),title:y?y.title:shortTitle(e,sp.name),views:y?y.views:null,url:y?y.url:(e.youtubeUrl||''),state:stateOf(e),editDate:e.date,extra:'',line:sp.line||(y&&y.sponsor&&y.sponsor.line)||'',domain:sp.domain||'',
+   moneyKey:'plan:'+e.date,ytId:y?y.id:'',dealStatus:sp.saved?sp.status:''});
  }
  for(const v of state.history.videos){
   if(seen.has(v.id)||!v.sponsor)continue;
   const d=linkSponsor(v.sponsor),inPlan=state.events.find(e=>e.yt&&e.yt.id===v.id);
   const editDate=inPlan?inPlan.date:'',extra=!inPlan&&v.date>=FIRST_YEAR+'-01-01'?v.id:'',videoDeal=!editDate?(state.history.deals[v.id]||''):'';
   rows.push({key:v.id,id:v.id,name:d.name,brand:d.brand,saved:false,source:'description',status:'',date:v.date,title:v.title,views:v.views,url:v.url,state:'published',
-   editDate,extra,line:d.line,domain:d.domain,videoDeal,hidden:videoDeal==='Not a sponsor'});
+   editDate,extra,line:d.line,domain:d.domain,videoDeal,hidden:videoDeal==='Not a sponsor',moneyKey:v.id,ytId:v.id,dealStatus:videoDeal});
  }
  rows.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
  return rows;
@@ -235,6 +236,40 @@ async function savePlanDeal(date,status){
  catch(e){notice(e.message||String(e),true);}
  finally{delete state.history.saving[key];state.busy=false;renderHistory();}
 }
+/* ---------- what each sponsorship paid ----------
+ * Kept in the sponsorship sheet's Studio meta tab (key videoMoney) by video id, or "plan:YYYY-MM-DD" for a content-plan entry.
+ * Typed as "$6,000", "£2k" or "~$7,200" (the ~ marks an estimate). No symbol keeps the row's currency, otherwise dollars. */
+const CUR={USD:'$',GBP:'£',EUR:'€'};
+const moneyOf=r=>{const m=state.history.money;return m[r.moneyKey]||(r.ytId&&m[r.ytId])||null};
+const fmtMoney=m=>m?(m.e?'~':'')+CUR[m.c||'USD']+Number(m.a).toLocaleString('en-GB',{maximumFractionDigits:2}):'';
+function parseMoney(text,prev){
+ const t=String(text||'').trim();if(!t)return null;
+ const m=t.match(/^([~≈]|about|approx\.?)?\s*([$£€])?\s*([\d][\d,]*(?:\.\d+)?)\s*(k)?\s*(usd|gbp|eur|dollars?|pounds?|euros?)?$/i);
+ if(!m)return undefined;
+ let a=Number(m[3].replace(/,/g,''));if(m[4])a*=1000;
+ const word=(m[5]||'').toLowerCase(),c=m[2]==='£'||/^(gbp|pound)/.test(word)?'GBP':m[2]==='€'||/^(eur|euro)/.test(word)?'EUR':m[2]==='$'||/^(usd|dollar)/.test(word)?'USD':(prev&&prev.c)||'USD';
+ return{a,c,e:Boolean(m[1])};
+}
+const addTo=(tot,m)=>{if(m){tot[m.c]=(tot[m.c]||0)+Number(m.a)}return tot};
+const fmtTotals=tot=>Object.keys(tot).sort((a,b)=>(a==='USD'?-1:b==='USD'?1:a.localeCompare(b))).map(c=>CUR[c]+Math.round(tot[c]).toLocaleString('en-GB')).join(' + ');
+function moneyCell(r){
+ const h=state.history,m=moneyOf(r),key=r.moneyKey;if(!key)return '<td class="num cal-money-cell"></td>';
+ const off=!h.moneyReady||Boolean(h.saving['money:'+key]);
+ const tip=!h.moneyReady?'Saving amounts needs the updated Studio bridge script (version 5).':(m&&m.n?m.n+(m.e?' (estimate)':''):'What this sponsorship paid. Type $6,000, £2k, or ~$7,200 for an estimate.');
+ return '<td class="num cal-money-cell"><input class="cal-money'+(m&&m.e?' est':'')+'" data-money-key="'+esc(key)+'" value="'+esc(fmtMoney(m))+'" placeholder="Add" aria-label="'+esc('Amount for '+r.title)+'" title="'+esc(tip)+'"'+(off?' disabled':'')+'></td>';
+}
+async function saveMoney(key,text){
+ const h=state.history,prev=h.money[key]||null,parsed=parseMoney(text,prev);
+ if(parsed===undefined){notice('Type an amount like $6,000, £2k or ~$7,200.',true);renderHistory();return}
+ if(!parsed&&!prev){renderHistory();return}
+ if(parsed&&prev&&parsed.a===prev.a&&parsed.c===prev.c&&parsed.e===prev.e){renderHistory();return}
+ const value=parsed?{...parsed,n:prev&&prev.n||''}:null;
+ if(value)h.money[key]=value;else delete h.money[key];
+ h.saving['money:'+key]=true;renderHistory();
+ try{const r=await api({action:'videoDeals',money:{[key]:value}});h.money=r.money||h.money;notice(value?'Amount saved to the Sponsorship sheet.':'Amount removed.');}
+ catch(e){if(prev)h.money[key]=prev;else delete h.money[key];notice(e.message||String(e),true);}
+ finally{delete h.saving['money:'+key];renderHistory();}
+}
 function dealCell(r){
  if(r.editDate)return planDealSelect(r);
  if(r.id)return videoDealSelect(r);
@@ -252,14 +287,16 @@ function renderHistory(){
  const oldest=h.videos.length?h.videos[h.videos.length-1].date:'';
  meta.innerHTML=(h.loaded||named.length?brandsN+' brand'+(brandsN===1?'':'s')+' across '+named.length+' sponsored video'+(named.length===1?'':'s')+(confirmN?' · '+confirmN+' to confirm':''):'')+
   (hiddenN?' · <button type="button" class="cal-history-hidden" data-history-hidden>'+hiddenN+' marked not a sponsor, '+(h.showHidden?'hide':'show')+'</button>':'')+
-  (h.loaded&&h.dealsError?'<span class="cal-history-note error">'+esc(h.dealsError)+'</span>':'')+
+  (h.loaded&&h.dealsError?'<span class="cal-history-note error">'+esc(h.dealsError)+'</span>':h.loaded&&!h.moneyReady?'<span class="cal-history-note error">Saving amounts needs the updated Studio bridge script (version 5): paste the new Code.gs into Studio bridge, run studioSelfTest, then Deploy, Manage deployments, ✎, New version.</span>':'')+
+  (()=>{const vis=all.filter(r=>!r.hidden),paid=vis.filter(r=>r.dealStatus==='Paid').reduce((t,r)=>addTo(t,moneyOf(r)),{}),due=vis.filter(r=>r.dealStatus!=='Paid').reduce((t,r)=>addTo(t,moneyOf(r)),{}),blank=vis.filter(r=>r.dealStatus==='Paid'&&!moneyOf(r)).length;
+   return Object.keys(paid).length||Object.keys(due).length?'<span class="cal-history-money"><b>Paid so far: '+esc(fmtTotals(paid)||'–')+'</b>'+(Object.keys(due).length?' · Still to come: '+esc(fmtTotals(due)):'')+(blank?' · '+blank+' paid video'+(blank===1?'':'s')+' with no amount yet':'')+'</span>':''})()+
   (h.loading?'<span class="cal-history-note">Reading sponsor links from every video on the channel…</span>':h.error?'<span class="cal-history-note error">'+esc(h.error)+'</span>':h.loaded?'<span class="cal-history-note">Confirmed ones come from the calendar; the rest are read from the top line of each video\'s description'+(oldest?', back to '+esc(fmtDay(oldest))+' '+esc(oldest.slice(0,4)):'')+'. Press Refresh to re-read.</span>':'');
  document.querySelectorAll('[data-history-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.historyView===h.view)));
  if(!rows.length){body.innerHTML='<div class="calendar-empty cal-history-empty">'+(h.loading?'Loading…':q?'Nothing matches "'+esc(h.q)+'".':named.length?'':'No sponsors found yet. Add a sponsor to a calendar entry, or put the sponsor\'s link in the top line of a video description.')+'</div>';return}
  const dayLabel=d=>d?new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'–';
  if(h.view==='videos'){
-  body.innerHTML='<div class="cal-agenda-wrap"><table class="cal-agenda cal-history-table"><thead><tr><th>Published</th><th class="cal-history-video">Video</th><th>Sponsor</th><th>Deal</th><th class="num">Views</th></tr></thead><tbody>'+
-   rows.map(r=>'<tr><td class="cal-a-date">'+esc(dayLabel(r.date))+(statePill(r)?'<small>'+statePill(r)+'</small>':'')+'</td>'+videoCell(r)+'<td>'+(r.name?'<span class="cal-a-sponsor'+(r.saved?'':' suggested')+'">◆ '+esc(r.name)+'</span>'+(r.brand?'<small><a href="#sponsorships/brands/'+esc(r.brand.id)+'">Tracker ↗</a></small>':''):'<span class="muted">Link to '+esc(r.domain||'?')+'</span>')+'</td><td>'+dealCell(r)+'</td><td class="num">'+(r.views==null?'<span class="muted">–</span>':compact(r.views))+'</td></tr>').join('')+'</tbody></table></div>';
+  body.innerHTML='<div class="cal-agenda-wrap"><table class="cal-agenda cal-history-table"><thead><tr><th>Published</th><th class="cal-history-video">Video</th><th>Sponsor</th><th>Deal</th><th class="num">Amount</th><th class="num">Views</th></tr></thead><tbody>'+
+   rows.map(r=>'<tr><td class="cal-a-date">'+esc(dayLabel(r.date))+(statePill(r)?'<small>'+statePill(r)+'</small>':'')+'</td>'+videoCell(r)+'<td>'+(r.name?'<span class="cal-a-sponsor'+(r.saved?'':' suggested')+'">◆ '+esc(r.name)+'</span>'+(r.brand?'<small><a href="#sponsorships/brands/'+esc(r.brand.id)+'">Tracker ↗</a></small>':''):'<span class="muted">Link to '+esc(r.domain||'?')+'</span>')+'</td><td>'+dealCell(r)+'</td>'+moneyCell(r)+'<td class="num">'+(r.views==null?'<span class="muted">–</span>':compact(r.views))+'</td></tr>').join('')+'</tbody></table></div>';
   return;
  }
  const groups=new Map();
@@ -267,10 +304,10 @@ function renderHistory(){
  const list=[...groups.values()].sort((a,b)=>(a.key==='unknown')-(b.key==='unknown')||String(b.rows[0].date).localeCompare(String(a.rows[0].date)));
  body.innerHTML=list.map(g=>{
   const views=g.rows.reduce((n,r)=>n+(r.views||0),0),saved=g.rows.filter(r=>r.saved||(r.videoDeal&&!r.hidden)).length,unknown=g.key==='unknown';
-  const head='<div class="cal-history-brand"><span class="cal-history-name">'+(unknown?'<span class="muted">Link not read</span>':'◆ '+esc(g.name))+'</span><span class="cal-history-stats">'+g.rows.length+' video'+(g.rows.length===1?'':'s')+(views?' · '+compact(views)+' views':'')+(saved?' · '+saved+' confirmed':'')+'</span>'+
+  const head='<div class="cal-history-brand"><span class="cal-history-name">'+(unknown?'<span class="muted">Link not read</span>':'◆ '+esc(g.name))+'</span><span class="cal-history-stats">'+g.rows.length+' video'+(g.rows.length===1?'':'s')+(views?' · '+compact(views)+' views':'')+(saved?' · '+saved+' confirmed':'')+(()=>{const t=fmtTotals(g.rows.filter(r=>!r.hidden).reduce((t,r)=>addTo(t,moneyOf(r)),{}));return t?' · <b>'+esc(t)+'</b>':''})()+'</span>'+
    (g.brand?'<a class="cal-history-link" href="#sponsorships/brands/'+esc(g.brand.id)+'">Tracker: '+esc(g.brand.status||'no status')+' ↗</a>':unknown?'<span class="cal-history-link muted">A shortened link the brand couldn\'t be read from. Open the video to check.</span>':'<span class="cal-history-link muted">Not in the Sponsorship tracker</span>')+'</div>';
   return '<section class="cal-history-group">'+head+'<div class="cal-agenda-wrap"><table class="cal-agenda cal-history-table"><tbody>'+
-   g.rows.map(r=>'<tr><td class="cal-a-date">'+esc(dayLabel(r.date))+(statePill(r)?'<small>'+statePill(r)+'</small>':'')+'</td>'+videoCell(r)+'<td>'+dealCell(r)+'</td><td class="num">'+(r.views==null?'<span class="muted">–</span>':compact(r.views))+'</td></tr>').join('')+'</tbody></table></div></section>';
+   g.rows.map(r=>'<tr><td class="cal-a-date">'+esc(dayLabel(r.date))+(statePill(r)?'<small>'+statePill(r)+'</small>':'')+'</td>'+videoCell(r)+'<td>'+dealCell(r)+'</td>'+moneyCell(r)+'<td class="num">'+(r.views==null?'<span class="muted">–</span>':compact(r.views))+'</td></tr>').join('')+'</tbody></table></div></section>';
  }).join('');
 }
 async function openSponsors(){
@@ -443,11 +480,14 @@ async function onMove(from,date){
 function boot(){
  $('calendarSponsorStatus').innerHTML='<option value="">No sponsor status</option>'+SPONSOR_STATUSES.map(s=>'<option>'+s+'</option>').join('');
  window.Studio.on('tab',({tab})=>show(tab));
- window.Studio.on('connection',()=>{state.loaded=false;state.events=[];state.extras=[];state.brands=null;state.brandRecords=null;learned=null;Object.assign(state.history,{videos:[],channel:null,loaded:false,error:'',deals:{},dealsError:''});if(window.Studio.current()==='calendar')refresh();});
+ window.Studio.on('connection',()=>{state.loaded=false;state.events=[];state.extras=[];state.brands=null;state.brandRecords=null;learned=null;Object.assign(state.history,{videos:[],channel:null,loaded:false,error:'',deals:{},money:{},moneyReady:false,dealsError:''});if(window.Studio.current()==='calendar')refresh();});
  $('calendarHistory').addEventListener('click',e=>{const v=e.target.closest('[data-history-view]');if(v){state.history.view=v.dataset.historyView;renderHistory();}
   if(e.target.closest('[data-history-hidden]')){state.history.showHidden=!state.history.showHidden;renderHistory();}});
  $('calendarHistoryBody').addEventListener('change',e=>{const sel=e.target.closest('[data-video-deal]');if(sel)saveVideoDeal(sel.dataset.videoDeal,sel.value);
-  const plan=e.target.closest('[data-plan-deal]');if(plan)savePlanDeal(plan.dataset.planDeal,plan.value);});
+  const plan=e.target.closest('[data-plan-deal]');if(plan)savePlanDeal(plan.dataset.planDeal,plan.value);
+  const money=e.target.closest('[data-money-key]');if(money)saveMoney(money.dataset.moneyKey,money.value);});
+ $('calendarHistoryBody').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('[data-money-key]'))e.target.blur();
+  if(e.key==='Escape'&&e.target.matches('[data-money-key]')){e.target.value=fmtMoney(moneyOf({moneyKey:e.target.dataset.moneyKey}));e.target.blur();}});
  $('calendarHistorySearch').addEventListener('input',e=>{state.history.q=e.target.value;renderHistory();});
  $('calendarRefresh').addEventListener('click',()=>refresh(true));
  $('calendarPrevious').addEventListener('click',()=>{state.start=Math.max(0,state.start-3);render()});

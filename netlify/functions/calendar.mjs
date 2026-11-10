@@ -8,13 +8,13 @@ const UNEXPECTED='Google Sheets returned a page instead of data. Usually the scr
 const VIDEO_DEAL_STATUSES=['','In progress','Invoiced','Paid','Not a sponsor'];
 const NEEDS_BRIDGE='Saving a status on videos from before 2026 needs the updated Studio bridge script (version 4): paste the new Code.gs into Studio bridge, run studioSelfTest, then Deploy, Manage deployments, ✎, New version.';
 /* Deal statuses for videos outside the content-plan tabs, kept in the sponsorship sheet's hidden Studio meta tab. */
-async function scriptVideoDeals(set){
+async function scriptVideoDeals(set,money){
  const url=process.env.STUDIO_CALENDAR_SCRIPT_URL,secret=process.env.STUDIO_CALENDAR_SCRIPT_SECRET;
  if(!url||!secret||!/^https:\/\/script\.google\.com\/macros\/s\//.test(url))throw Error('Google Sheets is not connected yet.');
- const upstream=await fetch(url,{method:'POST',headers:{'content-type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'sponsorVideoDeals',set:set||null,secret}),redirect:'follow',signal:AbortSignal.timeout(19000)});
+ const upstream=await fetch(url,{method:'POST',headers:{'content-type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'sponsorVideoDeals',set:set||null,money:money||null,secret}),redirect:'follow',signal:AbortSignal.timeout(19000)});
  const raw=await upstream.text();let parsed;try{parsed=JSON.parse(raw)}catch{throw Error(UNEXPECTED)}
  if(!parsed.ok)throw Error(/Unknown sponsorship action/i.test(parsed.error||'')?NEEDS_BRIDGE:(parsed.error||'Google Sheets update failed.'));
- return parsed.deals||{};
+ return{deals:parsed.deals||{},money:parsed.money||null,bridgeVersion:Number(parsed.bridgeVersion)||0};
 }
 export default async function handler(request){
  if(request.method!=='POST')return fail('POST required.',405);
@@ -25,23 +25,32 @@ export default async function handler(request){
  // Sponsor history: every long-form upload on the channel with the sponsor link read from its description. YouTube only, no sheet round-trip.
  if(action==='sponsorHistory'){
   if(!youtubeConfigured())return fail('Connect YouTube first (YOUTUBE_API_KEY in Netlify, see the README) to list sponsors from video descriptions.',503);
-  const dealsPromise=scriptVideoDeals(null).then(d=>({deals:d}),e=>({dealsError:String(e.message||e)}));
+  const dealsPromise=scriptVideoDeals(null,null).then(d=>d,e=>({dealsError:String(e.message||e)}));
   try{
    const{channel,videos}=await allUploads({fresh:Boolean(data.fresh)});
    const slim=v=>({id:v.id,title:v.title,url:v.url,date:v.date,views:v.views,seconds:v.seconds,thumb:v.thumb,sponsor:v.sponsor?{line:v.sponsor.line,lineNo:v.sponsor.lineNo,url:v.sponsor.url,domain:v.sponsor.domain,shortened:Boolean(v.sponsor.shortened),finalDomain:v.sponsor.finalDomain||'',guess:v.sponsor.guess||''}:null});
    const deals=await dealsPromise;
-   return Response.json({ok:true,channel,videos:videos.filter(v=>v.long&&v.live!=='upcoming').map(slim),deals:deals.deals||{},dealsError:deals.dealsError||''},{headers:{'Cache-Control':'no-store'}});
+   return Response.json({ok:true,channel,videos:videos.filter(v=>v.long&&v.live!=='upcoming').map(slim),deals:deals.deals||{},money:deals.money||{},moneyReady:Boolean(deals.money),dealsError:deals.dealsError||''},{headers:{'Cache-Control':'no-store'}});
   }catch(e){return fail('YouTube: '+String(e.message||e).replace(/^YouTube:\s*/,''),502);}
  }
  if(action==='videoDeals'){
-  const set={};
+  const set={},money={};
   for(const[id,status]of Object.entries(data.set||{})){
    if(!/^[A-Za-z0-9_-]{11}$/.test(id))return fail('Invalid video id.');
    if(!VIDEO_DEAL_STATUSES.includes(status))return fail('Status must be In progress, Invoiced, Paid or Not a sponsor.');
    set[id]=status;
   }
-  if(!Object.keys(set).length||Object.keys(set).length>200)return fail('Nothing to save.');
-  try{return Response.json({ok:true,deals:await scriptVideoDeals(set)},{headers:{'Cache-Control':'no-store'}});}
+  for(const[key,m]of Object.entries(data.money||{})){
+   if(!/^[A-Za-z0-9_-]{11}$/.test(key)&&!/^plan:20\d\d-\d\d-\d\d$/.test(key))return fail('Invalid video.');
+   if(m==null||m.a===''||m.a==null){money[key]=null;continue}
+   const a=Number(m.a);if(!Number.isFinite(a)||a<0||a>10000000)return fail('Amount must be a number.');
+   money[key]={a,c:['USD','GBP','EUR'].includes(m.c)?m.c:'USD',e:Boolean(m.e),n:String(m.n||'').slice(0,300)};
+  }
+  const n=Object.keys(set).length+Object.keys(money).length;
+  if(!n||n>200)return fail('Nothing to save.');
+  try{const r=await scriptVideoDeals(Object.keys(set).length?set:null,Object.keys(money).length?money:null);
+   if(Object.keys(money).length&&!r.money)return fail('Saving amounts needs the updated Studio bridge script (version 5): paste the new Code.gs into Studio bridge, run studioSelfTest, then Deploy, Manage deployments, ✎, New version.',400);
+   return Response.json({ok:true,deals:r.deals,money:r.money||{}},{headers:{'Cache-Control':'no-store'}});}
   catch(e){return fail(String(e.message||e),502);}
  }
  const url=process.env.STUDIO_CALENDAR_SCRIPT_URL,secret=process.env.STUDIO_CALENDAR_SCRIPT_SECRET;
