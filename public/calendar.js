@@ -196,7 +196,7 @@ function historyRows(){
  for(const v of state.history.videos){
   if(seen.has(v.id)||!v.sponsor)continue;
   const d=linkSponsor(v.sponsor),inPlan=state.events.find(e=>e.yt&&e.yt.id===v.id);
-  const editDate=inPlan?inPlan.date:'',extra=!inPlan&&v.date>=FIRST_YEAR+'-01-01'?v.id:'',videoDeal=!editDate&&!extra?(state.history.deals[v.id]||''):'';
+  const editDate=inPlan?inPlan.date:'',extra=!inPlan&&v.date>=FIRST_YEAR+'-01-01'?v.id:'',videoDeal=!editDate?(state.history.deals[v.id]||''):'';
   rows.push({key:v.id,id:v.id,name:d.name,brand:d.brand,saved:false,source:'description',status:'',date:v.date,title:v.title,views:v.views,url:v.url,state:'published',
    editDate,extra,line:d.line,domain:d.domain,videoDeal,hidden:videoDeal==='Not a sponsor'});
  }
@@ -219,11 +219,25 @@ async function saveVideoDeal(id,status){
  catch(e){if(before)h.deals[id]=before;else delete h.deals[id];notice(e.message||String(e),true);}
  finally{delete h.saving[id];renderHistory();}
 }
+/* Videos in the content plan: the status is the calendar entry's own sponsor status (Studio Metrics). Picking one on a suggestion confirms the sponsor. */
+function planDealSelect(r){
+ const v=r.saved&&r.status!=='No status'?r.status:'',busy=Boolean(state.history.saving['plan:'+r.editDate]);
+ return '<select class="cal-deal cal-deal-select '+(r.saved?statusClass(v):'sp-suggested')+'" data-plan-deal="'+esc(r.editDate)+'" aria-label="'+esc('Deal status for '+r.title)+'"'+(busy?' disabled':'')+' title="'+esc(r.saved?'Saved on the calendar entry':'Suggested sponsor: '+r.name+'. Pick a status to confirm it.')+'">'+
+  '<option value="">'+(r.saved?'No status':'Confirm?')+'</option>'+SPONSOR_STATUSES.map(s=>'<option'+(s===v?' selected':'')+'>'+s+'</option>').join('')+'</select>';
+}
+async function savePlanDeal(date,status){
+ const item=state.events.find(x=>x.date===date);if(!item)return;
+ const sp=sponsorOf(item);if(!item.sponsor&&(!status||!sp))return;
+ if(state.busy){notice('Still saving. Try again in a moment.',true);renderHistory();return}
+ const key='plan:'+date;state.history.saving[key]=true;state.busy=true;renderHistory();
+ try{const data=await api({action:'save',from:date,previousText:item.text,date,text:item.text,metrics:{...metricsOf(item),sponsor:item.sponsor||sp.name,sponsorStatus:status}});
+  delete state.history.saving[key];state.busy=false;apply(data);notice(item.sponsor?'Saved to the content plan.':'Sponsor confirmed and saved to the content plan.');}
+ catch(e){notice(e.message||String(e),true);}
+ finally{delete state.history.saving[key];state.busy=false;renderHistory();}
+}
 function dealCell(r){
- if(r.id&&!r.editDate&&!r.extra)return videoDealSelect(r);
- if(r.saved)return '<span class="cal-deal '+statusClass(r.status==='No status'?'':r.status)+'">'+esc(r.status)+'</span>';
- if(r.editDate)return '<button type="button" class="cal-deal sp-suggested cal-deal-btn" data-edit-date="'+esc(r.editDate)+'">Confirm?</button>';
- if(r.extra)return '<button type="button" class="cal-deal sp-suggested cal-deal-btn" data-extra="'+esc(r.extra)+'">Add to plan</button>';
+ if(r.editDate)return planDealSelect(r);
+ if(r.id)return videoDealSelect(r);
  return '';
 }
 const videoCell=r=>'<td class="cal-history-video"><strong>'+(r.url?'<a href="'+esc(r.url)+'" target="_blank" rel="noopener noreferrer">'+esc(r.title)+' ↗</a>':esc(r.title))+'</strong>'+(r.line?'<small title="'+esc(r.line)+'">'+esc(r.line.replace(/https?:\/\/\S+|www\.\S+/g,'').replace(/\s+/g,' ').trim()||r.domain)+'</small>':'')+'</td>';
@@ -234,7 +248,7 @@ function renderHistory(){
  if(!state.loaded){body.innerHTML='';meta.textContent='';return}
  const q=h.q.trim().toLowerCase();
  const every=historyRows(),hiddenN=every.filter(r=>r.hidden).length,all=h.showHidden?every:every.filter(r=>!r.hidden),rows=q?all.filter(r=>[r.name,r.title,r.line,r.domain].some(x=>String(x||'').toLowerCase().includes(q))):all;
- const named=all.filter(r=>r.name&&!r.hidden),brandsN=new Set(named.map(groupKey)).size,confirmN=all.filter(r=>r.name&&!r.saved&&(r.editDate||r.extra)).length;
+ const named=all.filter(r=>r.name&&!r.hidden),brandsN=new Set(named.map(groupKey)).size,confirmN=all.filter(r=>r.name&&!r.saved&&r.editDate).length;
  const oldest=h.videos.length?h.videos[h.videos.length-1].date:'';
  meta.innerHTML=(h.loaded||named.length?brandsN+' brand'+(brandsN===1?'':'s')+' across '+named.length+' sponsored video'+(named.length===1?'':'s')+(confirmN?' · '+confirmN+' to confirm':''):'')+
   (hiddenN?' · <button type="button" class="cal-history-hidden" data-history-hidden>'+hiddenN+' marked not a sponsor, '+(h.showHidden?'hide':'show')+'</button>':'')+
@@ -432,7 +446,8 @@ function boot(){
  window.Studio.on('connection',()=>{state.loaded=false;state.events=[];state.extras=[];state.brands=null;state.brandRecords=null;learned=null;Object.assign(state.history,{videos:[],channel:null,loaded:false,error:'',deals:{},dealsError:''});if(window.Studio.current()==='calendar')refresh();});
  $('calendarHistory').addEventListener('click',e=>{const v=e.target.closest('[data-history-view]');if(v){state.history.view=v.dataset.historyView;renderHistory();}
   if(e.target.closest('[data-history-hidden]')){state.history.showHidden=!state.history.showHidden;renderHistory();}});
- $('calendarHistoryBody').addEventListener('change',e=>{const sel=e.target.closest('[data-video-deal]');if(sel)saveVideoDeal(sel.dataset.videoDeal,sel.value);});
+ $('calendarHistoryBody').addEventListener('change',e=>{const sel=e.target.closest('[data-video-deal]');if(sel)saveVideoDeal(sel.dataset.videoDeal,sel.value);
+  const plan=e.target.closest('[data-plan-deal]');if(plan)savePlanDeal(plan.dataset.planDeal,plan.value);});
  $('calendarHistorySearch').addEventListener('input',e=>{state.history.q=e.target.value;renderHistory();});
  $('calendarRefresh').addEventListener('click',()=>refresh(true));
  $('calendarPrevious').addEventListener('click',()=>{state.start=Math.max(0,state.start-3);render()});
