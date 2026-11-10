@@ -2,7 +2,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const state={events:[],extras:[],youtube:{},bridgeVersion:0,start:null,loaded:false,busy:false,loading:null,error:'',from:null,previousText:'',brands:null,brandRecords:null,editing:null,
- history:{videos:[],channel:null,loaded:false,loading:null,error:'',view:'brands',q:''}}; // every upload on the channel, for the sponsor history
+ history:{videos:[],channel:null,loaded:false,loading:null,error:'',view:'brands',q:'',deals:{},dealsError:'',showHidden:false,saving:{}}}; // every upload on the channel, for the sponsor history
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /* Months are counted from January 2026 (0) so the quarter view can run on into later years; one sheet tab per year. */
 const FIRST_YEAR=2026,LAST_YEAR=2030,MAX_START=(LAST_YEAR-FIRST_YEAR)*12+9;
@@ -177,7 +177,7 @@ function loadHistory(fresh=false){
  const h=state.history;
  if(h.loading)return h.loading;
  h.loading=(async()=>{
-  try{const r=await api({action:'sponsorHistory',fresh:Boolean(fresh)});h.videos=r.videos||[];h.channel=r.channel||null;h.loaded=true;h.error='';}
+  try{const r=await api({action:'sponsorHistory',fresh:Boolean(fresh)});h.videos=r.videos||[];h.channel=r.channel||null;h.deals=r.deals||{};h.dealsError=r.dealsError||'';h.loaded=true;h.error='';}
   catch(e){h.error=e.message||String(e);}
   finally{h.loading=null;renderHistory();}
  })();
@@ -196,18 +196,35 @@ function historyRows(){
  for(const v of state.history.videos){
   if(seen.has(v.id)||!v.sponsor)continue;
   const d=linkSponsor(v.sponsor),inPlan=state.events.find(e=>e.yt&&e.yt.id===v.id);
-  rows.push({key:v.id,name:d.name,brand:d.brand,saved:false,source:'description',status:'',date:v.date,title:v.title,views:v.views,url:v.url,state:'published',
-   editDate:inPlan?inPlan.date:'',extra:!inPlan&&v.date>=FIRST_YEAR+'-01-01'?v.id:'',line:d.line,domain:d.domain});
+  const editDate=inPlan?inPlan.date:'',extra=!inPlan&&v.date>=FIRST_YEAR+'-01-01'?v.id:'',videoDeal=!editDate&&!extra?(state.history.deals[v.id]||''):'';
+  rows.push({key:v.id,id:v.id,name:d.name,brand:d.brand,saved:false,source:'description',status:'',date:v.date,title:v.title,views:v.views,url:v.url,state:'published',
+   editDate,extra,line:d.line,domain:d.domain,videoDeal,hidden:videoDeal==='Not a sponsor'});
  }
  rows.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
  return rows;
 }
 const groupKey=r=>r.brand?'brand:'+r.brand.id:r.name?'name:'+squash(r.name):'unknown';
+/* Videos from before the 2026 plan: the status is kept in the sponsorship sheet's Studio meta tab, keyed by video id. */
+const VIDEO_DEALS=['In progress','Invoiced','Paid','Not a sponsor'];
+function videoDealSelect(r){
+ const h=state.history,v=r.videoDeal,busy=Boolean(h.saving[r.id]);
+ return '<select class="cal-deal cal-deal-select '+(v?statusClass(v):'sp-suggested')+'" data-video-deal="'+esc(r.id)+'" aria-label="'+esc('Deal status for '+r.title)+'"'+(busy||h.dealsError?' disabled':'')+' title="'+esc(h.dealsError||'Before the 2026 plan. Saved in the Sponsorship sheet.')+'">'+
+  '<option value="">From description</option>'+VIDEO_DEALS.map(s=>'<option'+(s===v?' selected':'')+'>'+s+'</option>').join('')+'</select>';
+}
+async function saveVideoDeal(id,status){
+ const h=state.history,before=h.deals[id]||'';
+ if(status)h.deals[id]=status;else delete h.deals[id];
+ h.saving[id]=true;renderHistory();
+ try{const r=await api({action:'videoDeals',set:{[id]:status}});h.deals=r.deals||h.deals;notice(status==='Not a sponsor'?'Marked as not a sponsor. It\'s hidden from the sponsor history.':'Saved to the Sponsorship sheet.');}
+ catch(e){if(before)h.deals[id]=before;else delete h.deals[id];notice(e.message||String(e),true);}
+ finally{delete h.saving[id];renderHistory();}
+}
 function dealCell(r){
+ if(r.id&&!r.editDate&&!r.extra)return videoDealSelect(r);
  if(r.saved)return '<span class="cal-deal '+statusClass(r.status==='No status'?'':r.status)+'">'+esc(r.status)+'</span>';
  if(r.editDate)return '<button type="button" class="cal-deal sp-suggested cal-deal-btn" data-edit-date="'+esc(r.editDate)+'">Confirm?</button>';
  if(r.extra)return '<button type="button" class="cal-deal sp-suggested cal-deal-btn" data-extra="'+esc(r.extra)+'">Add to plan</button>';
- return '<span class="cal-deal sp-suggested" title="Before the 2026 plan, so it can\'t be edited here">From description</span>';
+ return '';
 }
 const videoCell=r=>'<td class="cal-history-video"><strong>'+(r.url?'<a href="'+esc(r.url)+'" target="_blank" rel="noopener noreferrer">'+esc(r.title)+' ↗</a>':esc(r.title))+'</strong>'+(r.line?'<small title="'+esc(r.line)+'">'+esc(r.line.replace(/https?:\/\/\S+|www\.\S+/g,'').replace(/\s+/g,' ').trim()||r.domain)+'</small>':'')+'</td>';
 const statePill=r=>r.state==='published'?'':r.state==='overdue'?pillFor('overdue'):pillFor('scheduled');
@@ -216,10 +233,12 @@ function renderHistory(){
  $('calendarHistory').hidden=!state.loaded&&!state.error;
  if(!state.loaded){body.innerHTML='';meta.textContent='';return}
  const q=h.q.trim().toLowerCase();
- const all=historyRows(),rows=q?all.filter(r=>[r.name,r.title,r.line,r.domain].some(x=>String(x||'').toLowerCase().includes(q))):all;
- const named=all.filter(r=>r.name),brandsN=new Set(named.map(groupKey)).size,confirmN=all.filter(r=>r.name&&!r.saved&&(r.editDate||r.extra)).length;
+ const every=historyRows(),hiddenN=every.filter(r=>r.hidden).length,all=h.showHidden?every:every.filter(r=>!r.hidden),rows=q?all.filter(r=>[r.name,r.title,r.line,r.domain].some(x=>String(x||'').toLowerCase().includes(q))):all;
+ const named=all.filter(r=>r.name&&!r.hidden),brandsN=new Set(named.map(groupKey)).size,confirmN=all.filter(r=>r.name&&!r.saved&&(r.editDate||r.extra)).length;
  const oldest=h.videos.length?h.videos[h.videos.length-1].date:'';
  meta.innerHTML=(h.loaded||named.length?brandsN+' brand'+(brandsN===1?'':'s')+' across '+named.length+' sponsored video'+(named.length===1?'':'s')+(confirmN?' · '+confirmN+' to confirm':''):'')+
+  (hiddenN?' · <button type="button" class="cal-history-hidden" data-history-hidden>'+hiddenN+' marked not a sponsor, '+(h.showHidden?'hide':'show')+'</button>':'')+
+  (h.loaded&&h.dealsError?'<span class="cal-history-note error">'+esc(h.dealsError)+'</span>':'')+
   (h.loading?'<span class="cal-history-note">Reading sponsor links from every video on the channel…</span>':h.error?'<span class="cal-history-note error">'+esc(h.error)+'</span>':h.loaded?'<span class="cal-history-note">Confirmed ones come from the calendar; the rest are read from the top line of each video\'s description'+(oldest?', back to '+esc(fmtDay(oldest))+' '+esc(oldest.slice(0,4)):'')+'. Press Refresh to re-read.</span>':'');
  document.querySelectorAll('[data-history-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.historyView===h.view)));
  if(!rows.length){body.innerHTML='<div class="calendar-empty cal-history-empty">'+(h.loading?'Loading…':q?'Nothing matches "'+esc(h.q)+'".':named.length?'':'No sponsors found yet. Add a sponsor to a calendar entry, or put the sponsor\'s link in the top line of a video description.')+'</div>';return}
@@ -233,7 +252,7 @@ function renderHistory(){
  rows.forEach(r=>{const k=groupKey(r);if(!groups.has(k))groups.set(k,{key:k,name:r.brand?r.brand.name:r.name,brand:r.brand,rows:[]});groups.get(k).rows.push(r)});
  const list=[...groups.values()].sort((a,b)=>(a.key==='unknown')-(b.key==='unknown')||String(b.rows[0].date).localeCompare(String(a.rows[0].date)));
  body.innerHTML=list.map(g=>{
-  const views=g.rows.reduce((n,r)=>n+(r.views||0),0),saved=g.rows.filter(r=>r.saved).length,unknown=g.key==='unknown';
+  const views=g.rows.reduce((n,r)=>n+(r.views||0),0),saved=g.rows.filter(r=>r.saved||(r.videoDeal&&!r.hidden)).length,unknown=g.key==='unknown';
   const head='<div class="cal-history-brand"><span class="cal-history-name">'+(unknown?'<span class="muted">Link not read</span>':'◆ '+esc(g.name))+'</span><span class="cal-history-stats">'+g.rows.length+' video'+(g.rows.length===1?'':'s')+(views?' · '+compact(views)+' views':'')+(saved?' · '+saved+' confirmed':'')+'</span>'+
    (g.brand?'<a class="cal-history-link" href="#sponsorships/brands/'+esc(g.brand.id)+'">Tracker: '+esc(g.brand.status||'no status')+' ↗</a>':unknown?'<span class="cal-history-link muted">A shortened link the brand couldn\'t be read from. Open the video to check.</span>':'<span class="cal-history-link muted">Not in the Sponsorship tracker</span>')+'</div>';
   return '<section class="cal-history-group">'+head+'<div class="cal-agenda-wrap"><table class="cal-agenda cal-history-table"><tbody>'+
@@ -410,8 +429,10 @@ async function onMove(from,date){
 function boot(){
  $('calendarSponsorStatus').innerHTML='<option value="">No sponsor status</option>'+SPONSOR_STATUSES.map(s=>'<option>'+s+'</option>').join('');
  window.Studio.on('tab',({tab})=>show(tab));
- window.Studio.on('connection',()=>{state.loaded=false;state.events=[];state.extras=[];state.brands=null;state.brandRecords=null;learned=null;Object.assign(state.history,{videos:[],channel:null,loaded:false,error:''});if(window.Studio.current()==='calendar')refresh();});
- $('calendarHistory').addEventListener('click',e=>{const v=e.target.closest('[data-history-view]');if(v){state.history.view=v.dataset.historyView;renderHistory();}});
+ window.Studio.on('connection',()=>{state.loaded=false;state.events=[];state.extras=[];state.brands=null;state.brandRecords=null;learned=null;Object.assign(state.history,{videos:[],channel:null,loaded:false,error:'',deals:{},dealsError:''});if(window.Studio.current()==='calendar')refresh();});
+ $('calendarHistory').addEventListener('click',e=>{const v=e.target.closest('[data-history-view]');if(v){state.history.view=v.dataset.historyView;renderHistory();}
+  if(e.target.closest('[data-history-hidden]')){state.history.showHidden=!state.history.showHidden;renderHistory();}});
+ $('calendarHistoryBody').addEventListener('change',e=>{const sel=e.target.closest('[data-video-deal]');if(sel)saveVideoDeal(sel.dataset.videoDeal,sel.value);});
  $('calendarHistorySearch').addEventListener('input',e=>{state.history.q=e.target.value;renderHistory();});
  $('calendarRefresh').addEventListener('click',()=>refresh(true));
  $('calendarPrevious').addEventListener('click',()=>{state.start=Math.max(0,state.start-3);render()});

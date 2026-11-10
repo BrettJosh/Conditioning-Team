@@ -474,3 +474,5 @@ body:not(.local-demo-mode) #connectionOverlay .connection-status{background:#eef
 .cal-sum.cal-slot,.cal-pill.cal-slot{background:#fffefa;border-style:dashed}
 .cal-agenda tr.cal-a-slot{cursor:pointer}
 .cal-agenda tr.cal-a-slot td{color:var(--muted)}
+.cal-deal-select{font:inherit;font-size:10.5px;font-weight:900;color:var(--ink);cursor:pointer;max-width:130px}.cal-deal-select.sp-suggested{color:var(--muted)}.cal-deal-select.sp-not-a-sponsor{background:transparent;color:var(--muted);text-decoration:line-through}.cal-deal-select:disabled{cursor:default;opacity:.7}
+.cal-history-hidden{font:inherit;font-weight:700;background:none;border:0;padding:0;color:inherit;text-decoration:underline;cursor:pointer}

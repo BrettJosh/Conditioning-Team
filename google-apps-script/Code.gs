@@ -26,7 +26,7 @@ function planSheet(year,create){
 function main(){const sheet=planSheet(FIRST_YEAR,false);if(!sheet)throw Error('Content plan tab missing');return sheet}
 /** Studio Metrics tab (same spreadsheet): one row per calendar date. Columns are found by their heading, so new ones can be added. */
 const METRIC_FIELDS={views:'Views at 7 days',ctr:'CTR percent',avd:'Average view duration',sponsor:'Sponsor',sponsorStatus:'Sponsor status',youtubeUrl:'YouTube link'};
-const BRIDGE_VERSION=3;
+const BRIDGE_VERSION=4;
 function metricsSheet(){const wb=SpreadsheetApp.openById('1zvaFJCApnz6YFzJCXUtC9BSLW40pR58vyPM7pgSWfB4');let sheet=wb.getSheetByName(METRICS_SHEET);if(!sheet)sheet=wb.insertSheet(METRICS_SHEET);
  const width=Math.max(sheet.getLastColumn(),1),head=sheet.getRange(1,1,1,width).getValues()[0].map(h=>String(h||'').trim());
  if(!head[0]){head[0]='Date';sheet.getRange(1,1).setValue('Date')}
@@ -387,6 +387,7 @@ function sponsorRequest(data) {
   if (action === 'sponsorSyncState') { writeMeta(wb, { zohoSync: JSON.stringify(data.state || {}) }); return { ok: true }; }
   if (action === 'sponsorEmails') return logEmails(wb, data.emails, data.state);
   if (action === 'sponsorAssign') return assignEmail(wb, data);
+  if (action === 'sponsorVideoDeals') return videoDeals(wb, data.set);
   const tab = data.tab === 'agencies' ? 'agencies' : 'brands';
   if (action === 'sponsorUpdate') {
     const info = readTab(wb, tab); const record = findRow(info, String(data.id || ''));
@@ -425,6 +426,25 @@ function sponsorRequest(data) {
     return listPayload(wb);
   }
   throw Error('Unknown sponsorship action');
+}
+
+/** Deal status for videos that aren't in a content-plan tab (pre-2026), keyed by YouTube video id.
+ *  Stored as JSON in the hidden "Studio meta" tab under "videoDeals". "Not a sponsor" hides a wrong description link. */
+const VIDEO_DEAL_STATUSES = ['In progress', 'Invoiced', 'Paid', 'Not a sponsor'];
+function videoDeals(wb, set) {
+  const lock = LockService.getScriptLock(); lock.waitLock(15000);
+  try {
+    let deals = {}; try { deals = JSON.parse(readMeta(wb).videoDeals || '{}') || {}; } catch (e) { deals = {}; }
+    if (set && typeof set === 'object') {
+      Object.keys(set).forEach(id => {
+        if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return;
+        const status = String(set[id] || '');
+        if (!status) delete deals[id]; else if (VIDEO_DEAL_STATUSES.indexOf(status) >= 0) deals[id] = status;
+      });
+      writeMeta(wb, { videoDeals: JSON.stringify(deals) });
+    }
+    return { ok: true, deals: deals, bridgeVersion: BRIDGE_VERSION };
+  } finally { lock.releaseLock(); }
 }
 
 function columnLetter(col) { let s = ''; while (col > 0) { const m = (col - 1) % 26; s = String.fromCharCode(65 + m) + s; col = Math.floor((col - 1) / 26); } return s; }
