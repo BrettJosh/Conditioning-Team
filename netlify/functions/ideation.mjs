@@ -74,6 +74,7 @@ const OUTLIER_FIELDS = {
   originalImage: v => imgRef(v, 'Image'),
   originalSmall: v => imgRef(v, 'Image'),
   tidiedAt: v => str(v, 30, 'Tidied date'),
+  multiplier: v => { if (v === '' || v == null) return null; const n = Number(v); if (!Number.isFinite(n) || n < 0 || n > 100000) throw oops('Outlier score must be a number.'); return Math.round(n * 10) / 10; },
   starred: bool,
   archived: bool,
   statsAt: v => str(v, 30, 'Stats date')

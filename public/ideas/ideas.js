@@ -27,6 +27,7 @@ const fmtDate = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLoc
 const fmtWhen = iso => { const d = new Date(iso); if (isNaN(d)) return ''; const mins = (Date.now() - d) / 6e4; if (mins < 1) return 'just now'; if (mins < 60) return Math.round(mins) + ' min ago'; if (mins < 1440) return Math.round(mins / 60) + ' h ago'; return fmtDate(iso); };
 const ytId = s => { const m = String(s || '').match(/(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/i); return m ? m[1] : ''; };
 const ratioOf = o => (o.views && o.subs ? o.views / o.subs : 0);
+const scoreOf = o => o.multiplier || ratioOf(o);
 const statusClass = s => 'status-' + String(s || 'Rough').replace(/\s+/g, '-');
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 let toastTimer;
@@ -156,6 +157,8 @@ async function tidyOutlier(o) {
   if (r.title && !o.title) patch.title = r.title;
   if (r.channel && !o.channel) patch.channel = r.channel;
   if (r.views != null && o.views == null) patch.views = r.views;
+  if (r.subs != null && o.subs == null) patch.subs = r.subs;
+  if (r.multiplier != null && o.multiplier == null) patch.multiplier = r.multiplier;
   const { item } = await api('saveOutlier', { id: o.id, patch });
   S.outliers.set(item.id, item);
   return { cropped: Boolean(r.cropped), title: Boolean(patch.title), item };
@@ -238,7 +241,7 @@ function renderOutliers() {
   $('#tagFilter').innerHTML = tagList.length ? tagList.map(([t, n]) => `<button class="chip" type="button" data-tag-filter="${esc(t)}" aria-pressed="${S.tagFilter === t}">${esc(t)} <span class="tab-count">${n}</span></button>`).join('') : '';
   // the matching: "Needs notes" uses hasThoughts
   let list = all.filter(o => (S.outFilter === 'nonotes' ? (!o.archived && !hasThoughts(o) && (!S.tagFilter || (o.tags || []).includes(S.tagFilter)) && queryOk(o)) : outlierMatches(o)));
-  const by = { new: (a, b) => String(b.createdAt).localeCompare(String(a.createdAt)), old: (a, b) => String(a.createdAt).localeCompare(String(b.createdAt)), views: (a, b) => (b.views || 0) - (a.views || 0), ratio: (a, b) => ratioOf(b) - ratioOf(a), notes: (a, b) => (b.notes || []).length - (a.notes || []).length };
+  const by = { new: (a, b) => String(b.createdAt).localeCompare(String(a.createdAt)), old: (a, b) => String(a.createdAt).localeCompare(String(b.createdAt)), views: (a, b) => (b.views || 0) - (a.views || 0), ratio: (a, b) => scoreOf(b) - scoreOf(a), notes: (a, b) => (b.notes || []).length - (a.notes || []).length };
   list.sort(by[S.outSort] || by.new);
   $('#outlierResults').textContent = list.length === live.length && !S.tagFilter && S.outFilter === 'all' ? `${live.length} outliers` : `Showing ${list.length} of ${live.length}`;
   $('#outlierTabCount').textContent = live.length || '';
@@ -253,7 +256,7 @@ function cardOutlier(o) {
   const usedIn = [...S.ideas.values()].filter(i => (i.outlierIds || []).includes(o.id)).length;
   return `<button class="out-card" type="button" data-open-outlier="${esc(o.id)}">
     <div class="out-thumb">${src ? `<img loading="lazy" decoding="async" src="${esc(src)}" alt="">` : '<span class="no-img">No image</span>'}
-      <div class="out-badges"><span ${o.views ? '' : 'hidden'}>${fmtNum(o.views)} views</span>${r >= 1 ? `<span class="ratio">${r >= 10 ? Math.round(r) : r.toFixed(1)}× subs</span>` : ''}${o.starred ? '<span class="star">★</span>' : ''}</div></div>
+      <div class="out-badges"><span ${o.views ? '' : 'hidden'}>${fmtNum(o.views)} views</span>${o.multiplier ? `<span class="ratio" title="Outlier score: views compared with the channel's average">${o.multiplier >= 100 ? Math.round(o.multiplier) : o.multiplier}× avg</span>` : r >= 1 ? `<span class="ratio" title="Views divided by the channel's subscribers">${r >= 10 ? Math.round(r) : r.toFixed(1)}× subs</span>` : ''}${o.starred ? '<span class="star">★</span>' : ''}</div></div>
     <div class="out-info">
       <p class="out-title ${o.title ? '' : 'empty'}">${esc(o.title || o.channel || 'Untitled · ' + fmtDate(o.discord?.postedAt || o.createdAt))}</p>
       ${o.why ? `<p class="out-why">${esc(o.why)}</p>` : ''}
@@ -360,6 +363,9 @@ function renderOutlierDrawer() {
       <label class="field">Channel <input type="text" maxlength="150" data-f="channel" value="${esc(o.channel)}" placeholder="Who made it"></label>
       <label class="field">Views <input type="number" min="0" data-f="views" value="${o.views ?? ''}" placeholder="e.g. 448000"></label>
       <label class="field">Channel subs <input type="number" min="0" data-f="subs" value="${o.subs ?? ''}" placeholder="for the × score"></label>
+    </div>
+    <div class="row3">
+      <label class="field">Outlier score <span class="field-hint">× the channel's average</span><input type="number" min="0" step="0.1" data-f="multiplier" value="${o.multiplier ?? ''}" placeholder="e.g. 63.5"></label>
     </div>
     <label class="field">YouTube link <span class="inline-field"><input type="url" maxlength="1500" data-f="url" value="${esc(o.url)}" placeholder="https://www.youtube.com/watch?v=..."><button class="quiet-btn small-btn" type="button" data-act="lookup">Look up</button></span></label>
     <label class="field">Why it works <span class="field-hint">The face, the contrast, the curiosity gap, the promise. What made people click?</span><textarea rows="5" maxlength="6000" data-f="why" placeholder="e.g. Two faces split down the middle, red vs blue, nobody knows who these people are so you have to click.">${esc(o.why)}</textarea></label>
