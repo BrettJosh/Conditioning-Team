@@ -81,10 +81,12 @@ The app updates when you press **Refresh** or reconnect. It does **not** provide
 ```
 netlify.toml
 README.md
+package.json           # one dependency (@netlify/blobs); Netlify installs it on deploy
 public/
   index.html
   styles.css
   app.js
+  ideas/               # the Ideation Machine page (/ideas): index.html, ideas.css, ideas.js
 netlify/
   functions/
     notion.mjs
@@ -92,10 +94,14 @@ netlify/
     calendar.mjs
     sponsorships.mjs   # Sponsorships tab bridge + Zoho actions
     zoho-sync.mjs      # hourly scheduled Zoho Mail sync
+    ideation.mjs       # Ideation Machine API + image server
+    ideation-backup.mjs  # hourly: daily snapshot + Google Drive copy
   lib/
     zoho-sync.mjs      # shared Zoho Mail logic
+    ideation-store.mjs   # Netlify Blobs storage for the Ideation Machine
+    ideation-backup.mjs  # backup logic, shared by the two functions above
 google-apps-script/
-  Code.gs              # ONE file: content calendar + sponsorship tracker + studioSelfTest()
+  Code.gs              # ONE file: content calendar + sponsorship tracker + Ideation Machine backups + studioSelfTest()
 ```
 
 The browser scripts load in this order: `studio.js` (remembered code, tab switching and links), `app.js` (task boards), `weekly.js`, `production.js`, `calendar.js`, `sponsorships.js`, `today.js`.
@@ -307,3 +313,36 @@ Stats are fetched on each Refresh (cached for 10 minutes) and cost a handful of 
 ### If the sheet tabs suddenly say "Google Sheets returned a page instead of data"
 
 Studio bridge is linked to a Google Cloud project whose consent screen is in **Testing**. Google can make that approval lapse after about 7 days. To fix it: open Studio bridge in Apps Script, choose **studioSelfTest**, press **Run**, approve, then press **Refresh** on the site. Switching the consent screen to **In production** (Google Auth Platform → Audience → Publish app) stops this, at the cost of the "unverified app" warning when approving.
+
+
+## Ideation Machine (/ideas): thumbnail outliers and video ideas
+
+Its own page at **`/ideas`** on this site (e.g. `conditioningteam.netlify.app/ideas/`). The Studio's tab row has a yellow **✺ Ideation Machine ↗** link to it, and the page has **← Studio** links back.
+
+- **Outliers**: every thumbnail that broke out, as a grid. Open one to write *why it works* and *what we'd steal*, add tags, star it, link it to a video idea and leave notes (each note carries the writer's name). Add new ones with **＋ Add outlier**, by pasting a screenshot (⌘V) or a YouTube link anywhere on the page, or by dropping several image files on the grid. With a YouTube link it fills in title, channel, views and the channel's subscribers (for the *× subs* outlier score) using the same `YOUTUBE_API_KEY` as the calendar; **Update views** refreshes them.
+- **Video ideas**: status (Rough → Developing → Packaging → Greenlit → In production, or Parked), owner, the angle, the hook, title options with a favourite, the thumbnail concept with mockups/references and the outliers it borrows from, sources, similar videos (paste a YouTube link) and notes. A **feed preview** shows the favourite title on the chosen thumbnail as it would look on YouTube; cycle through the options.
+- **Links**: `#outliers`, `#outliers/<id>`, `#ideas`, `#ideas/<id>`, `#backups`. Every drawer has **⧉ Copy link**.
+- **Who's this?** Each device picks a name once (top right) so notes say who wrote them. It isn't a login.
+
+**Access.** Same `BOARD_ACCESS_CODE` as the Studio, and the same remembered device: a computer already connected to the Studio opens the Ideation Machine connected. Images are served only with a key derived from that code, so changing the code in Netlify also changes every image link.
+
+**Storage.** Netlify Blobs, part of this Netlify site: no extra account, service or environment variable. `package.json` lists the one library it needs and Netlify installs it automatically on deploy. Saving is per field with automatic retry, so two people editing at once don't overwrite each other.
+
+### Backups
+
+1. **Daily snapshots (automatic).** Once a day the whole thing is copied inside Netlify and kept for 30 days. **Backups → Restore** puts any day back (what's there now is saved first, so a restore can itself be undone).
+2. **Google Drive copy (off-site).** Every hour, if anything changed: a readable Google Sheet (*Ideation Machine (readable backup)*: a Video ideas tab and an Outliers tab with thumbnails and notes), `ideation-machine-latest.json` plus a dated copy per day (90 kept), and every image in an *Images* folder, all in a Drive folder called **Josh Brett Ideation Machine backups**. It goes through the same Apps Script bridge as the calendar and sponsorships, so it needs the updated script once:
+   1. Open the **Studio bridge** Apps Script project and replace `Code.gs` with `google-apps-script/Code.gs` from this repo (bridge version 6).
+   2. Choose **studioSelfTest**, press **Run**, then **Allow**. It now also asks for Google Drive access, which it uses only to create and update that one folder. The log should end with *Ideation Machine backups folder OK*.
+   3. **Deploy → Manage deployments → ✎ → New version → Deploy.** The URL doesn't change, so nothing changes in Netlify.
+   4. On the site, **Backups → Back up now**. The Drive folder and sheet links appear there. Images copy across in batches, about 20 an hour.
+3. **Download backup** saves everything as one JSON file whenever you want.
+
+### The Discord import (one-time)
+
+The first outliers and ideas came from the JOSH BRETT YOUTUBE Discord: #outliers, #mega-viral-outliers, #educational-outliers and #thumbnail-inspo became outliers (tagged by channel, with Discord's caption as the first note and an *Open in Discord* link), and #rough-ideas became Rough ideas. Discord's image links expire after about a day, so the images were copied into the site. Running the import again skips anything already brought in.
+
+### Limits
+
+- Up to 3,000 outliers and 3,000 ideas; images up to 4 MB each (screenshots are shrunk in the browser before upload).
+- The page itself is public like the rest of the site; the data and images need the code. Don't put anything sensitive in it.

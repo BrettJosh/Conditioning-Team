@@ -1,0 +1,8 @@
+{
+  "name": "josh-brett-studio",
+  "private": true,
+  "description": "Josh Brett Studio board and Ideation Machine. Netlify installs the one dependency below automatically.",
+  "dependencies": {
+    "@netlify/blobs": "^10.7.13"
+  }
+}

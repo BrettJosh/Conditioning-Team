@@ -26,7 +26,7 @@ function planSheet(year,create){
 function main(){const sheet=planSheet(FIRST_YEAR,false);if(!sheet)throw Error('Content plan tab missing');return sheet}
 /** Studio Metrics tab (same spreadsheet): one row per calendar date. Columns are found by their heading, so new ones can be added. */
 const METRIC_FIELDS={views:'Views at 7 days',ctr:'CTR percent',avd:'Average view duration',sponsor:'Sponsor',sponsorStatus:'Sponsor status',youtubeUrl:'YouTube link'};
-const BRIDGE_VERSION=5;
+const BRIDGE_VERSION=6;
 function metricsSheet(){const wb=SpreadsheetApp.openById('1zvaFJCApnz6YFzJCXUtC9BSLW40pR58vyPM7pgSWfB4');let sheet=wb.getSheetByName(METRICS_SHEET);if(!sheet)sheet=wb.insertSheet(METRICS_SHEET);
  const width=Math.max(sheet.getLastColumn(),1),head=sheet.getRange(1,1,1,width).getValues()[0].map(h=>String(h||'').trim());
  if(!head[0]){head[0]='Date';sheet.getRange(1,1).setValue('Date')}
@@ -53,6 +53,7 @@ function doPost(e){try{const data=JSON.parse(e.postData.contents||'{}'),secret=P
  const lock=LockService.getScriptLock();lock.waitLock(15000);
  try{const action=data.action;
   if(String(action||'').indexOf('sponsor')===0)return json(sponsorRequest(data)); // sponsorships, further down
+  if(String(action||'').indexOf('ideation')===0)return json(ideationRequest(data)); // Ideation Machine backups, at the end
   main();
   const done=()=>json({ok:true,events:events(),bridgeVersion:BRIDGE_VERSION,years:{first:FIRST_YEAR,last:LAST_YEAR}});
   if(action==='list')return done();
@@ -471,5 +472,104 @@ function studioSelfTest() {
   Logger.log('Calendar OK: ' + calendar.length + ' scheduled entries');
   const result = sponsorRequest({ action: 'sponsorList' });
   Logger.log('Sponsorships OK: ' + result.brands.length + ' brands, ' + result.agencies.length + ' agencies, ' + result.actions.length + ' open actions');
+  Logger.log('Ideation Machine backups folder OK: ' + ideationFolder().getUrl());
   Logger.log('All good — now Deploy → Manage deployments → ✎ → New version → Deploy.');
+}
+
+
+/* =====================================================================================================
+ * Josh Brett Ideation Machine: off-site backup to Google Drive (bridge version 6).
+ * The Netlify site sends the whole workspace once a day (and whenever it changes, at most hourly), plus images in batches.
+ * Everything goes in one Drive folder, "Josh Brett Ideation Machine backups":
+ *   - "Ideation Machine (readable backup)"  a Google Sheet with a Video ideas tab and an Outliers tab
+ *   - ideation-machine-latest.json          the full workspace, what the site can be restored from
+ *   - Daily copies/ideation-machine-YYYY-MM-DD.json   one a day, the last 90 kept
+ *   - Images/                                every thumbnail and screenshot as a file
+ * The folder and sheet are created on the first run; their ids are kept in Script properties.
+ * ===================================================================================================== */
+const IDEATION_FOLDER_NAME = 'Josh Brett Ideation Machine backups';
+const IDEATION_KEEP_DAILY = 90;
+function ideationProp(key, value) { const p = PropertiesService.getScriptProperties(); if (value === undefined) return p.getProperty(key); p.setProperty(key, value); return value; }
+function ideationFolder() {
+  const id = ideationProp('IDEATION_FOLDER_ID');
+  if (id) { try { const f = DriveApp.getFolderById(id); if (!f.isTrashed()) return f; } catch (e) {} }
+  const f = DriveApp.createFolder(IDEATION_FOLDER_NAME);
+  ideationProp('IDEATION_FOLDER_ID', f.getId());
+  return f;
+}
+function ideationSubfolder(parent, name) { const it = parent.getFoldersByName(name); return it.hasNext() ? it.next() : parent.createFolder(name); }
+function ideationWriteFile(folder, name, text) {
+  const it = folder.getFilesByName(name);
+  if (it.hasNext()) { const f = it.next(); f.setContent(text); return f; }
+  return folder.createFile(name, text, 'application/json');
+}
+function ideationSheet(folder) {
+  const id = ideationProp('IDEATION_SHEET_ID');
+  if (id) { try { const ss = SpreadsheetApp.openById(id); if (!DriveApp.getFileById(id).isTrashed()) return ss; } catch (e) {} }
+  const ss = SpreadsheetApp.create('Ideation Machine (readable backup)');
+  DriveApp.getFileById(ss.getId()).moveTo(folder);
+  ideationProp('IDEATION_SHEET_ID', ss.getId());
+  return ss;
+}
+function ideationCell(v) { const s = v == null ? '' : String(v); return s.length > 45000 ? s.slice(0, 45000) + '…' : s; }
+function ideationNotes(notes) { return (notes || []).map(n => '[' + String(n.at || '').slice(0, 10) + ' ' + (n.by || '') + '] ' + (n.text || '')).join('\n\n'); }
+function ideationTab(ss, name, header, rows) {
+  let sh = ss.getSheetByName(name); if (!sh) sh = ss.insertSheet(name);
+  sh.clear();
+  const data = [header].concat(rows.map(r => r.map(ideationCell)));
+  sh.getRange(1, 1, data.length, header.length).setValues(data);
+  sh.setFrozenRows(1); sh.getRange(1, 1, 1, header.length).setFontWeight('bold').setBackground('#f8d65f');
+  sh.getRange(2, 1, Math.max(rows.length, 1), header.length).setVerticalAlignment('top').setWrap(true);
+  return sh;
+}
+function ideationRequest(data) {
+  const action = String(data.action || '');
+  if (action === 'ideationBackup') {
+    const db = JSON.parse(String(data.json || '{}'));
+    if (!db || !db.outliers || !db.ideas) throw Error('Backup payload was empty.');
+    const folder = ideationFolder();
+    ideationWriteFile(folder, 'ideation-machine-latest.json', String(data.json));
+    const daily = ideationSubfolder(folder, 'Daily copies');
+    const day = /^\d{4}-\d\d-\d\d$/.test(String(data.day || '')) ? data.day : Utilities.formatDate(new Date(), 'Europe/London', 'yyyy-MM-dd');
+    ideationWriteFile(daily, 'ideation-machine-' + day + '.json', String(data.json));
+    const old = []; const files = daily.getFiles(); while (files.hasNext()) old.push(files.next());
+    old.sort((a, b) => b.getName().localeCompare(a.getName())).slice(IDEATION_KEEP_DAILY).forEach(f => f.setTrashed(true));
+
+    const ss = ideationSheet(folder);
+    const outliers = Object.keys(db.outliers).map(k => db.outliers[k]);
+    const ideas = Object.keys(db.ideas).map(k => db.ideas[k]);
+    const byDate = (a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+    const site = String(data.siteUrl || '').replace(/\/$/, ''), key = String(data.imageKey || '');
+    const imgUrl = id => site && key && id ? site + '/.netlify/functions/ideation?img=' + encodeURIComponent(id) + '&k=' + encodeURIComponent(key) : '';
+    const outlierName = {}; outliers.forEach(o => { outlierName[o.id] = o.title || (o.discord && o.discord.channel ? '#' + o.discord.channel + ' ' + String(o.createdAt || '').slice(0, 10) : o.id); });
+    ideationTab(ss, 'Video ideas',
+      ['Title', 'Status', 'Owner', 'The angle', 'Hook', 'Title options', 'Thumbnail concept', 'Sources', 'Similar videos', 'Outliers we\'re borrowing from', 'Notes', 'Tags', 'Added', 'Updated', 'ID'],
+      ideas.sort(byDate).map(i => [i.title || '(untitled)', i.status || '', i.owner || '', i.premise || '', i.hook || '',
+        (i.titleOptions || []).map(t => (t.fav ? '★ ' : '• ') + t.text).join('\n'), i.thumbnailConcept || '',
+        (i.sources || []).map(s => '• ' + (s.label || s.url) + (s.url ? ' ' + s.url : '') + (s.note ? ' (' + s.note + ')' : '')).join('\n'),
+        (i.similar || []).map(v => '• ' + (v.title || v.url) + (v.channel ? ' / ' + v.channel : '') + ' ' + (v.url || '')).join('\n'),
+        (i.outlierIds || []).map(id => '• ' + (outlierName[id] || id)).join('\n'),
+        ideationNotes(i.notes), (i.tags || []).join(', '), String(i.createdAt || '').slice(0, 10), String(i.updatedAt || '').slice(0, 10), i.id]));
+    const sh = ideationTab(ss, 'Outliers',
+      ['Thumbnail', 'Title', 'Channel', 'Views', 'Why it works', 'What we\'d steal', 'Tags', 'Notes', 'Discord channel', 'Added', 'YouTube link', 'Image link', 'ID'],
+      outliers.sort(byDate).map(o => { const link = imgUrl(o.imageSmall || o.image); return [link ? '=IMAGE("' + link + '")' : '', o.title || '', o.channel || '', o.views == null ? '' : o.views, o.why || '', o.steal || '', (o.tags || []).join(', '), ideationNotes(o.notes), o.discord ? '#' + o.discord.channel : 'Added on the site', String(o.createdAt || '').slice(0, 10), o.url || '', imgUrl(o.image), o.id]; }));
+    if (outliers.length) { sh.setRowHeights(2, outliers.length, 90); sh.setColumnWidth(1, 160); }
+    const about = ss.getSheetByName('Sheet1') || ss.getSheetByName('About') || ss.insertSheet('About');
+    about.setName('About'); about.clear();
+    about.getRange(1, 1, 4, 1).setValues([['Read-only copy of the Josh Brett Ideation Machine. Edits here are overwritten on the next backup.'], ['Last backup: ' + Utilities.formatDate(new Date(), 'Europe/London', 'd MMM yyyy HH:mm')], [ideas.length + ' video ideas, ' + outliers.length + ' outliers'], ['Full data: ideation-machine-latest.json in this folder. Images: the Images folder.']]);
+    return { ok: true, folderUrl: folder.getUrl(), sheetUrl: ss.getUrl(), bridgeVersion: BRIDGE_VERSION };
+  }
+  if (action === 'ideationBackupImages') {
+    const folder = ideationSubfolder(ideationFolder(), 'Images');
+    const saved = [];
+    (data.images || []).slice(0, 40).forEach(img => {
+      const name = String(img.name || '');
+      if (!/^[\w-]+\.(jpg|png|webp|gif|avif)$/.test(name)) return;
+      if (!folder.getFilesByName(name).hasNext()) folder.createFile(Utilities.newBlob(Utilities.base64Decode(String(img.b64 || '')), String(img.type || 'image/jpeg'), name));
+      saved.push(img.id);
+    });
+    return { ok: true, saved: saved };
+  }
+  if (action === 'ideationPing') return { ok: true, folderUrl: ideationFolder().getUrl(), bridgeVersion: BRIDGE_VERSION };
+  throw Error('Unknown ideation action');
 }

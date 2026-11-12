@@ -482,3 +482,7 @@ body:not(.local-demo-mode) #connectionOverlay .connection-status{background:#eef
 .cal-history-money{display:block;margin-top:3px;font-weight:700}.cal-history-money b{font-weight:900}
 @media(max-width:700px){.cal-history-table td.cal-money-cell{width:auto;min-width:0}.cal-money{width:76px}}
 .cal-a-money{font-weight:800;white-space:nowrap}
+
+/* Link out to the Ideation Machine (/ideas), its own page. */
+.studio-tab-link{text-decoration:none;color:var(--ink);background:var(--yellow);display:inline-flex;align-items:center}
+.studio-tab-link:hover{background:#ffe27e}

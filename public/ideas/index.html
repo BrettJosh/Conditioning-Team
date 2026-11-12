@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#f8f5ec" />
+  <meta name="robots" content="noindex" />
+  <meta name="description" content="Josh Brett Ideation Machine: thumbnail outliers and video ideas, packaged." />
+  <title>Josh Brett · Ideation Machine</title>
+  <link rel="stylesheet" href="../styles.css" />
+  <link rel="stylesheet" href="./ideas.css" />
+</head>
+<body>
+  <div class="page-wrap">
+    <header class="topbar">
+      <a class="brand brand-link" href="./" aria-label="Josh Brett Ideation Machine">
+        <span class="brand-mark"><img class="brand-logo" src="../assets/josh-logo-original.webp" alt="Josh Brett logo" width="54" height="54"></span>
+        <span class="brand-label">JOSH BRETT<br><strong>IDEATION MACHINE</strong></span>
+      </a>
+      <div class="topbar-center"><span class="tiny-star">✳</span> SPOT IT · STEAL IT · PACKAGE IT <span class="tiny-star">✳</span></div>
+      <div class="topbar-right">
+        <a class="quiet-btn back-to-studio" href="../#overview" title="Back to Josh Brett Studio">← <span>Studio</span></a>
+        <button class="connection-btn" id="whoBtn" type="button" title="Who's using this device? Your name goes on notes."><span class="who-label">You:</span> <span id="whoName">?</span><span class="chevron">⌄</span></button>
+        <button class="connection-btn" id="connectionBtn" type="button"><span class="connection-dot" id="connectionDot"></span><span id="connectionText">Not connected</span></button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <section class="hero idea-hero" aria-label="Introduction">
+        <div class="hero-stickers" aria-label="Reminders">
+          <span class="hero-sticker sticker-one">✳ steal like an artist</span>
+          <span class="hero-sticker sticker-two">↗ package first</span>
+          <span class="hero-sticker sticker-three">✦ 5M views or bust</span>
+        </div>
+        <h1>Ideation<br><span class="highlight-word">machine<span class="period">.</span></span></h1>
+        <p>Every outlier we've spotted and every idea we might make, in one place.<br class="desktop-break"> Work out why it broke out, then package the next one.</p>
+      </section>
+
+      <nav class="studio-tabs" role="tablist" aria-label="Ideation views">
+        <button class="studio-tab" data-tab="outliers" role="tab" aria-selected="true">▣ Outliers <span class="tab-num" id="outlierTabCount"></span></button>
+        <button class="studio-tab" data-tab="ideas" role="tab" aria-selected="false">✳ Video ideas <span class="tab-num" id="ideaTabCount"></span></button>
+        <button class="studio-tab" data-tab="backups" role="tab" aria-selected="false">◷ Backups</button>
+      </nav>
+
+      <div id="globalNotice" class="notice" hidden role="status"></div>
+
+      <!-- OUTLIERS -->
+      <section class="workspace" id="outliersView" aria-label="Thumbnail outliers">
+        <div class="workspace-heading">
+          <div><div class="overline">/ THUMBNAILS THAT BROKE OUT</div><h2>THE <span class="scribble">OUTLIERS</span></h2></div>
+          <div class="workspace-actions">
+            <button class="quiet-btn" id="refreshBtn" type="button" title="Reload everything">↻ <span>Refresh</span></button>
+            <button class="quiet-btn" id="statsBtn" type="button" title="Pull fresh view counts from YouTube for outliers with a link" hidden>▲ <span>Update views</span></button>
+            <button class="primary-btn" id="addOutlierBtn" type="button"><span>＋</span> Add outlier</button>
+          </div>
+        </div>
+        <p class="view-intro">Paste a screenshot (⌘V) or a YouTube link anywhere on this page to add one. Drop image files on the grid to add several at once. Open any thumbnail to write down why it works.</p>
+        <div class="board-tools">
+          <div class="project-tabs" id="outlierFilters" role="group" aria-label="Filter outliers"></div>
+          <div class="tools-right">
+            <select id="outlierSort" class="sort-select" aria-label="Sort outliers">
+              <option value="new">Newest first</option>
+              <option value="old">Oldest first</option>
+              <option value="views">Most views</option>
+              <option value="ratio">Biggest outlier (views ÷ subs)</option>
+              <option value="notes">Most notes</option>
+            </select>
+            <label class="search-box" aria-label="Search outliers"><span>⌕</span><input id="outlierSearch" type="search" placeholder="Search titles, notes, tags..." autocomplete="off"></label>
+          </div>
+        </div>
+        <div class="tag-filter" id="tagFilter" aria-label="Filter by tag"></div>
+        <p class="results-line" id="outlierResults"></p>
+        <div class="outlier-grid" id="outlierGrid" aria-live="polite"></div>
+      </section>
+
+      <!-- IDEAS -->
+      <section class="workspace" id="ideasView" aria-label="Video ideas" hidden>
+        <div class="workspace-heading">
+          <div><div class="overline">/ THE NEXT BANGERS</div><h2>VIDEO <span class="scribble">IDEAS</span></h2></div>
+          <div class="workspace-actions">
+            <button class="quiet-btn" id="refreshBtn2" type="button" title="Reload everything">↻ <span>Refresh</span></button>
+            <button class="primary-btn" id="newIdeaBtn" type="button"><span>＋</span> New idea</button>
+          </div>
+        </div>
+        <p class="view-intro">Each idea holds the angle, title options, the thumbnail plan and the outliers it borrows from, sources and similar videos. Move it from Rough to Greenlit as it gets packaged.</p>
+        <div class="board-tools">
+          <div class="project-tabs" id="ideaFilters" role="group" aria-label="Filter ideas by status"></div>
+          <div class="tools-right">
+            <select id="ideaSort" class="sort-select" aria-label="Sort ideas">
+              <option value="updated">Recently worked on</option>
+              <option value="new">Newest first</option>
+              <option value="old">Oldest first</option>
+              <option value="starred">Starred first</option>
+              <option value="az">A to Z</option>
+            </select>
+            <label class="search-box" aria-label="Search ideas"><span>⌕</span><input id="ideaSearch" type="search" placeholder="Search ideas, notes, sources..." autocomplete="off"></label>
+          </div>
+        </div>
+        <p class="results-line" id="ideaResults"></p>
+        <div class="idea-grid" id="ideaGrid" aria-live="polite"></div>
+      </section>
+
+      <!-- BACKUPS -->
+      <section class="workspace" id="backupsView" aria-label="Backups" hidden>
+        <div class="workspace-heading">
+          <div><div class="overline">/ NOTHING GETS LOST</div><h2>BACK<span class="scribble">UPS</span></h2></div>
+          <div class="workspace-actions">
+            <button class="quiet-btn" id="downloadBtn" type="button">⤓ <span>Download backup</span></button>
+            <button class="primary-btn" id="backupNowBtn" type="button">◷ Back up now</button>
+          </div>
+        </div>
+        <div class="backup-grid" id="backupGrid"></div>
+      </section>
+
+      <footer class="footer-line"><span>JOSH BRETT · IDEATION MACHINE</span><span class="footer-star">✳</span><a href="../#overview">← BACK TO THE STUDIO</a></footer>
+    </main>
+  </div>
+
+  <!-- Outlier drawer -->
+  <div class="overlay" id="outlierOverlay" hidden>
+    <div class="overlay-backdrop" data-close></div>
+    <aside class="task-drawer idea-drawer outlier-drawer" role="dialog" aria-modal="true" aria-labelledby="outlierDrawerTitle">
+      <div class="drawer-top"><span class="overline">/ OUTLIER</span><div class="drawer-top-actions"><span class="save-state" data-save-state></span><button class="copy-link-btn" type="button" data-copy-link>⧉ <span>Copy link</span></button><button class="icon-close" type="button" data-close aria-label="Close">✕</button></div></div>
+      <h2 class="sr-only" id="outlierDrawerTitle">Outlier</h2>
+      <div id="outlierBody"></div>
+    </aside>
+  </div>
+
+  <!-- Idea drawer -->
+  <div class="overlay" id="ideaOverlay" hidden>
+    <div class="overlay-backdrop" data-close></div>
+    <aside class="task-drawer idea-drawer wide-drawer" role="dialog" aria-modal="true" aria-labelledby="ideaDrawerTitle">
+      <div class="drawer-top"><span class="overline">/ VIDEO IDEA</span><div class="drawer-top-actions"><span class="save-state" data-save-state></span><button class="copy-link-btn" type="button" data-copy-link>⧉ <span>Copy link</span></button><button class="icon-close" type="button" data-close aria-label="Close">✕</button></div></div>
+      <h2 class="sr-only" id="ideaDrawerTitle">Video idea</h2>
+      <div id="ideaBody"></div>
+    </aside>
+  </div>
+
+  <!-- Add outlier -->
+  <div class="overlay centered-overlay" id="addOverlay" hidden>
+    <div class="overlay-backdrop" data-close></div>
+    <section class="connection-dialog add-dialog" role="dialog" aria-modal="true" aria-labelledby="addTitle">
+      <div class="drawer-top"><span class="overline">/ NEW OUTLIER</span><button class="icon-close" type="button" data-close aria-label="Close">✕</button></div>
+      <h2 id="addTitle">Add an<br><span class="highlight-inline">outlier.</span></h2>
+      <form id="addForm" class="task-form">
+        <label>YouTube link <span class="field-hint">fills in the title, channel, views and thumbnail</span>
+          <span class="inline-field"><input id="addUrl" type="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off"><button class="quiet-btn small-btn" type="button" id="addFetch">Look up</button></span></label>
+        <div class="drop-zone" id="addDrop" tabindex="0" role="button" aria-label="Add a screenshot: paste, drop or click to choose">
+          <img id="addPreview" alt="" hidden>
+          <span id="addDropText"><strong>…or a screenshot.</strong> Paste it (⌘V), drop it here, or click to choose a file.</span>
+        </div>
+        <input type="file" id="addFile" accept="image/*" hidden>
+        <label>Title <input id="addTitleInput" type="text" maxlength="300" placeholder="Optional"></label>
+        <div class="form-row"><label>Channel <input id="addChannel" type="text" maxlength="150" placeholder="Optional"></label><label>Views <input id="addViews" type="number" min="0" placeholder="Optional"></label></div>
+        <label>Why it works <textarea id="addWhy" rows="3" placeholder="First impression. You can add more later."></textarea></label>
+        <div class="form-actions"><span class="save-state" id="addStatus"></span><button class="primary-btn" type="submit" id="addSave">Add outlier ↗</button></div>
+      </form>
+    </section>
+  </div>
+
+  <!-- Outlier picker (for linking outliers to an idea) -->
+  <div class="overlay centered-overlay" id="pickOverlay" hidden>
+    <div class="overlay-backdrop" data-close></div>
+    <section class="connection-dialog pick-dialog" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
+      <div class="drawer-top"><span class="overline">/ BORROW FROM</span><button class="icon-close" type="button" data-close aria-label="Close">✕</button></div>
+      <h2 id="pickTitle">Pick <span class="highlight-inline">outliers.</span></h2>
+      <div class="pick-tools"><label class="search-box"><span>⌕</span><input id="pickSearch" type="search" placeholder="Search..." autocomplete="off"></label><span id="pickCount" class="results-line"></span></div>
+      <div class="pick-grid" id="pickGrid"></div>
+      <div class="form-actions"><span></span><button class="primary-btn" type="button" id="pickDone">Done ↗</button></div>
+    </section>
+  </div>
+
+  <!-- Connect -->
+  <div class="overlay centered-overlay" id="connectOverlay" hidden>
+    <div class="overlay-backdrop"></div>
+    <section class="connection-dialog" role="dialog" aria-modal="true" aria-labelledby="connectTitle">
+      <div class="drawer-top"><span class="overline">/ STUDIO ACCESS</span></div>
+      <span class="connect-sticker">● NOT CONNECTED</span>
+      <h2 id="connectTitle">Unlock the<br><span class="highlight-inline">machine.</span></h2>
+      <p><strong>Enter the Studio workspace code.</strong> It's the same code as the Studio board. If this device is already connected to the Studio, you won't see this.</p>
+      <form id="connectForm" class="connection-form">
+        <label>Workspace access code <input id="accessCode" type="password" autocomplete="off" placeholder="The team code"></label>
+        <label class="remember-check"><input type="checkbox" id="rememberDevice" checked> <span><strong>Remember this device</strong><small>Untick on a shared or borrowed computer.</small></span></label>
+        <button class="primary-btn" type="submit">Connect ↗</button>
+        <p class="connect-error" id="connectError" role="alert"></p>
+      </form>
+    </section>
+  </div>
+
+  <!-- Who are you -->
+  <div class="overlay centered-overlay" id="whoOverlay" hidden>
+    <div class="overlay-backdrop" data-close></div>
+    <section class="connection-dialog" role="dialog" aria-modal="true" aria-labelledby="whoTitle">
+      <div class="drawer-top"><span class="overline">/ ON THIS DEVICE</span><button class="icon-close" type="button" data-close aria-label="Close">✕</button></div>
+      <h2 id="whoTitle">Who's<br><span class="highlight-inline">this?</span></h2>
+      <p>Your name goes on the notes you write, so everyone knows whose thought it was.</p>
+      <div class="who-choices" id="whoChoices"></div>
+      <form id="whoForm" class="connection-form"><label>Someone else <input id="whoOther" type="text" maxlength="40" placeholder="Name"></label><button class="quiet-btn" type="submit">That's me</button></form>
+      <button class="text-btn" id="forgetDevice" type="button">Forget the access code on this device</button>
+    </section>
+  </div>
+
+  <!-- Discord import -->
+  <div class="overlay centered-overlay" id="importOverlay" hidden>
+    <div class="overlay-backdrop"></div>
+    <section class="connection-dialog import-dialog" role="dialog" aria-modal="true" aria-labelledby="importTitle">
+      <div class="drawer-top"><span class="overline">/ FROM DISCORD</span><button class="icon-close" type="button" data-close aria-label="Close">✕</button></div>
+      <h2 id="importTitle">Bring in<br><span class="highlight-inline">Discord.</span></h2>
+      <div id="importBody"></div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="./ideas.js" defer></script>
+</body>
+</html>
