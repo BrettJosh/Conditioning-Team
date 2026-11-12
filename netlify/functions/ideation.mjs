@@ -8,7 +8,7 @@
  * it uses the Studio's BOARD_ACCESS_CODE, and YOUTUBE_API_KEY (already set for the calendar) for view counts.
  */
 import { timingSafeEqual, createHash } from 'node:crypto';
-import { STATUSES, readDb, readAll, getItem, putItem, updateItem, deleteItem, newId, validId, imageKey, saveImage, readImage, youtubeId, youtubeThumb } from '../lib/ideation-store.mjs';
+import { STATUSES, readDb, readAll, getItem, putItem, updateItem, deleteItem, imageBytes, newId, validId, imageKey, saveImage, readImage, youtubeId, youtubeThumb } from '../lib/ideation-store.mjs';
 import { runBackup, backupStatus, listSnapshots, restoreSnapshot } from '../lib/ideation-backup.mjs';
 
 const send = (data, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
@@ -218,6 +218,40 @@ function fromDataUrl(data) {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length);
 }
 
+/* ---------- duplicates: the same video posted twice ---------- */
+const dupKey = o => o.videoId ? 'v:' + o.videoId : (norm(o.title).length >= 15 ? 't:' + norm(o.title) : '');
+/** Fold `others` into `keep`: notes, tags, stars, thoughts and idea links all survive. Returns the merged keeper. */
+async function mergeInto(keep, others, by) {
+  const now = new Date().toISOString();
+  const otherIds = others.map(o => o.id);
+  const merged = await updateItem('outliers', keep.id, k => {
+    for (const o of others) {
+      const texts = new Set((k.notes || []).map(n => n.text.trim()));
+      (o.notes || []).forEach(n => { if (!texts.has(n.text.trim())) { (k.notes ||= []).push(n); texts.add(n.text.trim()); } });
+      k.tags = [...new Set([...(k.tags || []), ...(o.tags || [])])];
+      for (const f of ['why', 'steal']) if (o[f] && o[f] !== k[f]) k[f] = k[f] ? k[f] + '\n\n' + o[f] : o[f];
+      for (const f of ['title', 'channel', 'url', 'videoId', 'published', 'thumbUrl', 'originalImage', 'originalSmall']) if (!k[f] && o[f]) k[f] = o[f];
+      for (const f of ['views', 'subs', 'multiplier']) if (k[f] == null && o[f] != null) k[f] = o[f];
+      k.starred = Boolean(k.starred || o.starred);
+      if (o.discord) (k.alsoPosted ||= []).push(o.discord);
+    }
+    (k.notes || []).sort((a, b) => String(a.at).localeCompare(String(b.at)));
+    k.updatedAt = now; k.updatedBy = by;
+  }, saved => true);
+  const { ideas } = await readAll();
+  for (const i of Object.values(ideas)) if ((i.outlierIds || []).some(id => otherIds.includes(id))) {
+    await updateItem('ideas', i.id, it => { it.outlierIds = [...new Set((it.outlierIds || []).map(id => (otherIds.includes(id) ? keep.id : id)))]; }, saved => !(saved.outlierIds || []).some(id => otherIds.includes(id)));
+  }
+  for (const id of otherIds) await deleteItem('outliers', id);
+  return merged;
+}
+/** Of several copies, keep the one with the sharpest image (then the most notes), and fold the rest into it. */
+async function mergeGroup(group, by) {
+  const scored = await Promise.all(group.map(async o => ({ o, bytes: await imageBytes(o.image), notes: (o.notes || []).length + (o.why ? 1 : 0) })));
+  scored.sort((a, b) => (b.bytes - a.bytes) || (b.notes - a.notes) || String(a.o.createdAt).localeCompare(String(b.o.createdAt)));
+  return mergeInto(scored[0].o, scored.slice(1).map(x => x.o), by);
+}
+
 /* ---------- actions ---------- */
 async function act(input) {
   const action = String(input.action || '');
@@ -300,9 +334,26 @@ async function act(input) {
         if (m.subs != null) it.subs = m.subs;
         if (m.title && m.title !== it.title) { it.ocrTitle = it.ocrTitle || it.title; it.title = m.title; }
       }, saved => saved.ytCheckedAt === now);
-      results.push({ id, matched: m.matched, reason: m.reason || '', best: m.best || null, item });
+      // Already in here under the same video? Fold the two together.
+      let final = item, removed = [];
+      if (m.matched) {
+        const { outliers } = await readAll();
+        const twins = Object.values(outliers).filter(x => x.id !== id && x.videoId === m.videoId && !x.archived);
+        if (twins.length) { final = await mergeGroup([item, ...twins], 'Duplicate check'); removed = [id, ...twins.map(t => t.id)].filter(x => x !== final.id); }
+      }
+      results.push({ id, matched: m.matched, reason: m.reason || '', best: m.best || null, item: final, removed });
     }
     return { results };
+  }
+
+  /* Merge outliers that are the same video (or the same title, for ones not found on YouTube). */
+  if (action === 'mergeDuplicates') {
+    const { outliers } = await readAll();
+    const groups = {};
+    Object.values(outliers).filter(o => !o.archived).forEach(o => { const k = dupKey(o); if (k) (groups[k] ||= []).push(o); });
+    const merged = [];
+    for (const g of Object.values(groups)) if (g.length > 1) { const keep = await mergeGroup(g, who(input.by)); merged.push({ kept: keep.id, title: keep.title, removed: g.map(o => o.id).filter(id => id !== keep.id) }); }
+    return { merged };
   }
 
   if (action === 'refreshStats') {

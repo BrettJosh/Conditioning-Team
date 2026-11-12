@@ -186,7 +186,7 @@ async function runMatch(todo) {
     await Promise.all([1, 2, 3].map(async () => {
       while (q.length) {
         const ids = q.splice(0, 2);
-        try { const { results } = await api('matchYouTube', { ids }); results.forEach(r => { if (r.item) S.outliers.set(r.item.id, r.item); if (r.matched) found++; else if (r.failed || !r.item) failed++; else missed++; }); }
+        try { const { results } = await api('matchYouTube', { ids }); results.forEach(r => { (r.removed || []).forEach(id => S.outliers.delete(id)); if (r.item) S.outliers.set(r.item.id, r.item); if (r.matched) found++; else if (r.failed || !r.item) failed++; else missed++; }); }
         catch (err) { failed += ids.length; console.warn('match', ids, err); }
         n += ids.length; status(); if (n % 10 < 2) renderOutliers();
       }
@@ -197,7 +197,13 @@ async function runMatch(todo) {
 /** After adding one: find it on YouTube in the background. */
 function autoMatch(item) {
   if (!S.youtube || !item?.title || item.videoId) return;
-  api('matchYouTube', { ids: [item.id] }).then(({ results }) => { const r = results[0]; if (r?.item) { S.outliers.set(r.item.id, r.item); renderLists(); if (S.open?.id === r.item.id) renderOutlierDrawer(); } }).catch(() => {});
+  api('matchYouTube', { ids: [item.id] }).then(({ results }) => {
+    const r = results[0]; if (!r?.item) return;
+    (r.removed || []).forEach(id => S.outliers.delete(id));
+    S.outliers.set(r.item.id, r.item); renderLists();
+    if ((r.removed || []).includes(item.id)) { toast('That one was already in here, so the two were merged.'); if (S.open?.id === item.id) openOutlier(r.item.id); }
+    else if (S.open?.id === r.item.id) renderOutlierDrawer();
+  }).catch(() => {});
 }
 function updateTidyBtn() { const n = [...S.outliers.values()].filter(needsTidy).length; $('#tidyBtn').hidden = !n || tidyRunning; $('#tidyBtn span').textContent = `Tidy ${n} screenshot${n === 1 ? '' : 's'}`; }
 function openTidy() {
@@ -443,7 +449,7 @@ async function outlierAction(act, o, el) {
   }
   if (act === 'match') {
     el.disabled = true; saveState('Searching YouTube…');
-    try { await flush('outlier', o.id); const { results } = await api('matchYouTube', { ids: [o.id] }); const r = results[0]; if (r?.item) S.outliers.set(o.id, r.item); renderOutlierDrawer(); renderLists(); saveState(r?.matched ? 'Found it on YouTube ✓' : 'Couldn\'t find a close match'); if (!r?.matched) toast('No close match on YouTube. Paste the video link into the YouTube link box instead.', 5000); }
+    try { await flush('outlier', o.id); const { results } = await api('matchYouTube', { ids: [o.id] }); const r = results[0]; (r?.removed || []).forEach(id => S.outliers.delete(id)); if (r?.item) S.outliers.set(r.item.id, r.item); if ((r?.removed || []).includes(o.id)) { toast('That video was already in here, so the two were merged.'); openOutlier(r.item.id); renderLists(); return; } renderOutlierDrawer(); renderLists(); saveState(r?.matched ? 'Found it on YouTube ✓' : 'Couldn\'t find a close match'); if (!r?.matched) toast('No close match on YouTube. Paste the video link into the YouTube link box instead.', 5000); }
     catch (err) { el.disabled = false; saveState('Search failed', true); toast(err.message, 5000); }
   }
   if (act === 'unmatch') {
@@ -642,6 +648,9 @@ async function saveAdd(e) {
   $('#addSave').disabled = true; $('#addStatus').textContent = 'Saving…';
   try {
     if (!addVideo && ytId($('#addUrl').value)) await addLookup();
+    const vid = addVideo?.videoId || ytId($('#addUrl').value);
+    const twin = vid && [...S.outliers.values()].find(x => x.videoId === vid);
+    if (twin) { $('#addOverlay').hidden = true; showTab('outliers', false); openOutlier(twin.id); toast('That video is already in here, so I opened it.', 4500); return; }
     const patch = { title: $('#addTitleInput').value.trim(), channel: $('#addChannel').value.trim(), why: $('#addWhy').value.trim() };
     const views = $('#addViews').value; if (views !== '') patch.views = Number(views);
     if (addVideo) Object.assign(patch, { url: addVideo.url, videoId: addVideo.videoId, subs: addVideo.subs, published: addVideo.published || '', statsAt: addVideo.statsAt || '', thumbUrl: addBlob ? '' : addVideo.thumb });

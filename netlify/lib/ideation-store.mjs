@@ -40,7 +40,7 @@ function localStore(name) {
       return { data, etag: tag(buf), metadata };
     },
     async get(key, opts = {}) { const r = await this.getWithMetadata(key, opts); return r ? r.data : null; },
-    async getMetadata(key) { try { const buf = await fs.readFile(file(key)); return { etag: tag(buf), metadata: {} }; } catch { return null; } },
+    async getMetadata(key) { try { const buf = await fs.readFile(file(key)); let metadata = {}; try { metadata = JSON.parse(await fs.readFile(file(key) + '.meta', 'utf8')); } catch {} return { etag: tag(buf), metadata }; } catch { return null; } },
     async set(key, value, { metadata, onlyIfMatch, onlyIfNew } = {}) {
       await fs.mkdir(dir, { recursive: true });
       let current = null; try { current = await fs.readFile(file(key)); } catch {}
@@ -212,6 +212,14 @@ export async function readImage(id) {
   const found = await s.getWithMetadata(id, { type: 'arrayBuffer' });
   if (!found) return null;
   return { bytes: found.data, type: found.metadata?.type || 'image/jpeg' };
+}
+
+/** Size of a stored image in bytes (a rough guide to which copy is sharper), or 0. */
+export async function imageBytes(id) {
+  if (!validId(id)) return 0;
+  const s = await store('ideation-images');
+  const m = await s.getMetadata(id).catch(() => null);
+  return Number(m?.metadata?.bytes) || 0;
 }
 
 /** Image ids referenced anywhere in the workspace. */
