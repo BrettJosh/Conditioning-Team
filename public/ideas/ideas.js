@@ -14,6 +14,7 @@ const API = '/.netlify/functions/ideation';
 const STATUSES = ['Rough', 'Developing', 'Packaging', 'Greenlit', 'In production', 'Parked'];
 const PEOPLE = ['Josh', 'Daisy', 'Rachit', 'Tristan'];
 const TAG_IDEAS = ['Face', 'Shock', 'Before/after', 'Big number', 'Text', 'No text', 'High contrast', 'Mystery', 'Comparison', 'Money', 'Celebrity', 'Object', 'Arrow/circle', 'Split screen', 'Dark', 'Minimal', 'Documentary', 'Curiosity gap'];
+const GENRES = ['Documentary', 'Education', 'Entertainment'];
 const CHANNEL_LABEL = { 'outliers': '#outliers', 'mega-viral-outliers': '#mega-viral', 'educational-outliers': '#educational', 'thumbnail-inspo': '#thumbnail-inspo', 'rough-ideas': '#rough-ideas' };
 
 /* ---------- small helpers ---------- */
@@ -36,7 +37,7 @@ function toast(msg, ms = 3200) { const t = $('#toast'); t.textContent = msg; t.c
 const S = {
   code: '', who: store('localStorage', WHO_KEY), loaded: false, loadedAt: 0,
   outliers: new Map(), ideas: new Map(), imageKey: '', youtube: false, backup: null,
-  tab: 'outliers', outFilter: 'all', tagFilter: '', outSort: 'ratio', outQuery: '', outLimit: 96,
+  tab: 'outliers', outFilter: 'all', genre: 'all', tagFilter: '', outSort: 'ratio', outQuery: '', outLimit: 96,
   ideaFilter: 'all', ideaSort: 'updated', ideaQuery: '',
   open: null // { kind: 'outlier'|'idea', id }
 };
@@ -259,7 +260,9 @@ function showTab(tab, push = true) {
 }
 
 /* ---------- rendering: outliers ---------- */
+const genreOk = o => S.genre === 'all' || (S.genre === 'none' ? !o.genre : o.genre === S.genre);
 function outlierMatches(o) {
+  if (!genreOk(o)) return false;
   const f = S.outFilter;
   if (f === 'archived') { if (!o.archived) return false; } else if (o.archived) return false;
   if (f === 'starred' && !o.starred) return false;
@@ -267,7 +270,7 @@ function outlierMatches(o) {
   if (f.startsWith('ch:') && o.discord?.channel !== f.slice(3)) return false;
   if (S.tagFilter && !(o.tags || []).includes(S.tagFilter)) return false;
   const q = S.outQuery.trim().toLowerCase();
-  if (q) { const hay = [o.title, o.channel, o.why, o.steal, ...(o.tags || []), ...(o.notes || []).map(n => n.text), o.discord?.channel].join(' ').toLowerCase(); if (!q.split(/\s+/).every(w => hay.includes(w))) return false; }
+  if (q) { const hay = [o.title, o.channel, o.genre, o.why, o.steal, ...(o.tags || []), ...(o.notes || []).map(n => n.text), o.discord?.channel].join(' ').toLowerCase(); if (!q.split(/\s+/).every(w => hay.includes(w))) return false; }
   return true;
 }
 const hasThoughts = o => Boolean(o.why || o.steal || (o.notes || []).some(n => !(o.discord && n.at === o.discord.postedAt)));
@@ -279,16 +282,20 @@ function renderOutliers() {
   const filters = [['all', 'All', live.length], ['starred', '★ Starred', count(o => o.starred)], ['nonotes', 'Needs notes', count(o => !hasThoughts(o))],
     ...channels.map(c => ['ch:' + c, CHANNEL_LABEL[c] || '#' + c, count(o => o.discord?.channel === c)]), ['manual', 'Added here', count(o => !o.discord)], ['archived', 'Archived', all.length - live.length]];
   $('#outlierFilters').innerHTML = filters.filter(([k, , n]) => n || k === 'all' || k === S.outFilter).map(([k, label, n]) => `<button class="tab" type="button" data-out-filter="${esc(k)}" aria-pressed="${S.outFilter === k}">${esc(label)}<span class="tab-count">${n}</span></button>`).join('');
+  const gCount = g => live.filter(o => (g === 'none' ? !o.genre : o.genre === g)).length;
+  $('#genreFilters').innerHTML = [['all', 'All genres', live.length], ...GENRES.map(g => [g, g, gCount(g)]), ['none', 'No genre yet', gCount('none')]]
+    .filter(([k, , n]) => n || k !== 'none' || S.genre === 'none')
+    .map(([k, label, n]) => `<button class="genre-tab" type="button" data-genre="${esc(k)}" aria-pressed="${S.genre === k}">${k === 'all' ? '' : `<span class="dot ${k === 'none' ? 'g-none' : 'g-' + k}"></span>`}${esc(label)} <span class="n">${n}</span></button>`).join('');
   const tagCounts = {};
   live.forEach(o => (o.tags || []).forEach(t => { tagCounts[t] = (tagCounts[t] || 0) + 1; }));
   const tagList = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 30);
   $('#tagFilter').innerHTML = tagList.length ? tagList.map(([t, n]) => `<button class="chip" type="button" data-tag-filter="${esc(t)}" aria-pressed="${S.tagFilter === t}">${esc(t)} <span class="tab-count">${n}</span></button>`).join('') : '';
   // the matching: "Needs notes" uses hasThoughts
-  let list = all.filter(o => (S.outFilter === 'nonotes' ? (!o.archived && !hasThoughts(o) && (!S.tagFilter || (o.tags || []).includes(S.tagFilter)) && queryOk(o)) : outlierMatches(o)));
+  let list = all.filter(o => (S.outFilter === 'nonotes' ? (!o.archived && genreOk(o) && !hasThoughts(o) && (!S.tagFilter || (o.tags || []).includes(S.tagFilter)) && queryOk(o)) : outlierMatches(o)));
   const byRatio = (a, b) => (ratioOf(b) - ratioOf(a)) || ((b.views || 0) - (a.views || 0));
   const by = { new: (a, b) => String(b.createdAt).localeCompare(String(a.createdAt)), old: (a, b) => String(a.createdAt).localeCompare(String(b.createdAt)), views: (a, b) => (b.views || 0) - (a.views || 0), ratio: byRatio, score: (a, b) => ((b.multiplier || 0) - (a.multiplier || 0)) || byRatio(a, b), notes: (a, b) => (b.notes || []).length - (a.notes || []).length };
   list.sort(by[S.outSort] || by.new);
-  $('#outlierResults').textContent = list.length === live.length && !S.tagFilter && S.outFilter === 'all' ? `${live.length} outliers` : `Showing ${list.length} of ${live.length}`;
+  $('#outlierResults').textContent = list.length === live.length && !S.tagFilter && S.outFilter === 'all' && S.genre === 'all' ? `${live.length} outliers` : `Showing ${list.length} of ${live.length}`;
   $('#outlierTabCount').textContent = live.length || '';
   updateTidyBtn(); updateMatchBtn();
   const grid = $('#outlierGrid');
@@ -296,6 +303,14 @@ function renderOutliers() {
   grid.innerHTML = list.slice(0, S.outLimit).map((o, i) => cardOutlier(o, S.outSort === 'ratio' && ratioOf(o) ? i + 1 : 0)).join('') + (list.length > S.outLimit ? `<button class="quiet-btn show-more" type="button" data-more-outliers>Show ${Math.min(96, list.length - S.outLimit)} more (${list.length - S.outLimit} left)</button>` : '');
 }
 function queryOk(o) { const q = S.outQuery.trim().toLowerCase(); if (!q) return true; const hay = [o.title, o.channel, o.why, o.steal, ...(o.tags || []), ...(o.notes || []).map(n => n.text)].join(' ').toLowerCase(); return q.split(/\s+/).every(w => hay.includes(w)); }
+/** The bottom of each card: why it works / the latest note, or an obvious nudge to add one. */
+function notesStrip(o) {
+  const notes = o.notes || [], last = notes[notes.length - 1];
+  const count = notes.length + (o.why ? 1 : 0) + (o.steal ? 1 : 0);
+  if (!o.why && !o.steal && !notes.length) return `<span class="out-notes empty" data-focus="why">✎ Add a note: why does this work?</span>`;
+  const main = o.why ? `<b>Why it works:</b> ${esc(o.why)}` : o.steal ? `<b>Steal:</b> ${esc(o.steal)}` : `<b>${esc(last.by)}:</b> ${esc(last.text)}`;
+  return `<span class="out-notes" data-focus="notes"><p>${main}</p>${notes.length ? `<span class="count">✎ ${notes.length} note${notes.length === 1 ? '' : 's'}${o.why && last ? ` · latest from ${esc(last.by)}` : ''}</span>` : ''}</span>`;
+}
 const fmtRatio = r => (r >= 100 ? Math.round(r).toLocaleString('en-GB') : r >= 10 ? r.toFixed(0) : r.toFixed(1)) + '×';
 function cardOutlier(o, rank = 0) {
   const src = outThumb(o), r = ratioOf(o), notes = (o.notes || []).length;
@@ -307,10 +322,10 @@ function cardOutlier(o, rank = 0) {
       <p class="out-title ${o.title ? '' : 'empty'}">${esc(o.title || 'Untitled · ' + fmtDate(o.discord?.postedAt || o.createdAt))}</p>
       ${o.channel ? `<p class="out-channel" title="${esc(o.channel)}">${esc(o.channel)}${o.videoId ? ' <span title="Matched on YouTube">✓</span>' : ''}</p>` : ''}
       ${o.views || o.subs ? `<div class="out-stats">${o.views ? `<span><b>${fmtNum(o.views)}</b> views</span>` : ''}${o.subs ? `<span><b>${fmtNum(o.subs)}</b> subs</span>` : ''}${r ? `<span class="ratio-chip" title="Views ÷ subscribers"><b>${fmtRatio(r)}</b> subs</span>` : ''}</div>` : ''}
-      ${o.why ? `<p class="out-why">${esc(o.why)}</p>` : ''}
-      <div class="out-foot"><span class="tags">${(o.tags || []).slice(0, 3).map(t => `<span>${esc(t)}</span>`).join('')}</span>
-      <span>${usedIn ? `✳ ${usedIn} idea${usedIn > 1 ? 's' : ''} · ` : ''}${notes ? `✎ ${notes}` : hasThoughts(o) ? '' : '<span class="needs-notes">needs notes</span>'}</span></div>
-    </div></button>`;
+      <div class="out-foot"><span class="tags">${o.genre ? `<span class="genre-pill g-${esc(o.genre)}">${esc(o.genre)}</span>` : ''}${(o.tags || []).slice(0, 2).map(t => `<span>${esc(t)}</span>`).join('')}</span>
+      <span>${usedIn ? `✳ ${usedIn} idea${usedIn > 1 ? 's' : ''}` : ''}</span></div>
+    </div>
+    ${notesStrip(o)}</button>`;
 }
 
 /* ---------- rendering: ideas ---------- */
@@ -379,7 +394,7 @@ function tagsHtml(tags) {
 }
 
 /* ---------- outlier drawer ---------- */
-function openOutlier(id, push = true) {
+function openOutlier(id, push = true, focus = '') {
   if (!S.outliers.has(id)) return;
   closeDrawers(false, true);
   S.open = { kind: 'outlier', id };
@@ -388,6 +403,8 @@ function openOutlier(id, push = true) {
   $('#outlierOverlay .task-drawer').scrollTop = 0;
   saveState('');
   if (push) setHash('#outliers/' + encodeURIComponent(id));
+  if (focus === 'why') setTimeout(() => $('#outlierBody [data-f="why"]')?.focus(), 80);
+  if (focus === 'notes') setTimeout(() => { const n = $('#outlierBody .notes-list'); n?.scrollIntoView({ block: 'center' }); }, 80);
 }
 function renderOutlierDrawer() {
   const o = S.outliers.get(S.open?.id); if (!o || S.open.kind !== 'outlier') return;
@@ -408,6 +425,13 @@ function renderOutlierDrawer() {
       <button class="primary-btn small-btn" type="button" data-act="new-idea">✳ Start an idea from this</button>
     </div>
     <input type="file" accept="image/*" hidden data-file>
+    <div class="field"><span>Genre</span><div class="genre-pick" data-genre-pick>${GENRES.map(g => `<button type="button" class="g-${g}" data-set-genre="${g}" aria-pressed="${o.genre === g}">${g}</button>`).join('')}</div></div>
+    <div class="drawer-section thoughts notes-first">
+      <label class="field">Why it works <span class="field-hint">The face, the contrast, the curiosity gap, the promise. What made people click?</span><textarea rows="4" maxlength="6000" data-f="why" placeholder="e.g. Two faces split down the middle, red vs blue, nobody knows who these people are so you have to click.">${esc(o.why)}</textarea></label>
+      <label class="field">What we'd steal <textarea rows="2" maxlength="3000" data-f="steal" placeholder="The bit we could use on one of ours.">${esc(o.steal)}</textarea></label>
+    </div>
+    ${notesHtml('outlier', o)}
+    <div class="drawer-section"><h3>The video <small>${o.videoId ? 'FROM YOUTUBE' : ''}</small></h3>
     <label class="field">Title <input type="text" maxlength="300" data-f="title" value="${esc(o.title)}" placeholder="The video's title"></label>
     <div class="row3">
       <label class="field">Channel <input type="text" maxlength="150" data-f="channel" value="${esc(o.channel)}" placeholder="Who made it"></label>
@@ -419,14 +443,12 @@ function renderOutlierDrawer() {
     </div>
     <p class="source-line" style="margin-top:10px">${ratioOf(o) ? `Views ÷ subscribers: <b>${fmtRatio(ratioOf(o))}</b>${o.statsAt ? ` · numbers from YouTube, ${esc(fmtDate(o.statsAt))}` : ''}` : 'Add views and the channel\'s subscribers to rank this one.'}</p>
     <label class="field">YouTube link <span class="inline-field"><input type="url" maxlength="1500" data-f="url" value="${esc(o.url)}" placeholder="https://www.youtube.com/watch?v=..."><button class="quiet-btn small-btn" type="button" data-act="lookup">Look up</button></span></label>
-    <label class="field">Why it works <span class="field-hint">The face, the contrast, the curiosity gap, the promise. What made people click?</span><textarea rows="5" maxlength="6000" data-f="why" placeholder="e.g. Two faces split down the middle, red vs blue, nobody knows who these people are so you have to click.">${esc(o.why)}</textarea></label>
-    <label class="field">What we'd steal <textarea rows="3" maxlength="3000" data-f="steal" placeholder="The bit we could use on one of ours.">${esc(o.steal)}</textarea></label>
     ${tagsHtml(o.tags)}
+    </div>
     <div class="drawer-section"><h3>Used in ideas <small>${linked.length}</small></h3>
       <div class="action-row">${linked.map(i => `<a class="chip" href="#ideas/${esc(i.id)}">${esc(i.title || 'Untitled idea')} ↗</a>`).join('') || '<span class="section-hint" style="margin:0">Not linked to an idea yet.</span>'}</div>
       ${ideas.length ? `<div class="add-row"><select class="mini-input" data-link-idea><option value="">Link to an idea…</option>${ideas.filter(i => !linked.includes(i)).sort((a, b) => String(a.title).localeCompare(String(b.title))).map(i => `<option value="${esc(i.id)}">${esc(i.title || 'Untitled idea')}</option>`).join('')}</select></div>` : ''}
     </div>
-    ${notesHtml('outlier', o)}
     <div class="drawer-section action-row">
       <button class="quiet-btn small-btn" type="button" data-act="archive">${o.archived ? '↺ Unarchive' : '⌫ Archive'}</button>
       <button class="danger-btn" type="button" data-act="delete">Delete outlier</button>
@@ -604,9 +626,10 @@ function closePicker(save) {
 }
 
 /* ---------- add outlier dialog ---------- */
-let addBlob = null, addVideo = null, addOriginal = null, addTidied = false, addTidyToken = 0;
+let addBlob = null, addVideo = null, addOriginal = null, addTidied = false, addTidyToken = 0, addGenre = '';
+function renderAddGenre() { $('#addGenre').innerHTML = GENRES.map(g => `<button type="button" class="g-${g}" data-add-genre="${g}" aria-pressed="${addGenre === g}">${g}</button>`).join(''); }
 function openAdd({ blob = null, url = '' } = {}) {
-  addBlob = null; addVideo = null; addOriginal = null; addTidied = false; addTidyToken++;
+  addBlob = null; addVideo = null; addOriginal = null; addTidied = false; addTidyToken++; addGenre = S.genre !== 'all' && S.genre !== 'none' ? S.genre : ''; renderAddGenre();
   $('#addForm').reset(); $('#addPreview').hidden = true; $('#addDropText').hidden = false; $('#addStatus').textContent = ''; $('#addSave').disabled = false;
   $('#addOverlay').hidden = false;
   if (blob) setAddBlob(blob);
@@ -651,7 +674,7 @@ async function saveAdd(e) {
     const vid = addVideo?.videoId || ytId($('#addUrl').value);
     const twin = vid && [...S.outliers.values()].find(x => x.videoId === vid);
     if (twin) { $('#addOverlay').hidden = true; showTab('outliers', false); openOutlier(twin.id); toast('That video is already in here, so I opened it.', 4500); return; }
-    const patch = { title: $('#addTitleInput').value.trim(), channel: $('#addChannel').value.trim(), why: $('#addWhy').value.trim() };
+    const patch = { title: $('#addTitleInput').value.trim(), channel: $('#addChannel').value.trim(), why: $('#addWhy').value.trim(), genre: addGenre };
     const views = $('#addViews').value; if (views !== '') patch.views = Number(views);
     if (addVideo) Object.assign(patch, { url: addVideo.url, videoId: addVideo.videoId, subs: addVideo.subs, published: addVideo.published || '', statsAt: addVideo.statsAt || '', thumbUrl: addBlob ? '' : addVideo.thumb });
     if (addBlob) { const up = await uploadBlob(addBlob, 'outlier'); patch.image = up.id; patch.imageSmall = up.small; if (addTidied) patch.tidiedAt = new Date().toISOString(); }
@@ -848,6 +871,7 @@ function bind() {
   $('#addFetch').addEventListener('click', addLookup);
   $('#addStatus').addEventListener('click', e => { if (!e.target.closest('[data-use-whole]') || !addOriginal) return; addTidyToken++; addBlob = addOriginal; addOriginal = null; showAddPreview(addBlob); $('#addStatus').textContent = 'Using the whole screenshot.'; });
   $('#tidyBtn').addEventListener('click', openTidy);
+  $('#addGenre').addEventListener('click', e => { const b = e.target.closest('[data-add-genre]'); if (!b) return; addGenre = addGenre === b.dataset.addGenre ? '' : b.dataset.addGenre; renderAddGenre(); });
   $('#matchBtn').addEventListener('click', openMatch);
   $('#addUrl').addEventListener('paste', () => setTimeout(() => { if (ytId($('#addUrl').value)) addLookup(); }, 30));
   const drop = $('#addDrop');
@@ -873,12 +897,13 @@ function bind() {
   document.addEventListener('click', e => {
     const close = e.target.closest('[data-close]');
     if (close) { const ov = close.closest('.overlay'); if (ov?.id === 'pickOverlay') closePicker(true); else if (ov?.id === 'outlierOverlay' || ov?.id === 'ideaOverlay') closeDrawers(); else if (ov) ov.hidden = true; return; }
-    const t = e.target.closest('[data-out-filter],[data-tag-filter],[data-idea-filter],[data-open-outlier],[data-open-idea],[data-more-outliers],[data-restore],[data-download],[data-copy-link],a[href^="#ideas/"],a[href^="#outliers/"]');
+    const t = e.target.closest('[data-genre],[data-out-filter],[data-tag-filter],[data-idea-filter],[data-open-outlier],[data-open-idea],[data-more-outliers],[data-restore],[data-download],[data-copy-link],a[href^="#ideas/"],a[href^="#outliers/"]');
     if (!t) return;
-    if (t.dataset.outFilter) { S.outFilter = t.dataset.outFilter; S.outLimit = 96; renderOutliers(); }
+    if (t.dataset.genre) { S.genre = t.dataset.genre; S.outLimit = 96; renderOutliers(); }
+    else if (t.dataset.outFilter) { S.outFilter = t.dataset.outFilter; S.outLimit = 96; renderOutliers(); }
     else if (t.dataset.tagFilter) { S.tagFilter = S.tagFilter === t.dataset.tagFilter ? '' : t.dataset.tagFilter; renderOutliers(); }
     else if (t.dataset.ideaFilter) { S.ideaFilter = t.dataset.ideaFilter; renderIdeas(); }
-    else if (t.dataset.openOutlier) { if (S.open?.kind === 'idea') { flush('idea', S.open.id); } showTab('outliers', false); openOutlier(t.dataset.openOutlier); }
+    else if (t.dataset.openOutlier) { if (S.open?.kind === 'idea') { flush('idea', S.open.id); } showTab('outliers', false); openOutlier(t.dataset.openOutlier, true, e.target.closest('[data-focus]')?.dataset.focus || ''); }
     else if (t.dataset.openIdea) openIdea(t.dataset.openIdea);
     else if (t.hasAttribute('data-more-outliers')) { S.outLimit += 96; renderOutliers(); }
     else if (t.dataset.restore) { if (confirm('Replace everything with this snapshot? What\'s here now is saved first, so you can undo it.')) api('restore', { key: t.dataset.restore }).then(() => { toast('Restored ✓'); load(); renderBackups(true); }).catch(err => toast(err.message, 6000)); }
@@ -915,6 +940,7 @@ function bind() {
       const b = e.target.closest('button,[data-act]'); if (!b) return;
       if (b.dataset.act) { kind === 'idea' ? ideaAction(b.dataset.act, it, b) : outlierAction(b.dataset.act, it, b); return; }
       if (b.dataset.delNote) return deleteNote(kind, it.id, b.dataset.delNote);
+      if (b.dataset.setGenre) { queueSave(kind, it.id, { genre: it.genre === b.dataset.setGenre ? '' : b.dataset.setGenre }, 0); renderOutlierDrawer(); renderLists(); return; }
       if (b.dataset.delTag) { queueSave(kind, it.id, { tags: (it.tags || []).filter(t => t !== b.dataset.delTag) }, 300); kind === 'idea' ? renderIdeaDrawer() : renderOutlierDrawer(); return; }
       if (b.dataset.addTag) { queueSave(kind, it.id, { tags: [...new Set([...(it.tags || []), b.dataset.addTag])] }, 300); kind === 'idea' ? renderIdeaDrawer() : renderOutlierDrawer(); return; }
       if (kind !== 'idea') return;

@@ -57,6 +57,7 @@
           </div>
         </div>
         <p class="view-intro">Paste a screenshot (⌘V) or a YouTube link anywhere on this page to add one. Drop image files on the grid to add several at once. Open any thumbnail to write down why it works.</p>
+        <div class="genre-tabs" id="genreFilters" role="group" aria-label="Filter by genre"></div>
         <div class="board-tools">
           <div class="project-tabs" id="outlierFilters" role="group" aria-label="Filter outliers"></div>
           <div class="tools-right">
@@ -155,6 +156,7 @@
         <input type="file" id="addFile" accept="image/*" hidden>
         <label>Title <input id="addTitleInput" type="text" maxlength="300" placeholder="Optional"></label>
         <div class="form-row"><label>Channel <input id="addChannel" type="text" maxlength="150" placeholder="Optional"></label><label>Views <input id="addViews" type="number" min="0" placeholder="Optional"></label></div>
+        <div class="field"><span>Genre</span><div class="genre-pick" id="addGenre"></div></div>
         <label>Why it works <textarea id="addWhy" rows="3" placeholder="First impression. You can add more later."></textarea></label>
         <div class="form-actions"><span class="save-state" id="addStatus"></span><button class="primary-btn" type="submit" id="addSave">Add outlier ↗</button></div>
       </form>

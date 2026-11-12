@@ -57,6 +57,7 @@ const list = (v, max, label, each) => {
 };
 const itemId = v => (validId(v) ? v : newId());
 
+const GENRES = ['Documentary', 'Education', 'Entertainment'];
 const OUTLIER_FIELDS = {
   title: v => str(v, 300, 'Title'),
   channel: v => str(v, 150, 'Channel'),
@@ -75,6 +76,7 @@ const OUTLIER_FIELDS = {
   originalSmall: v => imgRef(v, 'Image'),
   tidiedAt: v => str(v, 30, 'Tidied date'),
   ytCheckedAt: v => str(v, 30, 'Checked date'),
+  genre: v => { const g = str(v, 30, 'Genre'); if (g && !GENRES.includes(g)) throw oops('Genre must be one of: ' + GENRES.join(', ')); return g; },
   ytMatch: v => { if (v === '' || v == null) return null; const n = Number(v); if (!Number.isFinite(n)) throw oops('Invalid match score.'); return n; },
   multiplier: v => { if (v === '' || v == null) return null; const n = Number(v); if (!Number.isFinite(n) || n < 0 || n > 100000) throw oops('Outlier score must be a number.'); return Math.round(n * 10) / 10; },
   starred: bool,
