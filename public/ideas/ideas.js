@@ -229,13 +229,14 @@ function ideaThumbs(i) {
 }
 function cardIdea(i) {
   const thumbs = ideaThumbs(i).slice(0, 4), fav = (i.titleOptions || []).find(t => t.fav);
+  const counts = [[(i.titleOptions || []).length, 'titles'], [(i.sources || []).length, 'sources'], [(i.similar || []).length, 'similar'], [(i.outlierIds || []).length, 'outliers'], [(i.notes || []).length, 'notes']].filter(([n]) => n).map(([n, l]) => [n, n === 1 ? l.replace(/s$/, '') : l]);
   return `<button class="idea-card" type="button" data-open-idea="${esc(i.id)}">
     <div class="idea-top"><span class="status-pill ${statusClass(i.status)}">${esc(i.status || 'Rough')}</span><span>${i.starred ? '★ ' : ''}${i.owner ? esc(i.owner) : ''}</span></div>
     <strong class="${i.title ? '' : 'empty'}">${esc(i.title || 'Untitled idea')}</strong>
     ${fav && fav.text !== i.title ? `<span class="idea-fav-title">★ ${esc(fav.text)}</span>` : ''}
     ${i.premise ? `<p class="idea-premise">${esc(i.premise)}</p>` : ''}
-    ${thumbs.length ? `<div class="idea-strip">${thumbs.map(s => `<img loading="lazy" src="${esc(s)}" alt="">`).join('')}</div>` : ''}
-    <div class="idea-counts"><span><b>${(i.titleOptions || []).length}</b> titles</span><span><b>${(i.sources || []).length}</b> sources</span><span><b>${(i.similar || []).length}</b> similar</span><span><b>${(i.outlierIds || []).length}</b> outliers</span><span><b>${(i.notes || []).length}</b> notes</span></div>
+    ${thumbs.length ? `<div class="idea-strip" style="grid-template-columns:repeat(${thumbs.length},1fr)">${thumbs.map(s => `<img loading="lazy" src="${esc(s)}" alt="">`).join('')}</div>` : ''}
+    <div class="idea-counts">${counts.length ? counts.map(([n, label]) => `<span><b>${n}</b> ${label}</span>`).join('') : '<span>Nothing added yet</span>'}</div>
   </button>`;
 }
 function renderLists() { renderOutliers(); renderIdeas(); }
