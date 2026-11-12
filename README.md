@@ -336,7 +336,7 @@ Its own page at **`/ideas`** on this site (e.g. `conditioningteam.netlify.app/id
    1. Open the **Studio bridge** Apps Script project and replace `Code.gs` with `google-apps-script/Code.gs` from this repo (bridge version 6).
    2. Choose **studioSelfTest**, press **Run**, then **Allow**. It now also asks for Google Drive access, which it uses only to create and update that one folder. The log should end with *Ideation Machine backups folder OK*.
    3. **Deploy → Manage deployments → ✎ → New version → Deploy.** The URL doesn't change, so nothing changes in Netlify.
-   4. On the site, **Backups → Back up now**. The Drive folder and sheet links appear there. Images copy across in batches, about 20 an hour.
+   4. On the site, **Backups → Back up now**. The Drive folder and sheet links appear there. Images copy across in small batches every hour (Back up now speeds it up).
 3. **Download backup** saves everything as one JSON file whenever you want.
 
 ### The Discord import (one-time)
