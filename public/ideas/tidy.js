@@ -123,7 +123,7 @@ function cleanTitle(t) {
   // in front: avatar letters, "(59x)", "(29", "o.8x", "2" before Why/The/How, lowercase scraps like "mre"
   for (let guard = 0; guard < 6 && tok.length > 2; guard++) {
     const a = tok[0], b = tok[1];
-    if (junk(a) || /#/.test(a) || /^\(?\w{0,2}\d+(?:\.\d+)?%?x?\)?$/i.test(a) && /[x%()]/i.test(a) || /^\w?\.?\d+(?:\.\d+)?x$/i.test(a) || /^\([A-Z0-9%.,]{1,6}\)$/.test(a) || /^[a-z][A-Z]$/.test(a)
+    if (junk(a) || /\w#/.test(a) || /^\(?\w{0,2}\d+(?:\.\d+)?%?x?\)?$/i.test(a) && /[x%()]/i.test(a) || /^\w?\.?\d+(?:\.\d+)?x$/i.test(a) || /^\([A-Z0-9%.,]{1,6}\)$/.test(a) || /^[a-z][A-Z]$/.test(a)
       || (/^\d$/.test(a) && /^(Why|The|How|What|When|Who)$/.test(b)) || (/^[a-z]{1,4}:?$/.test(a) && !REAL_LOWER.has(a) && /^["“'‘(A-Z]/.test(b))
       || /^(?:[OQ0@©®]|[£$€@]\w?)$/.test(a) && /^["“'‘(A-Z0-9]/.test(b)) { tok.shift(); continue; }
     break;
