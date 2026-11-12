@@ -178,7 +178,7 @@ async function matchOutlier(o) {
   const words = norm(title).split(' ').filter(w => w.length > 1).length;
   if (title.length < 8 || words < 2) return { matched: false, reason: 'no title' };
   const need = words < 5 ? 0.9 : 0.72; // a short or cut-off title needs a near-exact match
-  const { results } = await searchYouTube(title);
+  const { results } = await searchYouTube(title.replace(/[|#*!?"“”]+/g, ' ').replace(/\s+/g, ' ').trim());
   if (!results.length) return { matched: false, unavailable: true, reason: 'YouTube search didn\'t answer; try again later' };
   let best = null;
   for (const r of results) {
