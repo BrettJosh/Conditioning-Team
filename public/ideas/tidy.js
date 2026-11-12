@@ -115,16 +115,17 @@ function grow(px, W, H, t, box, bg) {
 
 /* ---------- reading the text ---------- */
 const UI_PHRASES = /\b(from your watch later playlist|from your search history|recommended for you|new video|members only|premiere)\b/gi;
-const WORDY = t => /^[A-Za-z0-9"“”'‘’$£€#(][A-Za-z0-9'’"“”.,!?:;&$£€%#()/+-]*$/.test(t) && /[A-Za-z0-9]/.test(t) && !/^[0-9.]+x$/i.test(t) && !/^[^(]*\)$/.test(t) && !/^\(?[A-Z]?\d{1,3}$/.test(t);
+const WORDY = t => /^[A-Za-z0-9"“”'‘’$£€#(][A-Za-z0-9'’"“”.,!?:;&$£€%#()/+-]*$/.test(t) && /[A-Za-z0-9]/.test(t) && !/^[0-9.]+x$/i.test(t) && !/^[^(]*\)$/.test(t);
 function cleanLine(l) {
-  return String(l || '').replace(UI_PHRASES, ' ').replace(/(^|\s)\|(?=\s)/g, '$1I').replace(/[•]+/g, ' · ').replace(/[▷►▶]/g, ' ').replace(/\s+/g, ' ').trim()
+  return String(l || '').replace(UI_PHRASES, ' ').replace(/(^|\b(?:how|why|what|when|where|so|and|but|then|if|as|until|after|before|now|today|here's|why|did|have|was|am|can|should|would|could|will)\s)\|(?=\s)/gi, '$1I').replace(/[•]+/g, ' · ').replace(/[▷►▶]/g, ' ').replace(/\s+/g, ' ').trim()
     .split(' ').filter((t, i, arr) => !(i === arr.length - 1 && (/^[^\w']{1,4}$/.test(t) || /^(e|o|c|a|s){2,4}$/i.test(t)))).join(' ')
     .replace(/\s*(\.\.\.|…|⋮)\s*$/, '').trim();
 }
 /** Drop badge / avatar junk in front of a title: start at the first run of three real words (or two, for short titles). */
 function trimFront(t) {
   const tok = t.split(' ');
-  while (tok.length > 2 && /^(?:[OQ0@©®]|[£$€@]\w?|\W{1,3})$/.test(tok[0]) && /^["“'‘(A-Z0-9]/.test(tok[1])) tok.shift(); // the channel avatar, read as a letter
+  // the channel avatar read as a letter, outlier-tool badges like "(37%)", "(EZ)", "13x"
+  while (tok.length > 2 && (/^(?:[OQ0@©®]|[£$€@]\w?|\W{1,3})$/.test(tok[0]) || /^\([A-Z0-9%.,]{1,6}\)$/.test(tok[0]) || /^\w{0,3}\d+(?:\.\d)?x$/i.test(tok[0])) && /^["“'‘(A-Za-z0-9]/.test(tok[1])) tok.shift();
   for (let i = 0; i < tok.length; i++) {
     const need = Math.min(3, tok.length - i);
     if (need >= 2 && tok.slice(i, i + need).every(WORDY)) return tok.slice(i).join(' ');
@@ -137,7 +138,6 @@ const num = (n, unit) => { const v = parseFloat(String(n).replace(',', '.')), m 
 function parse(text, rawLines) {
   const all = String(text || '');
   const out = { title: '', channel: '', views: null, age: '', subs: null, multiplier: null };
-  const mult = all.match(/(?:^|\s)(\d{1,4}(?:\.\d)?)\s?x(?=\s)/i); if (mult) out.multiplier = parseFloat(mult[1]);
   const subs = all.match(/(\d+(?:[.,]\d+)?)\s*([kmb])\s*subs(?:cribers)?/i); if (subs) out.subs = num(subs[1], subs[2]);
   let lines = (rawLines && rawLines.length ? rawLines : all.split('\n').map(t => ({ text: t, h: 0 }))).map(l => ({ ...l, text: cleanLine(l.text) })).filter(l => l.text.length > 1 && /[a-z0-9]/i.test(l.text));
   const isMeta = l => META.test(l.text);
@@ -174,7 +174,10 @@ function parse(text, rawLines) {
       endI = continues || last.length > 30 ? head.length - 1 : head.length - 2;
     }
     if (!big && subsLine && endI === head.length - 2 && head.length >= 1) endI = head.length - 1; // the subs line was the channel, so every line above is title
-    out.title = trimFront(head.slice(start, endI + 1).map(l => l.text).join(' '));
+    const rawTitle = head.slice(start, endI + 1).map(l => l.text).join(' ');
+    const mult = rawTitle.match(/^(?:\S{1,4}\s)?(\d{1,4}(?:\.\d)?)\s?x\s/i); // outlier tools put "63.5x" in front of the title
+    if (mult) out.multiplier = parseFloat(mult[1]);
+    out.title = trimFront(rawTitle);
     const rest = head.slice(endI + 1).map(l => l.text).find(t => /[a-z]{2}/i.test(t)) || subsLine;
     if (!out.channel && rest && rest.length <= 60) out.channel = trimFront(rest.replace(/\s*[@·-]?\s*\d+(?:[.,]\d+)?\s*[kmb]\s*subs(?:cribers)?.*$/i, '').replace(/\s*@\s*[\d.]+[kmb]?\s*$/i, ''));
   }
@@ -182,6 +185,8 @@ function parse(text, rawLines) {
   out.title = out.title.replace(/\s+/g, ' ').replace(/\s*[·-]\s*$/, '').trim();
   if (out.title.length < 6 || (out.title.match(/[a-z]/gi) || []).length < out.title.length * 0.5) out.title = '';
   out.title = out.title.slice(0, 300);
+  out.channel = out.channel.replace(/\S*\s?VPH\b.*$/i, '').replace(/\s+\S*\d+(?:\.\d)?x\b.*$/i, '').replace(/\s+@\s*$/, '').trim();
+  if ((out.channel.match(/[a-z]/gi) || []).length < 3) out.channel = '';
   out.channel = out.channel.replace(/\s*[✓✔]$/, '').replace(/^@?\W+(?=\w)/, m => (m.startsWith('@') ? '@' : '')).slice(0, 150);
   return out;
 }
