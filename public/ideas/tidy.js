@@ -114,7 +114,32 @@ function grow(px, W, H, t, box, bg) {
 }
 
 /* ---------- reading the text ---------- */
-const UI_PHRASES = /\b(from your watch later playlist|from your search history|recommended for you|new video|members only|premiere)\b/gi;
+const UI_PHRASES = /\b(from your watch later playlist|from your search history|recommended for you|new video|members only|premiere|enable inline keywords)\b/gi;
+const REAL_LOWER = new Set('a i an the how why what who is are was my we so if and but to in on at of it me you your our no do did can now all this that these those when where one two top big new old bad'.split(' '));
+/** Tidy a title read by machine: badges, avatar letters, stray symbols. */
+function cleanTitle(t) {
+  let tok = String(t || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  const junk = x => /[#=<>~§«»{}\[\]]/.test(x) || (/%/.test(x) && !/\d%/.test(x)) || (/^\W+$/.test(x) && !/^(?:[&\-–—|:]|\|\|)$/.test(x));
+  // in front: avatar letters, "(59x)", "(29", "o.8x", "2" before Why/The/How, lowercase scraps like "mre"
+  for (let guard = 0; guard < 6 && tok.length > 2; guard++) {
+    const a = tok[0], b = tok[1];
+    if (junk(a) || /^\(?\w{0,2}\d+(?:\.\d+)?%?x?\)?$/i.test(a) && /[x%()]/i.test(a) || /^\w?\.?\d+(?:\.\d+)?x$/i.test(a) || /^\([A-Z0-9%.,]{1,6}\)$/.test(a) || /^[a-z][A-Z]$/.test(a)
+      || (/^\d$/.test(a) && /^(Why|The|How|What|When|Who)$/.test(b)) || (/^[a-z]{1,4}:?$/.test(a) && !REAL_LOWER.has(a) && /^["“'‘(A-Z]/.test(b))
+      || /^(?:[OQ0@©®]|[£$€@]\w?)$/.test(a) && /^["“'‘(A-Z0-9]/.test(b)) { tok.shift(); continue; }
+    break;
+  }
+  if (tok[0] === '1' && /^[A-Z][a-z]+$/.test(tok[1] || '') && !/^(Year|Day|Week|Month|Hour|Minute|Thing|Way|Man|Woman|Habit|Rule|Trick)s?$/.test(tok[1])) tok[0] = 'I';
+  // inside: stray symbols, "|" standing in for "I" before a lowercase word
+  tok = tok.filter((x, i) => !(i > 0 && junk(x))).map((x, i, arr) => (x === '|' && arr[i + 1] && /^[a-z]/.test(arr[i + 1]) ? 'I' : x));
+  // at the end: scraps like "ree", "i.", "H", "- 002", trailing ":" or ".."
+  while (tok.length > 3) {
+    const z = tok[tok.length - 1];
+    if (junk(z) || /^[a-z]\.$/.test(z) || (/^[a-z]{1,3}\.?$/.test(z) && !REAL_LOWER.has(z.replace('.', ''))) || /^[A-Z]$/.test(z) && !/^[AI]$/.test(z) || /^-?\d{3}$/.test(z) && tok[tok.length - 2] === '-') { tok.pop(); continue; }
+    if (z === '-' ) { tok.pop(); continue; }
+    break;
+  }
+  return tok.join(' ').replace(/\s*:\.+$/, '').replace(/\s*:$/, '').replace(/\s+([,.!?])/g, '$1').trim();
+}
 const WORDY = t => /^[A-Za-z0-9"“”'‘’$£€#(][A-Za-z0-9'’"“”.,!?:;&$£€%#()/+-]*$/.test(t) && /[A-Za-z0-9]/.test(t) && !/^[0-9.]+x$/i.test(t) && !/^[^(]*\)$/.test(t);
 function cleanLine(l) {
   return String(l || '').replace(UI_PHRASES, ' ').replace(/(^|\b(?:how|why|what|when|where|so|and|but|then|if|as|until|after|before|now|today|here's|why|did|have|was|am|can|should|would|could|will)\s)\|(?=\s)/gi, '$1I').replace(/[•]+/g, ' · ').replace(/[▷►▶]/g, ' ').replace(/\s+/g, ' ').trim()
@@ -177,7 +202,8 @@ function parse(text, rawLines) {
     const rawTitle = head.slice(start, endI + 1).map(l => l.text).join(' ');
     const mult = rawTitle.match(/^(?:\S{1,4}\s)?(\d{1,4}(?:\.\d)?)\s?x\s/i); // outlier tools put "63.5x" in front of the title
     if (mult) out.multiplier = parseFloat(mult[1]);
-    out.title = trimFront(rawTitle);
+    out.title = cleanTitle(trimFront(rawTitle));
+    const pm = rawTitle.match(/^\S{0,4}\s?\((\d{1,4}(?:\.\d)?)x\)\s/i); if (pm && out.multiplier == null) out.multiplier = parseFloat(pm[1]); // "(59x) Title"
     const rest = head.slice(endI + 1).map(l => l.text).find(t => /[a-z]{2}/i.test(t)) || subsLine;
     if (!out.channel && rest && rest.length <= 60) out.channel = trimFront(rest.replace(/\s*[@·-]?\s*\d+(?:[.,]\d+)?\s*[kmb]\s*subs(?:cribers)?.*$/i, '').replace(/\s*@\s*[\d.]+[kmb]?\s*$/i, ''));
   }
@@ -239,5 +265,5 @@ async function analyse(src, { readText = true } = {}) {
   return out;
 }
 
-window.IdeationTidy = { analyse, parse, warm: () => worker() };
+window.IdeationTidy = { analyse, parse, cleanTitle, warm: () => worker() };
 })();
