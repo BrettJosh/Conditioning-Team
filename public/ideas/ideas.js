@@ -138,6 +138,61 @@ async function uploadBlob(blob, source = '') {
   return api('uploadImage', { data, small, source });
 }
 
+/* ---------- tidy: crop screenshots to the thumbnail and read the title (tidy.js, loaded on first use) ---------- */
+let tidyLoading = null, tidyRunning = false;
+function loadTidy() {
+  if (window.IdeationTidy) return Promise.resolve(window.IdeationTidy);
+  if (!tidyLoading) tidyLoading = new Promise((resolve, reject) => { const sc = document.createElement('script'); sc.src = './tidy.js'; sc.onload = () => resolve(window.IdeationTidy); sc.onerror = () => { tidyLoading = null; reject(new Error('Could not load the screenshot tidier.')); }; document.head.appendChild(sc); });
+  return tidyLoading;
+}
+const needsTidy = o => Boolean(o.image) && !o.tidiedAt && !o.archived;
+/** Crop an outlier's screenshot to its thumbnail (always from the original) and fill in any empty title / channel / views. */
+async function tidyOutlier(o) {
+  const T = await loadTidy();
+  const srcId = o.originalImage || o.image;
+  const r = await T.analyse(img(srcId));
+  const patch = { tidiedAt: new Date().toISOString() };
+  if (r.cropped) { const up = await uploadBlob(r.cropped, 'tidy'); Object.assign(patch, { image: up.id, imageSmall: up.small, originalImage: srcId, originalSmall: o.originalImage ? (o.originalSmall || '') : (o.imageSmall || '') }); }
+  if (r.title && !o.title) patch.title = r.title;
+  if (r.channel && !o.channel) patch.channel = r.channel;
+  if (r.views != null && o.views == null) patch.views = r.views;
+  const { item } = await api('saveOutlier', { id: o.id, patch });
+  S.outliers.set(item.id, item);
+  return { cropped: Boolean(r.cropped), title: Boolean(patch.title), item };
+}
+function updateTidyBtn() { const n = [...S.outliers.values()].filter(needsTidy).length; $('#tidyBtn').hidden = !n || tidyRunning; $('#tidyBtn span').textContent = `Tidy ${n} screenshot${n === 1 ? '' : 's'}`; }
+function openTidy() {
+  if (tidyRunning) { $('#tidyOverlay').hidden = false; return; }
+  const todo = [...S.outliers.values()].filter(needsTidy);
+  $('#tidyBody').innerHTML = `<p class="import-stats"><b>${todo.length}</b> screenshot${todo.length === 1 ? '' : 's'} to tidy. Each one is cropped down to just the thumbnail, and the title, channel and views are read from the text beside it (only where those are still empty).</p><p class="section-hint">The original screenshot is kept: open any outlier and press "Use the whole screenshot" to undo. It takes a second or two each, so a few minutes in all. Keep this tab open.</p><div class="progress"><span id="tidyBar"></span></div><p class="section-hint" id="tidyStatus"></p><div class="form-actions"><span></span><button class="primary-btn" type="button" id="tidyGo">Tidy ${todo.length} ↗</button></div>`;
+  $('#tidyOverlay').hidden = false;
+  $('#tidyGo').addEventListener('click', () => runTidy(todo));
+}
+async function runTidy(todo) {
+  if (tidyRunning) return;
+  tidyRunning = true; updateTidyBtn();
+  const go = $('#tidyGo'); go.disabled = true; go.textContent = 'Tidying…';
+  let n = 0, cropped = 0, titled = 0, failed = 0;
+  const status = () => { const bar = $('#tidyBar'); if (bar) bar.style.width = Math.round(n / todo.length * 100) + '%'; const st = $('#tidyStatus'); if (st) st.textContent = `${n} of ${todo.length} · ${cropped} cropped · ${titled} titles read${failed ? ` · ${failed} skipped` : ''}`; };
+  status();
+  try {
+    await (await loadTidy()).warm();
+    const q = todo.slice();
+    await Promise.all([1, 2].map(async () => {
+      while (q.length) {
+        const o = S.outliers.get(q.shift().id);
+        if (o && needsTidy(o)) { try { const r = await tidyOutlier(o); cropped += r.cropped; titled += r.title; } catch (err) { failed++; console.warn('tidy', o.id, err); } }
+        n++; status(); if (n % 12 === 0) renderOutliers();
+      }
+    }));
+    const plain = todo.length - cropped - failed;
+    $('#tidyBody').innerHTML = `<p class="import-stats">Done ✓ Cropped <b>${cropped}</b> screenshot${cropped === 1 ? '' : 's'} and read <b>${titled}</b> title${titled === 1 ? '' : 's'}.${plain > 0 ? (plain === 1 ? ' <b>1</b> already looked like a plain thumbnail, so it was left alone.' : ` <b>${plain}</b> already looked like plain thumbnails, so they were left alone.`) : ''}${failed ? ` <b>${failed}</b> couldn't be read.` : ''}</p><p class="section-hint">Titles are read by machine, so give them a glance. If anything got cropped wrong, open it and press "Use the whole screenshot".</p><div class="form-actions"><span></span><button class="primary-btn" type="button" data-close>Have a look ↗</button></div>`;
+  } catch (err) {
+    const st = $('#tidyStatus'); if (st) st.textContent = 'Stopped: ' + err.message + '. Press Tidy again to carry on.';
+    go.disabled = false; go.textContent = 'Tidy again ↗';
+  } finally { tidyRunning = false; renderLists(); }
+}
+
 /* ---------- router ---------- */
 function route() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -187,6 +242,7 @@ function renderOutliers() {
   list.sort(by[S.outSort] || by.new);
   $('#outlierResults').textContent = list.length === live.length && !S.tagFilter && S.outFilter === 'all' ? `${live.length} outliers` : `Showing ${list.length} of ${live.length}`;
   $('#outlierTabCount').textContent = live.length || '';
+  updateTidyBtn();
   const grid = $('#outlierGrid');
   if (!list.length) { grid.innerHTML = `<div class="empty-state">${S.outliers.size ? 'Nothing matches that.' : 'No outliers yet.'}<small>${S.outliers.size ? 'Try another filter or search.' : 'Paste a screenshot (⌘V) or a YouTube link, or press Add outlier.'}</small></div>`; return; }
   grid.innerHTML = list.slice(0, S.outLimit).map(cardOutlier).join('') + (list.length > S.outLimit ? `<button class="quiet-btn show-more" type="button" data-more-outliers>Show ${Math.min(96, list.length - S.outLimit)} more (${list.length - S.outLimit} left)</button>` : '');
@@ -294,6 +350,8 @@ function renderOutlierDrawer() {
       <button class="star-toggle" type="button" data-act="star" aria-pressed="${Boolean(o.starred)}">${o.starred ? '★ Starred' : '☆ Star'}</button>
       ${yt ? `<a class="quiet-btn small-btn" href="${esc(yt)}" target="_blank" rel="noopener">▶ Watch on YouTube ↗</a>` : ''}
       <button class="quiet-btn small-btn" type="button" data-act="replace-image">⇪ ${full ? 'Replace' : 'Add'} image</button>
+      ${o.image ? `<button class="quiet-btn small-btn" type="button" data-act="tidy" title="Crop the screenshot to just the thumbnail and read the title, channel and views from it">✂ Crop + read title</button>` : ''}
+      ${o.originalImage ? `<button class="quiet-btn small-btn" type="button" data-act="untidy">↺ Use the whole screenshot</button>` : ''}
       <button class="primary-btn small-btn" type="button" data-act="new-idea">✳ Start an idea from this</button>
     </div>
     <input type="file" accept="image/*" hidden data-file>
@@ -327,12 +385,18 @@ async function outlierAction(act, o, el) {
     catch (err) { toast(err.message, 5000); }
   }
   if (act === 'replace-image') $('#outlierBody [data-file]').click();
+  if (act === 'tidy') {
+    el.disabled = true; saveState('Cropping…');
+    try { await flush('outlier', o.id); const r = await tidyOutlier(S.outliers.get(o.id)); renderOutlierDrawer(); renderLists(); saveState(r.cropped ? 'Cropped ✓' + (r.title ? ' and read the title' : '') : 'No thumbnail found in this one'); }
+    catch (err) { el.disabled = false; saveState('Couldn\'t tidy it', true); toast(err.message, 5000); }
+  }
+  if (act === 'untidy') { queueSave('outlier', o.id, { image: o.originalImage, imageSmall: o.originalSmall || '', originalImage: '', originalSmall: '' }, 0); renderOutlierDrawer(); renderLists(); }
   if (act === 'lookup') await lookupInto(o, $('#outlierBody [data-f="url"]').value);
   if (act === 'new-idea') await newIdea({ outlierIds: [o.id] });
 }
 async function setOutlierImage(o, blob) {
   saveState('Uploading…');
-  try { const up = await uploadBlob(blob, 'outlier'); queueSave('outlier', o.id, { image: up.id, imageSmall: up.small, thumbUrl: '' }, 0); renderOutlierDrawer(); renderLists(); }
+  try { const up = await uploadBlob(blob, 'outlier'); queueSave('outlier', o.id, { image: up.id, imageSmall: up.small, thumbUrl: '', originalImage: '', originalSmall: '', tidiedAt: '' }, 0); renderOutlierDrawer(); renderLists(); }
   catch (err) { saveState('Upload failed', true); toast(err.message, 5000); }
 }
 async function lookupInto(o, link) {
@@ -473,15 +537,30 @@ function closePicker(save) {
 }
 
 /* ---------- add outlier dialog ---------- */
-let addBlob = null, addVideo = null;
+let addBlob = null, addVideo = null, addOriginal = null, addTidied = false, addTidyToken = 0;
 function openAdd({ blob = null, url = '' } = {}) {
-  addBlob = null; addVideo = null;
+  addBlob = null; addVideo = null; addOriginal = null; addTidied = false; addTidyToken++;
   $('#addForm').reset(); $('#addPreview').hidden = true; $('#addDropText').hidden = false; $('#addStatus').textContent = ''; $('#addSave').disabled = false;
   $('#addOverlay').hidden = false;
   if (blob) setAddBlob(blob);
   if (url) { $('#addUrl').value = url; addLookup(); } else setTimeout(() => $('#addUrl').focus(), 50);
 }
-function setAddBlob(blob) { addBlob = blob; const p = $('#addPreview'); p.src = URL.createObjectURL(blob); p.hidden = false; $('#addDropText').hidden = true; }
+function showAddPreview(blob) { const p = $('#addPreview'); p.src = URL.createObjectURL(blob); p.hidden = false; $('#addDropText').hidden = true; }
+function setAddBlob(blob) { addBlob = blob; addOriginal = null; addTidied = false; showAddPreview(blob); autoTidyAdd(blob); }
+async function autoTidyAdd(blob) {
+  const token = ++addTidyToken, st = $('#addStatus');
+  st.textContent = 'Looking for the thumbnail…';
+  try {
+    const r = await (await loadTidy()).analyse(blob);
+    if (token !== addTidyToken) return;
+    addTidied = true;
+    if (r.cropped) { addOriginal = blob; addBlob = r.cropped; showAddPreview(r.cropped); }
+    if (r.title && !$('#addTitleInput').value) $('#addTitleInput').value = r.title;
+    if (r.channel && !$('#addChannel').value) $('#addChannel').value = r.channel;
+    if (r.views != null && !$('#addViews').value) $('#addViews').value = r.views;
+    st.innerHTML = r.cropped ? `Cropped to the thumbnail${r.title ? ' and read the title' : ''} ✓ <button type="button" class="link-btn" data-use-whole>Use the whole screenshot</button>` : (r.title ? 'Read the title ✓' : '');
+  } catch { if (token === addTidyToken) st.textContent = ''; }
+}
 async function addLookup() {
   const link = $('#addUrl').value.trim();
   if (!ytId(link)) { $('#addStatus').textContent = 'That doesn\'t look like a YouTube link.'; return; }
@@ -505,7 +584,8 @@ async function saveAdd(e) {
     const patch = { title: $('#addTitleInput').value.trim(), channel: $('#addChannel').value.trim(), why: $('#addWhy').value.trim() };
     const views = $('#addViews').value; if (views !== '') patch.views = Number(views);
     if (addVideo) Object.assign(patch, { url: addVideo.url, videoId: addVideo.videoId, subs: addVideo.subs, published: addVideo.published || '', statsAt: addVideo.statsAt || '', thumbUrl: addBlob ? '' : addVideo.thumb });
-    if (addBlob) { const up = await uploadBlob(addBlob, 'outlier'); patch.image = up.id; patch.imageSmall = up.small; }
+    if (addBlob) { const up = await uploadBlob(addBlob, 'outlier'); patch.image = up.id; patch.imageSmall = up.small; if (addTidied) patch.tidiedAt = new Date().toISOString(); }
+    if (addOriginal) { const orig = await uploadBlob(addOriginal, 'outlier'); patch.originalImage = orig.id; patch.originalSmall = orig.small; }
     else if (addVideo) { try { patch.image = (await api('importImageUrl', { url: 'https://i.ytimg.com/vi/' + addVideo.videoId + '/hqdefault.jpg' })).id; } catch {} }
     const { item } = await api('saveOutlier', { patch });
     S.outliers.set(item.id, item);
@@ -521,7 +601,17 @@ async function quickAddFiles(files) {
   let done = 0;
   toast(`Adding ${list.length} screenshots…`, 60000);
   for (const f of list) {
-    try { const up = await uploadBlob(f, 'outlier'); const { item } = await api('saveOutlier', { patch: { image: up.id, imageSmall: up.small } }); S.outliers.set(item.id, item); done++; toast(`Added ${done} of ${list.length}…`, 60000); }
+    try {
+      const patch = {}; let blob = f;
+      try {
+        const r = await (await loadTidy()).analyse(f);
+        patch.tidiedAt = new Date().toISOString();
+        if (r.cropped) { const orig = await uploadBlob(f, 'outlier'); Object.assign(patch, { originalImage: orig.id, originalSmall: orig.small }); blob = r.cropped; }
+        if (r.title) patch.title = r.title; if (r.channel) patch.channel = r.channel; if (r.views != null) patch.views = r.views;
+      } catch {}
+      const up = await uploadBlob(blob, 'outlier'); Object.assign(patch, { image: up.id, imageSmall: up.small });
+      const { item } = await api('saveOutlier', { patch }); S.outliers.set(item.id, item); done++; toast(`Added ${done} of ${list.length}…`, 60000);
+    }
     catch (err) { toast(err.message, 5000); }
   }
   renderLists(); toast(`Added ${done} outliers. Give them titles and notes when you can.`);
@@ -648,7 +738,7 @@ function closeDrawers(push = true, keepHash = false) {
   if (push && !keepHash) setHash('#' + S.tab);
 }
 function closeTop() {
-  for (const id of ['pickOverlay', 'addOverlay', 'whoOverlay', 'importOverlay']) if (!$('#' + id).hidden) { if (id === 'pickOverlay') closePicker(true); else $('#' + id).hidden = true; return; }
+  for (const id of ['pickOverlay', 'addOverlay', 'whoOverlay', 'importOverlay', 'tidyOverlay']) if (!$('#' + id).hidden) { if (id === 'pickOverlay') closePicker(true); else $('#' + id).hidden = true; return; }
   if (S.open) closeDrawers();
 }
 
@@ -685,6 +775,8 @@ function bind() {
   // add dialog
   $('#addForm').addEventListener('submit', saveAdd);
   $('#addFetch').addEventListener('click', addLookup);
+  $('#addStatus').addEventListener('click', e => { if (!e.target.closest('[data-use-whole]') || !addOriginal) return; addTidyToken++; addBlob = addOriginal; addOriginal = null; showAddPreview(addBlob); $('#addStatus').textContent = 'Using the whole screenshot.'; });
+  $('#tidyBtn').addEventListener('click', openTidy);
   $('#addUrl').addEventListener('paste', () => setTimeout(() => { if (ytId($('#addUrl').value)) addLookup(); }, 30));
   const drop = $('#addDrop');
   drop.addEventListener('click', () => $('#addFile').click());
@@ -796,7 +888,7 @@ function bind() {
     const file = [...(e.clipboardData?.files || [])].find(f => /^image\//.test(f.type));
     const text = e.clipboardData?.getData('text') || '';
     if (!$('#addOverlay').hidden) { if (file) { e.preventDefault(); setAddBlob(file); } return; }
-    if (!$('#pickOverlay').hidden || !$('#whoOverlay').hidden || !$('#connectOverlay').hidden || !$('#importOverlay').hidden) return;
+    if (!$('#pickOverlay').hidden || !$('#whoOverlay').hidden || !$('#connectOverlay').hidden || !$('#importOverlay').hidden || !$('#tidyOverlay').hidden) return;
     if (S.open?.kind === 'idea') { if (file && !typing) { e.preventDefault(); addIdeaImages([file]); } return; }
     if (S.open?.kind === 'outlier') { if (file && !typing && confirm('Replace this outlier\'s image with the one you pasted?')) { e.preventDefault(); setOutlierImage(S.outliers.get(S.open.id), file); } return; }
     if (typing || S.tab === 'backups') return;

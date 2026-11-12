@@ -71,6 +71,9 @@ const OUTLIER_FIELDS = {
   image: v => imgRef(v, 'Image'),
   imageSmall: v => imgRef(v, 'Image'),
   thumbUrl: v => url(v, 'Thumbnail link'),
+  originalImage: v => imgRef(v, 'Image'),
+  originalSmall: v => imgRef(v, 'Image'),
+  tidiedAt: v => str(v, 30, 'Tidied date'),
   starred: bool,
   archived: bool,
   statsAt: v => str(v, 30, 'Stats date')
