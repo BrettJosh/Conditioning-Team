@@ -10,6 +10,8 @@
 import { timingSafeEqual, createHash } from 'node:crypto';
 import { STATUSES, readDb, readAll, getItem, putItem, updateItem, deleteItem, imageBytes, newId, validId, imageKey, saveImage, readImage, youtubeId, youtubeThumb } from '../lib/ideation-store.mjs';
 import { runBackup, backupStatus, listSnapshots, restoreSnapshot } from '../lib/ideation-backup.mjs';
+import { oembed, ytApi, videoStats } from '../lib/ideation-youtube.mjs';
+import { discordStatus, discordConnect, discordDisconnect, syncDiscord } from '../lib/ideation-discord.mjs';
 
 const send = (data, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 const fail = (message, status = 400) => send({ error: message }, status);
@@ -110,40 +112,6 @@ function clean(patch, rules) {
 const who = v => str(v, 60, 'Your name').trim() || 'Someone';
 const kindOf = k => (k === 'idea' ? 'ideas' : k === 'outlier' ? 'outliers' : null);
 
-/* ---------- YouTube lookups ---------- */
-async function oembed(videoId) {
-  try {
-    const res = await fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + videoId), { signal: AbortSignal.timeout(6000) });
-    if (!res.ok) return null;
-    const d = await res.json();
-    return { title: d.title || '', channel: d.author_name || '' };
-  } catch { return null; }
-}
-async function ytApi(pathname, params) {
-  const key = (process.env.YOUTUBE_API_KEY || '').trim();
-  if (!key) return null;
-  const u = new URL('https://www.googleapis.com/youtube/v3' + pathname);
-  Object.entries({ ...params, key }).forEach(([k, v]) => u.searchParams.set(k, v));
-  const res = await fetch(u, { signal: AbortSignal.timeout(7000) });
-  if (!res.ok) return null;
-  return res.json();
-}
-/** Title, channel, views, publish date and the channel's subscriber count for up to 50 videos. */
-async function videoStats(ids) {
-  const out = {};
-  const data = await ytApi('/videos', { part: 'snippet,statistics', id: ids.join(','), maxResults: 50 }).catch(() => null);
-  if (!data) return out;
-  const channels = new Set();
-  (data.items || []).forEach(v => {
-    out[v.id] = { title: v.snippet?.title || '', channel: v.snippet?.channelTitle || '', channelId: v.snippet?.channelId || '', published: v.snippet?.publishedAt || '', views: Number(v.statistics?.viewCount) || null };
-    if (v.snippet?.channelId) channels.add(v.snippet.channelId);
-  });
-  const ch = await ytApi('/channels', { part: 'statistics', id: [...channels].slice(0, 50).join(','), maxResults: 50 }).catch(() => null);
-  const subs = {};
-  (ch?.items || []).forEach(c => { subs[c.id] = c.statistics?.hiddenSubscriberCount ? null : Number(c.statistics?.subscriberCount) || null; });
-  Object.values(out).forEach(v => { v.subs = subs[v.channelId] ?? null; delete v.channelId; });
-  return out;
-}
 /* ---------- finding a screenshot's video on YouTube ---------- */
 const norm = t => String(t || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/&amp;|&#39;|&quot;/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
 /** How alike two titles are, 0 to 1. A screenshot's title is often cut short ("…"), so words it shares count most. */
@@ -261,7 +229,7 @@ async function act(input) {
 
   if (action === 'list') {
     const { db } = await readDb();
-    return { outliers: Object.values(db.outliers), ideas: Object.values(db.ideas), updatedAt: db.updatedAt || '', imageKey: imageKey(), youtube: Boolean((process.env.YOUTUBE_API_KEY || '').trim()), backup: await backupStatus(db).catch(() => null) };
+    return { outliers: Object.values(db.outliers), ideas: Object.values(db.ideas), updatedAt: db.updatedAt || '', imageKey: imageKey(), youtube: Boolean((process.env.YOUTUBE_API_KEY || '').trim()), backup: await backupStatus(db).catch(() => null), discord: await discordStatus().catch(() => null) };
   }
 
   if (action === 'saveOutlier' || action === 'saveIdea') {
@@ -405,6 +373,11 @@ async function act(input) {
     const { db } = await readDb();
     return { exportedAt: now, site: process.env.URL || '', imageKey: imageKey(), db };
   }
+
+  /* Discord bot: new posts come in by themselves (see ../lib/ideation-discord.mjs). The token is never sent back. */
+  if (action === 'discordConnect') return { status: await discordConnect(str(input.token, 200, 'Token'), who(input.by)) };
+  if (action === 'discordDisconnect') return { status: await discordDisconnect() };
+  if (action === 'discordSync') return await syncDiscord({ budgetMs: 8500 }); // short rounds: the page calls again while there's more
 
   if (action === 'backups') return { status: await backupStatus(), snapshots: await listSnapshots() };
   if (action === 'backupNow') return { result: await runBackup({ force: true, budgetMs: 22000 }) };

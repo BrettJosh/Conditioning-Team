@@ -49,6 +49,7 @@
         <div class="workspace-heading">
           <div><div class="overline">/ THUMBNAILS THAT BROKE OUT</div><h2>THE <span class="scribble">OUTLIERS</span></h2></div>
           <div class="workspace-actions">
+            <button class="quiet-btn discord-btn" id="discordBtn" type="button" title="New posts in the Discord outlier channels come in here by themselves"><span class="discord-dot" aria-hidden="true"></span> <span id="discordLabel">Discord</span></button>
             <button class="quiet-btn" id="refreshBtn" type="button" title="Reload everything">↻ <span>Refresh</span></button>
             <button class="quiet-btn" id="statsBtn" type="button" title="Pull fresh view counts from YouTube for outliers with a link" hidden>▲ <span>Update views</span></button>
             <button class="quiet-btn" id="tidyBtn" type="button" title="Crop screenshots down to the thumbnail and read the title, channel and views from them" hidden>✂ <span>Tidy screenshots</span></button>
@@ -212,6 +213,16 @@
       <div class="drawer-top"><span class="overline">/ FROM DISCORD</span><button class="icon-close" type="button" data-close aria-label="Close">✕</button></div>
       <h2 id="importTitle">Bring in<br><span class="highlight-inline">Discord.</span></h2>
       <div id="importBody"></div>
+    </section>
+  </div>
+
+  <!-- Discord bot: new posts come in by themselves -->
+  <div class="overlay centered-overlay" id="discordOverlay" hidden>
+    <div class="overlay-backdrop" data-close></div>
+    <section class="connection-dialog import-dialog discord-dialog" role="dialog" aria-modal="true" aria-labelledby="discordTitle">
+      <div class="drawer-top"><span class="overline">/ DISCORD SYNC</span><button class="icon-close" type="button" data-close aria-label="Close">✕</button></div>
+      <h2 id="discordTitle">Straight from<br><span class="highlight-inline">Discord.</span></h2>
+      <div id="discordBody"></div>
     </section>
   </div>
 

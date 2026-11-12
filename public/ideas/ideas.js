@@ -74,13 +74,14 @@ async function load({ quiet = false } = {}) {
     const keepIdea = S.open?.kind === 'idea' && pending.size ? S.ideas.get(S.open.id) : null;
     S.ideas = new Map(d.ideas.map(i => [i.id, i]));
     if (keepIdea) S.ideas.set(keepIdea.id, keepIdea);
-    S.imageKey = d.imageKey; S.youtube = d.youtube; S.backup = d.backup;
+    S.imageKey = d.imageKey; S.youtube = d.youtube; S.backup = d.backup; S.discord = d.discord || null;
     S.loaded = true; S.loadedAt = Date.now();
     setConnected(true);
     $('#statsBtn').hidden = !S.youtube || ![...S.outliers.values()].some(o => o.videoId);
-    renderAll();
+    renderAll(); updateDiscordBtn();
     if (!S.who) openWho();
     maybeImport();
+    autoTidyNew();
   } catch (err) {
     if (!quiet) notice(err.message, true);
   }
@@ -390,6 +391,102 @@ function cardIdea(i) {
 }
 function renderLists() { renderOutliers(); renderIdeas(); }
 function renderAll() { renderLists(); if (S.tab === 'backups') renderBackups(); route(); }
+
+/* ---------- Discord: new posts in the outlier channels and #rough-ideas come in by themselves ---------- */
+const DISCORD_PORTAL = 'https://discord.com/developers/applications';
+let discordBusy = false;
+function updateDiscordBtn() {
+  const d = S.discord, b = $('#discordBtn'); if (!b) return;
+  const problem = d?.configured && (!d.ready || d.lastError);
+  b.classList.toggle('on', Boolean(d?.ready && !d.lastError)); b.classList.toggle('warn', Boolean(problem));
+  $('#discordLabel').textContent = !d?.configured ? 'Connect Discord' : !d.ready ? 'Discord: finish setup' : d.lastError ? 'Discord: needs a look' : `Discord ✓ ${d.lastRun ? fmtWhen(d.lastRun) : ''}`.trim();
+}
+function openDiscord() { renderDiscord(); $('#discordOverlay').hidden = false; }
+function discordRow(ok, html) { return `<li class="${ok === true ? 'ok' : ok === false ? 'bad' : 'wait'}"><span class="mark">${ok === true ? '✓' : ok === false ? '✕' : '…'}</span><span>${html}</span></li>`; }
+function renderDiscord(msg = '') {
+  const d = S.discord || {}, c = d.check || null, body = $('#discordBody');
+  const note = msg ? `<p class="discord-msg">${msg}</p>` : '';
+  if (!d.configured) {
+    body.innerHTML = `<p class="import-stats">Anything new posted in ${esc((d.channels || ['#outliers', '#educational-outliers', '#thumbnail-inspo', '#mega-viral-outliers', '#rough-ideas']).join(', '))} turns up here on its own, every 10 minutes: screenshots cropped, titles read, found on YouTube, ranked.</p>
+      <p class="section-hint">It needs a small read-only Discord bot. One-off setup, about 5 minutes:</p>
+      <ol class="discord-steps">
+        <li><b>Make the bot.</b> In the Developer Portal press <b>New Application</b>, call it <i>Ideation Machine</i> and create it.<br><a class="quiet-btn small-btn" href="${DISCORD_PORTAL}" target="_blank" rel="noopener">Open the Developer Portal ↗</a></li>
+        <li><b>Let it read posts.</b> Open <b>Bot</b> on the left, switch on <b>Message Content Intent</b> and press <b>Save Changes</b>.</li>
+        <li><b>Copy its token.</b> Still on Bot, press <b>Reset Token</b>, then <b>Copy</b>.</li>
+        <li><b>Paste it here.</b> It's kept on the server; nobody can read it back from this page.
+          <form id="discordTokenForm" class="inline-field discord-token"><input id="discordToken" type="password" autocomplete="off" spellcheck="false" placeholder="Paste the bot token"><button class="primary-btn small-btn" type="submit">Connect ↗</button></form></li>
+        <li><b>Add it to the server.</b> A button for that shows up here once the token's in.</li>
+      </ol>${note}`;
+    return;
+  }
+  const chans = c?.channels || [];
+  const allChans = chans.length && chans.every(x => x.ok);
+  const rows = [
+    discordRow(true, `Bot <b>${esc(c?.bot || 'connected')}</b> is connected${d.tokenFrom === 'netlify' ? ' (token set in Netlify)' : ''}.`),
+    discordRow(c ? c.intent !== false : null, c?.intent === false ? `<b>Message Content Intent is off.</b> In the <a href="${DISCORD_PORTAL}${c.appId ? '/' + esc(c.appId) + '/bot' : ''}" target="_blank" rel="noopener">Developer Portal → Bot</a>, switch it on and save, then press Check now.` : 'It can read what posts say.'),
+    discordRow(c ? c.inServer : null, c?.inServer ? 'It\'s in the JOSH BRETT YOUTUBE server.' : `<b>Add it to the server.</b> Press the button, pick nothing else, and press <b>Authorise</b>. It only gets permission to read.<br><a class="primary-btn small-btn" href="${esc(c?.invite || '#')}" target="_blank" rel="noopener">Add the bot to the server ↗</a>`),
+    c?.inServer ? discordRow(allChans, allChans ? `It can read ${chans.map(x => '#' + esc(x.name)).join(', ')}.` : `It can't read ${chans.filter(x => !x.ok).map(x => '#' + esc(x.name)).join(', ')}. In Discord, give the bot's role access to ${chans.filter(x => !x.ok).length === 1 ? 'that channel' : 'those channels'} (channel settings → Permissions).`) : ''
+  ].join('');
+  const recent = (d.recent || []).filter(r => r.kind === 'idea' ? S.ideas.has(r.id) : S.outliers.has(r.id)).slice(0, 8);
+  body.innerHTML = `<ul class="discord-checks">${rows}</ul>
+    <p class="section-hint">${d.ready ? `New posts come in every 10 minutes.${d.lastRun ? ` Last checked ${esc(fmtWhen(d.lastRun))}.` : ''} ${d.imported ? `${d.imported} brought in so far.` : ''}` : 'Once everything above has a tick, new posts come in every 10 minutes.'}</p>
+    ${d.lastError && d.ready ? `<p class="discord-msg bad">${esc(d.lastError)}</p>` : ''}${note}
+    ${recent.length ? `<div class="discord-recent"><h3>Just came in</h3>${recent.map(r => { const it = r.kind === 'idea' ? S.ideas.get(r.id) : S.outliers.get(r.id); const t = r.kind === 'idea' ? (it.title || 'Untitled idea') : outName(it); const th = r.kind === 'idea' ? '' : outThumb(it); return `<button type="button" class="discord-item" ${r.kind === 'idea' ? `data-open-idea="${esc(r.id)}"` : `data-open-outlier="${esc(r.id)}"`}>${th ? `<img src="${esc(th)}" alt="">` : '<span class="ph">✳</span>'}<span><b>${esc(t)}</b><small>${esc(CHANNEL_LABEL[r.channel] || '#' + r.channel)} · ${esc(fmtWhen(r.at))}</small></span></button>`; }).join('')}</div>` : ''}
+    <div class="form-actions">${d.tokenFrom === 'netlify' ? '<span></span>' : '<button class="text-btn" type="button" data-discord="disconnect">Disconnect the bot</button>'}<button class="primary-btn" type="button" data-discord="sync" ${discordBusy ? 'disabled' : ''}>${discordBusy ? 'Checking…' : 'Check Discord now ↗'}</button></div>`;
+}
+async function discordConnect() {
+  const input = $('#discordToken'), token = input.value.trim(); if (!token) return input.focus();
+  const btn = $('#discordTokenForm button'); btn.disabled = true; btn.textContent = 'Checking…';
+  try { const { status } = await api('discordConnect', { token }); S.discord = status; input.value = ''; updateDiscordBtn(); renderDiscord(status.ready ? 'Connected ✓' : ''); }
+  catch (err) { btn.disabled = false; btn.textContent = 'Connect ↗'; renderDiscord(); $('#discordBody').insertAdjacentHTML('beforeend', `<p class="discord-msg bad">${esc(err.message)}</p>`); }
+}
+async function discordSync() {
+  if (discordBusy) return;
+  discordBusy = true; renderDiscord();
+  let added = 0, msg = '';
+  try {
+    for (let round = 0; round < 8; round++) { // a backlog comes in a few posts at a time
+      const r = await api('discordSync');
+      if (r.status) S.discord = r.status;
+      added += (r.added || []).length;
+      if (r.busy) { msg = 'It\'s already checking in the background. Give it a minute.'; break; }
+      if (!r.more || (r.errors || []).length) break;
+    }
+    msg ||= added ? `Brought in ${added} new post${added === 1 ? '' : 's'} ✓` : (S.discord?.ready ? 'Nothing new since last time ✓' : '');
+  } catch (err) { msg = esc(err.message); }
+  discordBusy = false; updateDiscordBtn();
+  if (added) await load({ quiet: true });
+  renderDiscord(msg);
+}
+function discordClick(e) {
+  if (e.target.closest('[data-open-outlier],[data-open-idea]')) { $('#discordOverlay').hidden = true; return; } // the page opens it
+  const b = e.target.closest('[data-discord]'); if (!b) return;
+  if (b.dataset.discord === 'sync') discordSync();
+  if (b.dataset.discord === 'disconnect' && confirm('Disconnect the Discord bot? New posts will stop coming in until someone connects it again.')) api('discordDisconnect').then(r => { S.discord = r.status; updateDiscordBtn(); renderDiscord('Disconnected.'); }).catch(err => toast(err.message, 5000));
+}
+/** Screenshots the bot brought in get cropped and titled here (it needs a browser), then found on YouTube. */
+let autoTidying = false;
+async function autoTidyNew() {
+  if (autoTidying || tidyRunning) return;
+  const todo = [...S.outliers.values()].filter(o => o.addedBy === 'Discord bot' && needsTidy(o)).slice(0, 15);
+  if (!todo.length) return;
+  autoTidying = true;
+  try {
+    for (const { id } of todo) {
+      const o = S.outliers.get(id); if (!o || !needsTidy(o) || S.open?.id === id) continue;
+      try {
+        const r = await tidyOutlier(o);
+        if (!r.cropped && !r.item.imageSmall) { // already a plain thumbnail: still make the small copy the grid uses
+          const blob = await fetch(img(r.item.image)).then(x => x.blob());
+          const up = await uploadBlob(blob, 'discord');
+          const { item } = await api('saveOutlier', { id, patch: { image: up.id, imageSmall: up.small, originalImage: r.item.originalImage || r.item.image } });
+          S.outliers.set(id, item);
+        }
+        renderLists(); autoMatch(S.outliers.get(id));
+      } catch (err) { console.warn('auto-tidy', id, err); }
+    }
+  } finally { autoTidying = false; }
+}
 
 /* ---------- notes thread (shared by both drawers) ---------- */
 function notesHtml(kind, item) {
@@ -859,7 +956,7 @@ function closeDrawers(push = true, keepHash = false) {
   if (push && !keepHash) setHash('#' + S.tab);
 }
 function closeTop() {
-  for (const id of ['pickOverlay', 'addOverlay', 'whoOverlay', 'importOverlay', 'tidyOverlay']) if (!$('#' + id).hidden) { if (id === 'pickOverlay') closePicker(true); else $('#' + id).hidden = true; return; }
+  for (const id of ['pickOverlay', 'addOverlay', 'whoOverlay', 'importOverlay', 'discordOverlay', 'tidyOverlay']) if (!$('#' + id).hidden) { if (id === 'pickOverlay') closePicker(true); else $('#' + id).hidden = true; return; }
   if (S.open) closeDrawers();
 }
 
@@ -900,6 +997,9 @@ function bind() {
   $('#tidyBtn').addEventListener('click', openTidy);
   $('#addGenre').addEventListener('click', e => { const b = e.target.closest('[data-add-genre]'); if (!b) return; addGenre = addGenre === b.dataset.addGenre ? '' : b.dataset.addGenre; renderAddGenre(); });
   $('#matchBtn').addEventListener('click', openMatch);
+  $('#discordBtn').addEventListener('click', openDiscord);
+  $('#discordBody').addEventListener('click', discordClick);
+  $('#discordBody').addEventListener('submit', e => { e.preventDefault(); if (e.target.matches('#discordTokenForm')) discordConnect(); });
   $('#addUrl').addEventListener('paste', () => setTimeout(() => { if (ytId($('#addUrl').value)) addLookup(); }, 30));
   const drop = $('#addDrop');
   drop.addEventListener('click', () => $('#addFile').click());
@@ -1021,7 +1121,7 @@ function bind() {
     const file = [...(e.clipboardData?.files || [])].find(f => /^image\//.test(f.type));
     const text = e.clipboardData?.getData('text') || '';
     if (!$('#addOverlay').hidden) { if (file) { e.preventDefault(); setAddBlob(file); } return; }
-    if (!$('#pickOverlay').hidden || !$('#whoOverlay').hidden || !$('#connectOverlay').hidden || !$('#importOverlay').hidden || !$('#tidyOverlay').hidden) return;
+    if (!$('#pickOverlay').hidden || !$('#whoOverlay').hidden || !$('#connectOverlay').hidden || !$('#importOverlay').hidden || !$('#discordOverlay').hidden || !$('#tidyOverlay').hidden) return;
     if (S.open?.kind === 'idea') { if (file && !typing) { e.preventDefault(); addIdeaImages([file]); } return; }
     if (S.open?.kind === 'outlier') { if (file && !typing && confirm('Replace this outlier\'s image with the one you pasted?')) { e.preventDefault(); setOutlierImage(S.outliers.get(S.open.id), file); } return; }
     if (typing || S.tab === 'backups') return;
