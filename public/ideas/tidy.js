@@ -119,11 +119,11 @@ const REAL_LOWER = new Set('a i an the how why what who is are was my we so if a
 /** Tidy a title read by machine: badges, avatar letters, stray symbols. */
 function cleanTitle(t) {
   let tok = String(t || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
-  const junk = x => /[#=<>~§«»{}\[\]]/.test(x) || (/%/.test(x) && !/\d%/.test(x)) || (/^\W+$/.test(x) && !/^(?:[&\-–—|:]|\|\|)$/.test(x));
+  const junk = x => /[=<>~§«»{}\[\]]/.test(x) || (/#/.test(x) && !/^#\w+$/.test(x)) || (/%/.test(x) && !/\d%/.test(x)) || (/^\W+$/.test(x) && !/^(?:[&+\-–—|:/]|\|\|)$/.test(x));
   // in front: avatar letters, "(59x)", "(29", "o.8x", "2" before Why/The/How, lowercase scraps like "mre"
   for (let guard = 0; guard < 6 && tok.length > 2; guard++) {
     const a = tok[0], b = tok[1];
-    if (junk(a) || /^\(?\w{0,2}\d+(?:\.\d+)?%?x?\)?$/i.test(a) && /[x%()]/i.test(a) || /^\w?\.?\d+(?:\.\d+)?x$/i.test(a) || /^\([A-Z0-9%.,]{1,6}\)$/.test(a) || /^[a-z][A-Z]$/.test(a)
+    if (junk(a) || /#/.test(a) || /^\(?\w{0,2}\d+(?:\.\d+)?%?x?\)?$/i.test(a) && /[x%()]/i.test(a) || /^\w?\.?\d+(?:\.\d+)?x$/i.test(a) || /^\([A-Z0-9%.,]{1,6}\)$/.test(a) || /^[a-z][A-Z]$/.test(a)
       || (/^\d$/.test(a) && /^(Why|The|How|What|When|Who)$/.test(b)) || (/^[a-z]{1,4}:?$/.test(a) && !REAL_LOWER.has(a) && /^["“'‘(A-Z]/.test(b))
       || /^(?:[OQ0@©®]|[£$€@]\w?)$/.test(a) && /^["“'‘(A-Z0-9]/.test(b)) { tok.shift(); continue; }
     break;
@@ -134,7 +134,7 @@ function cleanTitle(t) {
   // at the end: scraps like "ree", "i.", "H", "- 002", trailing ":" or ".."
   while (tok.length > 3) {
     const z = tok[tok.length - 1];
-    if (junk(z) || /^[a-z]\.$/.test(z) || (/^[a-z]{1,3}\.?$/.test(z) && !REAL_LOWER.has(z.replace('.', ''))) || /^[A-Z]$/.test(z) && !/^[AI]$/.test(z) || /^-?\d{3}$/.test(z) && tok[tok.length - 2] === '-') { tok.pop(); continue; }
+    if (junk(z) || /^[a-z]\.$/.test(z) || (/^[a-z]{1,3}\.?$/.test(z) && !REAL_LOWER.has(z.replace('.', ''))) || /^-?\d{3}$/.test(z) && tok[tok.length - 2] === '-') { tok.pop(); continue; }
     if (z === '-' ) { tok.pop(); continue; }
     break;
   }
