@@ -376,6 +376,7 @@ async function act(input) {
 
   /* Discord bot: new posts come in by themselves (see ../lib/ideation-discord.mjs). The token is never sent back. */
   if (action === 'discordConnect') return { status: await discordConnect(str(input.token, 200, 'Token'), who(input.by)) };
+  if (action === 'discordStatus') return { status: await discordStatus() };
   if (action === 'discordDisconnect') return { status: await discordDisconnect() };
   if (action === 'discordSync') return await syncDiscord({ budgetMs: 8500 }); // short rounds: the page calls again while there's more
 

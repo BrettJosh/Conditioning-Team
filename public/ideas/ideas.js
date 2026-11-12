@@ -401,7 +401,10 @@ function updateDiscordBtn() {
   b.classList.toggle('on', Boolean(d?.ready && !d.lastError)); b.classList.toggle('warn', Boolean(problem));
   $('#discordLabel').textContent = !d?.configured ? 'Connect Discord' : !d.ready ? 'Discord: finish setup' : d.lastError ? 'Discord: needs a look' : `Discord ✓ ${d.lastRun ? fmtWhen(d.lastRun) : ''}`.trim();
 }
-function openDiscord() { renderDiscord(); $('#discordOverlay').hidden = false; }
+function openDiscord() {
+  renderDiscord(); $('#discordOverlay').hidden = false;
+  if (!discordBusy) api('discordStatus').then(({ status }) => { S.discord = status; updateDiscordBtn(); if (!$('#discordOverlay').hidden && !discordBusy) renderDiscord(); }).catch(() => {}); // what the page loaded may be old
+}
 function discordRow(ok, html) { return `<li class="${ok === true ? 'ok' : ok === false ? 'bad' : 'wait'}"><span class="mark">${ok === true ? '✓' : ok === false ? '✕' : '…'}</span><span>${html}</span></li>`; }
 function renderDiscord(msg = '') {
   const d = S.discord || {}, c = d.check || null, body = $('#discordBody');
@@ -450,6 +453,7 @@ async function discordSync() {
       if (r.status) S.discord = r.status;
       added += (r.added || []).length;
       if (r.busy) { msg = 'It\'s already checking in the background. Give it a minute.'; break; }
+      if (r.hiccup) { msg = 'Discord didn\'t answer just now. Try again in a minute (it also retries by itself).'; break; }
       if (!r.more || (r.errors || []).length) break;
     }
     msg ||= added ? `Brought in ${added} new post${added === 1 ? '' : 's'} ✓` : (S.discord?.ready ? 'Nothing new since last time ✓' : '');

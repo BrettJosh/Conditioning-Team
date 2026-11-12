@@ -67,19 +67,28 @@ const friendly = e => e.status === 401 ? 'The bot\'s token stopped working (it m
   : e.status === 403 || e.code === 50001 ? 'The bot can\'t see this channel. Give its role access to it in Discord.'
   : e.message;
 
-/** Who the bot is, whether it's in the server, whether it can read each channel, and whether Message Content is on. */
+const transient = e => e.rate || e.status >= 500 || e.name === 'TimeoutError' || e.name === 'AbortError' || !e.status;
+
+/**
+ * Who the bot is, whether it's in the server, whether it can read each channel, and whether Message Content is on.
+ * Reading the channels is the real test: if any works, it's in the server. Only when none can be read does it ask
+ * Discord about the server itself. A Discord hiccup (busy, timeout) throws instead of reporting "not in the server".
+ */
 async function inspect(token) {
   const me = await discord(token, '/users/@me');
   const app = await discord(token, '/applications/@me').catch(() => null);
   const appId = app?.id || me.id;
-  const guilds = await discord(token, '/users/@me/guilds').catch(() => []);
-  const inServer = Array.isArray(guilds) && guilds.some(g => g.id === GUILD_ID);
   const channels = [];
   for (const c of CHANNELS) {
-    if (!inServer) { channels.push({ name: c.name, ok: false }); continue; }
     try { await discord(token, `/channels/${c.id}/messages?limit=1`); channels.push({ name: c.name, ok: true }); }
-    catch (e) { channels.push({ name: c.name, ok: false, error: friendly(e) }); }
+    catch (e) { if (transient(e)) throw e; channels.push({ name: c.name, ok: false, error: friendly(e) }); }
   }
+  let inServer = channels.some(c => c.ok);
+  if (!inServer) {
+    try { await discord(token, `/guilds/${GUILD_ID}`); inServer = true; }
+    catch (e) { if (transient(e)) throw e; inServer = false; }
+  }
+  if (!inServer) channels.forEach(c => { c.error = ''; });
   return {
     bot: me.global_name || me.username || 'Bot',
     appId,
@@ -272,7 +281,10 @@ export async function syncDiscord({ budgetMs = 22000, recheck = false } = {}) {
   try {
     // Check the setup (cheap) every run, so a switched-off Message Content Intent can't silently lose posts.
     try { state.check = await inspect(t.token); }
-    catch (e) { throw new Error(friendly(e)); }
+    catch (e) {
+      if (transient(e) && state.check?.inServer) throw Object.assign(new Error('Discord didn\'t answer just now. It will try again in 10 minutes.'), { soft: true });
+      throw new Error(friendly(e));
+    }
     const check = state.check;
     if (!check.inServer) throw new Error('The bot isn\'t in the JOSH BRETT YOUTUBE server yet. Use "Add the bot to the server".');
     if (check.intent === false) throw new Error('Turn on "Message Content Intent" for the bot in the Discord Developer Portal (Bot page), or it can\'t see posts.');
@@ -312,8 +324,8 @@ export async function syncDiscord({ budgetMs = 22000, recheck = false } = {}) {
     state.imported = (state.imported || 0) + result.added.length;
     if (result.added.length) state.recent = [...result.added.map(a => ({ kind: a.kind, id: a.id, title: a.title, channel: a.channel, at: a.at })).reverse(), ...(state.recent || [])].slice(0, RECENT_KEPT);
   } catch (e) {
-    state.lastError = e.message;
-    result.errors.push(e.message);
+    if (e.soft) { result.hiccup = true; state.lastHiccup = new Date().toISOString(); } // a blip, not a setup problem: the button stays green
+    else { state.lastError = e.message; result.errors.push(e.message); }
   } finally {
     state.lastRun = new Date().toISOString();
     state.lockUntil = '';
