@@ -217,7 +217,7 @@ export async function readImage(id) {
 /** Image ids referenced anywhere in the workspace. */
 export function imageIds(db) {
   const ids = new Set();
-  Object.values(db.outliers || {}).forEach(o => { if (o.image) ids.add(o.image); });
+  Object.values(db.outliers || {}).forEach(o => { if (o.image) ids.add(o.image); if (o.originalImage) ids.add(o.originalImage); });
   Object.values(db.ideas || {}).forEach(i => (i.images || []).forEach(x => { if (x?.id) ids.add(x.id); }));
   return [...ids];
 }

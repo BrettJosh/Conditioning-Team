@@ -90,7 +90,8 @@ export async function runBackup({ force = false, budgetMs = 24000 } = {}) {
     try {
       const json = JSON.stringify(db);
       const hash = createHash('sha1').update(json).digest('hex');
-      if (force || hash !== state.lastDriveHash || state.lastDriveDay !== today) {
+      const recent = state.lastDrive && Date.now() - Date.parse(state.lastDrive) < 5 * 60e3;
+      if (hash !== state.lastDriveHash || state.lastDriveDay !== today || (force && !recent)) {
         const r = await callBridge({ action: 'ideationBackup', json, day: today, siteUrl: process.env.URL || '', imageKey: imageKey() }, Math.min(15000, left() - 2000));
         Object.assign(state, { lastDriveHash: hash, lastDriveDay: today, lastDrive: new Date().toISOString(), folderUrl: r.folderUrl || state.folderUrl || '', sheetUrl: r.sheetUrl || state.sheetUrl || '', lastDriveError: '' });
         out.drive = true;
