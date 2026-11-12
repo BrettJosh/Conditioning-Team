@@ -7,8 +7,8 @@
  * Storage is Netlify Blobs (see ../lib/ideation-store.mjs). No extra Netlify variables are needed:
  * it uses the Studio's BOARD_ACCESS_CODE, and YOUTUBE_API_KEY (already set for the calendar) for view counts.
  */
-import { timingSafeEqual } from 'node:crypto';
-import { STATUSES, readDb, updateDb, newId, validId, imageKey, saveImage, readImage, youtubeId, youtubeThumb } from '../lib/ideation-store.mjs';
+import { timingSafeEqual, createHash } from 'node:crypto';
+import { STATUSES, readDb, readAll, putItem, updateItem, deleteItem, newId, validId, imageKey, saveImage, readImage, youtubeId, youtubeThumb } from '../lib/ideation-store.mjs';
 import { runBackup, backupStatus, listSnapshots, restoreSnapshot } from '../lib/ideation-backup.mjs';
 
 const send = (data, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
@@ -169,34 +169,31 @@ async function act(input) {
 
   if (action === 'list') {
     const { db } = await readDb();
-    return { outliers: Object.values(db.outliers), ideas: Object.values(db.ideas), updatedAt: db.updatedAt || '', imageKey: imageKey(), youtube: Boolean((process.env.YOUTUBE_API_KEY || '').trim()), backup: await backupStatus().catch(() => null) };
+    return { outliers: Object.values(db.outliers), ideas: Object.values(db.ideas), updatedAt: db.updatedAt || '', imageKey: imageKey(), youtube: Boolean((process.env.YOUTUBE_API_KEY || '').trim()), backup: await backupStatus(db).catch(() => null) };
   }
 
   if (action === 'saveOutlier' || action === 'saveIdea') {
     const isIdea = action === 'saveIdea', table = isIdea ? 'ideas' : 'outliers';
     const patch = clean(input.patch, isIdea ? IDEA_FIELDS : OUTLIER_FIELDS);
     const by = who(input.by);
-    const { result } = await updateDb(db => {
-      let item = input.id ? db[table][input.id] : null;
-      if (input.id && !item) throw oops('That ' + (isIdea ? 'idea' : 'outlier') + ' was deleted by someone else. Refresh the page.', 404);
-      if (!item) {
-        if (Object.keys(db[table]).length >= 3000) throw oops('That\'s 3,000 already. Archive some first.');
-        item = { id: newId(isIdea ? 'idea_' : 'out_'), createdAt: now, addedBy: by, notes: [], tags: [], ...(isIdea ? { status: 'Rough', titleOptions: [], sources: [], similar: [], outlierIds: [], images: [] } : {}) };
-        db[table][item.id] = item;
-      }
-      Object.assign(item, patch, { updatedAt: now, updatedBy: by });
-      return item;
-    });
-    return { item: result };
+    if (!input.id) {
+      const item = { id: newId(isIdea ? 'idea_' : 'out_'), createdAt: now, addedBy: by, notes: [], tags: [], ...(isIdea ? { status: 'Rough', titleOptions: [], sources: [], similar: [], outlierIds: [], images: [] } : {}), ...patch, updatedAt: now, updatedBy: by };
+      return { item: await putItem(table, item) };
+    }
+    if (!validId(input.id)) throw oops('Invalid id.');
+    const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+    const item = await updateItem(table, input.id, it => { Object.assign(it, patch, { updatedAt: now, updatedBy: by }); }, saved => Object.keys(patch).every(k => same(saved[k], patch[k])));
+    return { item };
   }
 
   if (action === 'deleteOutlier' || action === 'deleteIdea') {
     const table = action === 'deleteIdea' ? 'ideas' : 'outliers';
     if (!validId(input.id)) throw oops('Invalid id.');
-    await updateDb(db => {
-      delete db[table][input.id];
-      if (table === 'outliers') Object.values(db.ideas).forEach(i => { if (i.outlierIds?.includes(input.id)) i.outlierIds = i.outlierIds.filter(x => x !== input.id); });
-    });
+    await deleteItem(table, input.id);
+    if (table === 'outliers') {
+      const { ideas } = await readAll();
+      for (const i of Object.values(ideas)) if (i.outlierIds?.includes(input.id)) await updateItem('ideas', i.id, it => { it.outlierIds = (it.outlierIds || []).filter(x => x !== input.id); }, saved => !(saved.outlierIds || []).includes(input.id)).catch(() => {});
+    }
     return { ok: true };
   }
 
@@ -205,16 +202,14 @@ async function act(input) {
     if (!table || !validId(input.id)) throw oops('Invalid item.');
     const text = action === 'addNote' ? str(input.text, 6000, 'Note').trim() : '';
     if (action === 'addNote' && !text) throw oops('Write something first.');
-    const { result } = await updateDb(db => {
-      const item = db[table][input.id];
-      if (!item) throw oops('That item was deleted by someone else. Refresh the page.', 404);
-      item.notes ||= [];
-      if (action === 'addNote') item.notes.push({ id: newId('n_'), by: who(input.by), text, at: now });
-      else item.notes = item.notes.filter(n => n.id !== input.noteId);
-      if (item.notes.length > 300) throw oops('That\'s a lot of notes. Delete a few old ones first.');
-      return item;
-    });
-    return { item: result };
+    const note = { id: newId('n_'), by: who(input.by), text, at: now };
+    const item = await updateItem(table, input.id, it => {
+      it.notes ||= [];
+      if (action === 'addNote') { if (!it.notes.some(n => n.id === note.id)) it.notes.push(note); }
+      else it.notes = it.notes.filter(n => n.id !== input.noteId);
+      if (it.notes.length > 300) throw oops('That\'s a lot of notes. Delete a few old ones first.');
+    }, saved => (action === 'addNote' ? (saved.notes || []).some(n => n.id === note.id) : !(saved.notes || []).some(n => n.id === input.noteId)));
+    return { item };
   }
 
   if (action === 'uploadImage') {
@@ -237,37 +232,35 @@ async function act(input) {
     const vids = [...new Set(wanted.map(id => db.outliers[id].videoId))];
     const stats = {};
     for (let i = 0; i < vids.length; i += 50) Object.assign(stats, await videoStats(vids.slice(i, i + 50)));
-    const { result } = await updateDb(d => {
-      const changed = [];
-      wanted.forEach(id => { const o = d.outliers[id], s = o && stats[o.videoId]; if (!s) return; Object.assign(o, { views: s.views, subs: s.subs, published: s.published || o.published, title: o.title || s.title, channel: o.channel || s.channel, statsAt: now }); changed.push(o); });
-      return changed;
-    });
-    return { items: result };
+    const changed = [];
+    for (const id of wanted) {
+      const s = stats[db.outliers[id].videoId]; if (!s) continue;
+      changed.push(await updateItem('outliers', id, o => { Object.assign(o, { views: s.views, subs: s.subs, published: s.published || o.published, title: o.title || s.title, channel: o.channel || s.channel, statsAt: now }); }, o => o.statsAt === now));
+    }
+    return { items: changed };
   }
 
   /* One-time import of the Discord channels. Items already imported (same Discord key) are skipped. */
   if (action === 'importDiscord') {
     const rows = Array.isArray(input.items) ? input.items.slice(0, 60) : [];
-    const { result } = await updateDb(db => {
-      const known = new Set([...Object.values(db.outliers), ...Object.values(db.ideas)].map(x => x.discord?.key).filter(Boolean));
-      const made = [];
-      rows.forEach(r => {
-        const key = str(r.key, 80, 'Discord key');
-        if (!key || known.has(key)) return;
-        known.add(key);
-        const discord = { key, channel: str(r.channel, 60, 'Channel'), postedBy: str(r.postedBy, 60, 'Posted by'), postedAt: str(r.postedAt, 40, 'Posted at'), messageUrl: url(r.messageUrl, 'Message link') };
-        const note = r.text ? [{ id: newId('n_'), by: discord.postedBy || 'Discord', text: str(r.text, 4000, 'Text'), at: discord.postedAt || now }] : [];
-        if (r.kind === 'idea') {
-          const item = { id: newId('idea_'), createdAt: discord.postedAt || now, updatedAt: now, addedBy: 'Discord import', status: 'Rough', title: str(r.title, 300, 'Title'), premise: '', hook: '', thumbnailConcept: '', owner: '', tags: [], titleOptions: [], sources: [], similar: [], outlierIds: [], notes: note, images: (Array.isArray(r.images) ? r.images.slice(0, 20) : r.image ? [{ id: r.image, small: r.imageSmall }] : []).map(x => ({ id: imgRef(x?.id, 'Image'), small: imgRef(x?.small, 'Image'), caption: '' })).filter(x => x.id), discord };
-          db.ideas[item.id] = item; made.push(item.id);
-        } else {
-          const item = { id: newId('out_'), createdAt: discord.postedAt || now, updatedAt: now, addedBy: 'Discord import', title: str(r.title, 300, 'Title'), channel: '', url: '', videoId: '', views: null, subs: null, why: '', steal: '', tags: [], notes: note, image: imgRef(r.image, 'Image'), imageSmall: imgRef(r.imageSmall, 'Image'), starred: false, archived: false, discord };
-          db.outliers[item.id] = item; made.push(item.id);
-        }
-      });
-      return made;
-    });
-    return { created: result.length };
+    const all = await readAll();
+    const known = new Set([...Object.values(all.outliers), ...Object.values(all.ideas)].map(x => x.discord?.key).filter(Boolean));
+    let created = 0;
+    for (const r of rows) {
+      const key = str(r.key, 80, 'Discord key');
+      if (!key || known.has(key)) continue;
+      known.add(key);
+      const stable = createHash('sha1').update(key).digest('hex').slice(0, 20); // same Discord post, same id: re-running can't duplicate
+      const discord = { key, channel: str(r.channel, 60, 'Channel'), postedBy: str(r.postedBy, 60, 'Posted by'), postedAt: str(r.postedAt, 40, 'Posted at'), messageUrl: url(r.messageUrl, 'Message link') };
+      const notes = r.text ? [{ id: 'n_' + stable, by: discord.postedBy || 'Discord', text: str(r.text, 4000, 'Text'), at: discord.postedAt || now }] : [];
+      if (r.kind === 'idea') {
+        await putItem('ideas', { id: 'idea_d' + stable, createdAt: discord.postedAt || now, updatedAt: now, addedBy: 'Discord import', status: 'Rough', title: str(r.title, 300, 'Title'), premise: '', hook: '', thumbnailConcept: '', owner: '', tags: [], titleOptions: [], sources: [], similar: [], outlierIds: [], notes, images: (Array.isArray(r.images) ? r.images.slice(0, 20) : r.image ? [{ id: r.image, small: r.imageSmall }] : []).map(x => ({ id: imgRef(x?.id, 'Image'), small: imgRef(x?.small, 'Image'), caption: '' })).filter(x => x.id), discord });
+      } else {
+        await putItem('outliers', { id: 'out_d' + stable, createdAt: discord.postedAt || now, updatedAt: now, addedBy: 'Discord import', title: str(r.title, 300, 'Title'), channel: '', url: '', videoId: '', views: null, subs: null, why: '', steal: '', tags: [], notes, image: imgRef(r.image, 'Image'), imageSmall: imgRef(r.imageSmall, 'Image'), starred: false, archived: false, discord });
+      }
+      created++;
+    }
+    return { created };
   }
 
   if (action === 'discordKeys') {

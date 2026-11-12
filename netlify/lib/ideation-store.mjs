@@ -3,14 +3,13 @@
  * and the hourly ideation-backup function.
  *
  * Everything lives in Netlify Blobs, attached to this Netlify site. Nothing to sign up for.
- *   store "ideation"          key "db"                the whole workspace: outliers + video ideas (one JSON document)
+ *   store "ideation"          keys "o/<id>", "i/<id>"  one outlier / one video idea each (legacy/… holds the old single-blob version)
  *   store "ideation-images"   key "<image id>"        thumbnails and screenshots (binary, content type in metadata)
  *   store "ideation-backups"  key "daily/YYYY-MM-DD"  one snapshot of "db" a day, the last 30 kept
  *                             key "before-restore/…"  a copy taken just before any restore
  *                             key "state"             backup bookkeeping (last Google Drive copy, images already copied)
  *
- * Writes are read-modify-write on "db" guarded by its ETag, so two people saving at once never overwrite each other:
- * the loser re-reads and applies its change again on top.
+ * Each save touches only its own item, and is read back and re-applied if another save landed on top of it.
  *
  * For local testing only: IDEATION_LOCAL_DIR=/some/folder keeps the same stores as files instead.
  */
@@ -18,7 +17,7 @@ import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-export const DB_KEY = 'db';
+export const DB_KEY = 'db'; // the first version's single blob, migrated away on first use
 export const STATUSES = ['Rough', 'Developing', 'Packaging', 'Greenlit', 'In production', 'Parked'];
 
 /* ---------- stores ---------- */
@@ -28,7 +27,6 @@ async function blobs() {
   return blobsModule;
 }
 
-let localQueue = Promise.resolve(); // local writes one at a time, so conditional writes behave like Netlify's
 /** A tiny file-backed stand-in with the same calls, used only when IDEATION_LOCAL_DIR is set (tests). */
 function localStore(name) {
   const dir = path.join(process.env.IDEATION_LOCAL_DIR, name);
@@ -42,14 +40,14 @@ function localStore(name) {
       return { data, etag: tag(buf), metadata };
     },
     async get(key, opts = {}) { const r = await this.getWithMetadata(key, opts); return r ? r.data : null; },
-    set(key, value, opts = {}) { const run = localQueue.then(() => this._set(key, value, opts)); localQueue = run.catch(() => {}); return run; },
-    async _set(key, value, { metadata, onlyIfMatch, onlyIfNew } = {}) {
+    async getMetadata(key) { try { const buf = await fs.readFile(file(key)); return { etag: tag(buf), metadata: {} }; } catch { return null; } },
+    async set(key, value, { metadata, onlyIfMatch, onlyIfNew } = {}) {
       await fs.mkdir(dir, { recursive: true });
       let current = null; try { current = await fs.readFile(file(key)); } catch {}
       if (onlyIfNew && current) return { modified: false };
       if (onlyIfMatch && (!current || tag(current) !== onlyIfMatch)) return { modified: false };
       const buf = typeof value === 'string' ? Buffer.from(value) : Buffer.from(value instanceof ArrayBuffer ? new Uint8Array(value) : value);
-      await fs.writeFile(file(key), buf);
+      const tmp = file(key) + '.' + randomBytes(4).toString('hex') + '.tmp'; await fs.writeFile(tmp, buf); await fs.rename(tmp, file(key)); // atomic, like a blob PUT
       if (metadata) await fs.writeFile(file(key) + '.meta', JSON.stringify(metadata));
       return { modified: true, etag: tag(buf) };
     },
@@ -57,7 +55,8 @@ function localStore(name) {
     async delete(key) { await fs.rm(file(key), { force: true }); await fs.rm(file(key) + '.meta', { force: true }); },
     async list({ prefix = '' } = {}) {
       let names = []; try { names = await fs.readdir(dir); } catch {}
-      return { blobs: names.filter(n => !n.endsWith('.meta')).map(n => decodeURIComponent(n)).filter(k => k.startsWith(prefix)).map(key => ({ key, etag: '' })), directories: [] };
+      const keys = names.filter(n => !n.endsWith('.meta') && !n.endsWith('.tmp')).map(n => decodeURIComponent(n)).filter(k => k.startsWith(prefix));
+      return { blobs: await Promise.all(keys.map(async key => ({ key, etag: tag(await fs.readFile(file(key))) }))), directories: [] };
     }
   };
 }
@@ -68,33 +67,109 @@ export async function store(name) {
   return getStore({ name, consistency: 'strong' });
 }
 
-/* ---------- the workspace document ---------- */
-export const emptyDb = () => ({ version: 1, outliers: {}, ideas: {}, createdAt: new Date().toISOString(), updatedAt: '' });
+/* ---------- outliers and ideas: one blob each ----------
+ * key "o/<id>" for an outlier, "i/<id>" for an idea. Two people saving different items never touch the same blob.
+ * For the same item, every change is written, read back and re-applied if someone else's save landed on top of it. */
+export const TABLES = { outliers: 'o/', ideas: 'i/' };
+const memo = new Map(); // blob key -> { etag, data }: warm function instances only download items that changed
+const tagOf = e => String(e || '').replace(/^W\//, '').replace(/"/g, '');
+let migrated = false;
 
-export async function readDb() {
+async function pool(list, size, fn) {
+  const queue = list.slice();
+  await Promise.all(Array.from({ length: Math.min(size, queue.length) }, async () => { while (queue.length) await fn(queue.shift()); }));
+}
+
+/** The first version kept everything in one blob ("db"). Split it into one blob per item, once, and keep the old blob as legacy/. */
+async function migrate(s) {
+  if (migrated) return;
+  const legacy = await s.get(DB_KEY, { type: 'json' }).catch(() => null);
+  if (legacy && (legacy.outliers || legacy.ideas)) {
+    const items = [...Object.values(legacy.outliers || {}).map(x => ['outliers', x]), ...Object.values(legacy.ideas || {}).map(x => ['ideas', x])];
+    await pool(items, 24, async ([table, item]) => {
+      const key = TABLES[table] + item.id;
+      if (!(await s.getMetadata(key).catch(() => null))) await s.setJSON(key, item);
+    });
+    await s.setJSON('legacy/db-' + new Date().toISOString().replace(/[:.]/g, '-'), legacy);
+    await s.delete(DB_KEY);
+  }
+  migrated = true;
+}
+
+/** Everything, as { outliers: {id: item}, ideas: {id: item} }. */
+export async function readAll() {
   const s = await store('ideation');
-  const found = await s.getWithMetadata(DB_KEY, { type: 'json' });
-  if (!found) return { db: emptyDb(), etag: null };
-  const db = found.data || emptyDb();
-  db.outliers ||= {}; db.ideas ||= {};
-  return { db, etag: found.etag };
+  await migrate(s);
+  const out = { outliers: {}, ideas: {} };
+  for (const [table, prefix] of Object.entries(TABLES)) {
+    const { blobs } = await s.list({ prefix });
+    const live = new Set(blobs.map(b => b.key));
+    await pool(blobs, 32, async b => {
+      let m = memo.get(b.key);
+      if (!m || !b.etag || tagOf(m.etag) !== tagOf(b.etag)) {
+        const r = await s.getWithMetadata(b.key, { type: 'json' }).catch(() => null);
+        if (!r?.data) return;
+        m = { etag: r.etag || b.etag, data: r.data };
+        memo.set(b.key, m);
+      }
+      out[table][m.data.id] = m.data;
+    });
+    for (const k of memo.keys()) if (k.startsWith(prefix) && !live.has(k)) memo.delete(k);
+  }
+  return out;
+}
+
+/** The whole workspace as one document (backups, export). */
+export async function readDb() {
+  const all = await readAll();
+  const stamps = [...Object.values(all.outliers), ...Object.values(all.ideas)].map(x => x.updatedAt || '').sort();
+  return { db: { version: 2, outliers: all.outliers, ideas: all.ideas, updatedAt: stamps.at(-1) || '' } };
+}
+
+export async function getItem(table, id) {
+  if (!TABLES[table] || !validId(id)) return null;
+  const s = await store('ideation');
+  await migrate(s);
+  return s.get(TABLES[table] + id, { type: 'json' }).catch(() => null);
+}
+export async function putItem(table, item) {
+  const s = await store('ideation');
+  await migrate(s);
+  await s.setJSON(TABLES[table] + item.id, item);
+  return item;
+}
+export async function deleteItem(table, id) {
+  const s = await store('ideation');
+  await migrate(s);
+  await s.delete(TABLES[table] + id);
+  memo.delete(TABLES[table] + id);
 }
 
 /**
- * Apply `change(db)` to the latest copy and save it. If someone else saved in between, start again from theirs.
- * `change` may return a value, which is passed back.
+ * Change one item: read it, apply `change(item)` (which edits it in place, or throws), save, read back.
+ * If `landed(saved)` says our change isn't there (another save overwrote it in between), apply it again on top.
  */
-export async function updateDb(change, { attempts = 12 } = {}) {
-  const s = await store('ideation');
-  for (let i = 0; i < attempts; i++) {
-    const { db, etag } = await readDb();
-    const result = await change(db);
-    db.updatedAt = new Date().toISOString();
-    const write = etag ? await s.setJSON(DB_KEY, db, { onlyIfMatch: etag }) : await s.setJSON(DB_KEY, db, { onlyIfNew: true });
-    if (write?.modified !== false) return { db, result };
-    await new Promise(r => setTimeout(r, 80 + Math.random() * 250));
+export async function updateItem(table, id, change, landed = () => true) {
+  for (let i = 0; i < 6; i++) {
+    const item = await getItem(table, id);
+    if (!item) throw Object.assign(new Error('That item was deleted by someone else. Refresh the page.'), { status: 404 });
+    await change(item);
+    await putItem(table, item);
+    await new Promise(r => setTimeout(r, 40 + Math.random() * 60));
+    const saved = await getItem(table, id);
+    if (saved && landed(saved)) return saved;
   }
-  throw Object.assign(new Error('Too many people saving at once. Try again in a second.'), { status: 409 });
+  throw Object.assign(new Error('Lots of people are saving this at once. Try again in a second.'), { status: 409 });
+}
+
+/** Replace everything with a snapshot ({outliers, ideas}): used by Restore. */
+export async function replaceAll(snapshot) {
+  const current = await readAll();
+  for (const table of Object.keys(TABLES)) {
+    const keep = snapshot[table] || {};
+    await pool(Object.values(keep), 24, item => putItem(table, item));
+    await pool(Object.keys(current[table]).filter(id => !keep[id]), 24, id => deleteItem(table, id));
+  }
 }
 
 /* ---------- ids, images ---------- */

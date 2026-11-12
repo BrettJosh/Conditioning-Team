@@ -9,7 +9,7 @@
  *    Needs the updated Code.gs (bridge version 6). Until then the Drive copy reports what to do and the snapshots still run.
  */
 import { createHash } from 'node:crypto';
-import { store, readDb, imageIds, readImage, imageKey, imageExt, updateDb } from './ideation-store.mjs';
+import { store, readDb, imageIds, readImage, imageKey, imageExt, replaceAll } from './ideation-store.mjs';
 
 const KEEP_DAYS = 30;
 const IMAGE_BATCH_BYTES = 6 * 1024 * 1024;
@@ -23,9 +23,9 @@ async function readState() {
 }
 async function writeState(state) { const s = await backups(); await s.setJSON('state', state); }
 
-export async function backupStatus() {
+export async function backupStatus(known) {
   const st = await readState();
-  const { db } = await readDb();
+  const db = known || (await readDb()).db;
   const ids = imageIds(db), done = new Set(st.driveImages || []);
   return {
     lastSnapshot: st.lastSnapshot || '', lastDrive: st.lastDrive || '', lastDriveError: st.lastDriveError || '', lastRun: st.lastRun || '',
@@ -49,7 +49,7 @@ export async function restoreSnapshot(key) {
   if (!snap?.outliers || !snap?.ideas) throw Object.assign(new Error('That snapshot is empty or unreadable.'), { status: 404 });
   const { db: current } = await readDb();
   await s.setJSON('before-restore/' + new Date().toISOString().replace(/[:.]/g, '-'), current);
-  await updateDb(db => { db.outliers = snap.outliers; db.ideas = snap.ideas; });
+  await replaceAll(snap);
 }
 
 async function callBridge(payload, timeoutMs) {

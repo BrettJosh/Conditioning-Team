@@ -326,7 +326,7 @@ Its own page at **`/ideas`** on this site (e.g. `conditioningteam.netlify.app/id
 
 **Access.** Same `BOARD_ACCESS_CODE` as the Studio, and the same remembered device: a computer already connected to the Studio opens the Ideation Machine connected. Images are served only with a key derived from that code, so changing the code in Netlify also changes every image link.
 
-**Storage.** Netlify Blobs, part of this Netlify site: no extra account, service or environment variable. `package.json` lists the one library it needs and Netlify installs it automatically on deploy. Saving is per field with automatic retry, so two people editing at once don't overwrite each other.
+**Storage.** Netlify Blobs, part of this Netlify site: no extra account, service or environment variable. `package.json` lists the one library it needs and Netlify installs it automatically on deploy. Every outlier and every idea is its own blob, and each save only sends the fields that changed, then reads the item back and re-applies the change if someone else's save landed on top. So two people working at once don't overwrite each other.
 
 ### Backups
 
