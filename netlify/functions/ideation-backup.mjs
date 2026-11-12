@@ -1,5 +1,5 @@
 /**
- * Hourly Ideation Machine backup. Netlify runs this on the schedule below; it is not reachable over HTTP.
+ * Ideation Machine backup, every 15 minutes. Netlify runs this on the schedule below; it is not reachable over HTTP.
  * Takes the daily snapshot (once a day) and keeps the Google Drive copy current. See ../lib/ideation-backup.mjs.
  * The same backup can be run on demand from the page: Backups → Back up now.
  */
@@ -16,4 +16,5 @@ export default async function handler() {
   }
 }
 
-export const config = { schedule: '@hourly' };
+// Every 15 minutes: quick when nothing has changed, and new images reach Google Drive soon after they're added.
+export const config = { schedule: '*/15 * * * *' };

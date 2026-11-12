@@ -643,9 +643,9 @@ async function renderBackups(fetchFresh) {
     <section class="backup-card drive"><h3>☁ Google Drive copy (off-site)</h3><div class="body">
       ${driveOk ? `<p class="ok-line">✓ Copied to Drive ${esc(fmtWhen(st.lastDrive))}</p>` : ''}
       ${st.lastDriveError ? `<p class="warn-line">${esc(st.lastDriveError)}</p>` : ''}
-      <p>A readable Google Sheet (every idea and outlier, with your notes), the full data file and every image, in a Drive folder called <b>Josh Brett Ideation Machine backups</b>. Updated every hour when something changes.</p>
+      <p>A readable Google Sheet (every idea and outlier, with your notes), the full data file and every image, in a Drive folder called <b>Josh Brett Ideation Machine backups</b>. Updated within 15 minutes of any change.</p>
       ${st.folderUrl ? `<p><a href="${esc(safeUrl(st.folderUrl))}" target="_blank" rel="noopener">Open the Drive folder ↗</a>${st.sheetUrl ? ` · <a href="${esc(safeUrl(st.sheetUrl))}" target="_blank" rel="noopener">Open the sheet ↗</a>` : ''}</p>` : ''}
-      <p>Images on Drive: <b>${st.imagesOnDrive || 0}</b> of <b>${st.imagesTotal || 0}</b>${st.imagesTotal && st.imagesOnDrive < st.imagesTotal ? ' (the rest follow in batches each hour)' : ''}</p>
+      <p>Images on Drive: <b>${st.imagesOnDrive || 0}</b> of <b>${st.imagesTotal || 0}</b>${st.imagesTotal && st.imagesOnDrive < st.imagesTotal ? ' (the rest follow a few at a time, every 15 minutes)' : ''}</p>
       ${!driveOk ? `<ol class="setup-steps"><li>Open the Studio bridge script in Google Apps Script and replace Code.gs with the new one from GitHub (google-apps-script/Code.gs).</li><li>Run <b>studioSelfTest</b> and press Allow (it now asks for Google Drive too).</li><li>Deploy → Manage deployments → ✎ → New version → Deploy.</li><li>Come back here and press Back up now.</li></ol>` : ''}
     </div></section>
     <section class="backup-card"><h3>⤓ Download a copy</h3><div class="body">

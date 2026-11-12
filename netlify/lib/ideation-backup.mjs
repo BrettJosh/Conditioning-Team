@@ -5,7 +5,7 @@
  *    Restorable from the page (Backups tab). A restore first saves the current state under before-restore/<time>.
  * 2. Off-site copy to Google Drive through the Studio's existing Apps Script bridge (STUDIO_CALENDAR_SCRIPT_URL):
  *    a readable Google Sheet (Video ideas, Outliers), ideation-machine-latest.json plus a dated copy each day,
- *    and every image as a file. Images go a batch at a time so each hourly run stays well inside Netlify's time limit.
+ *    and every image as a file. Images go a few at a time so each run stays well inside Netlify's time limit.
  *    Needs the updated Code.gs (bridge version 6). Until then the Drive copy reports what to do and the snapshots still run.
  */
 import { createHash } from 'node:crypto';
@@ -13,7 +13,7 @@ import { store, readDb, imageIds, readImage, imageKey, imageExt, replaceAll } fr
 
 const KEEP_DAYS = 30;
 const IMAGE_BATCH_BYTES = 3 * 1024 * 1024;
-const IMAGE_BATCH_COUNT = 8;
+const IMAGE_BATCH_COUNT = 5;
 const londonDate = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
 
 async function backups() { return store('ideation-backups'); }
@@ -99,7 +99,7 @@ export async function runBackup({ force = false, budgetMs = 24000 } = {}) {
       // Images not on Drive yet, a batch at a time.
       const done = new Set(state.driveImages || []);
       const pending = imageIds(db).filter(id => !done.has(id));
-      while (pending.length && left() > 7000) {
+      while (pending.length && left() > 9000) {
         const batch = []; let bytes = 0;
         while (pending.length && batch.length < IMAGE_BATCH_COUNT && bytes < IMAGE_BATCH_BYTES) {
           const id = pending.shift();
@@ -109,7 +109,7 @@ export async function runBackup({ force = false, budgetMs = 24000 } = {}) {
           batch.push({ id, name: id + '.' + imageExt(img.type), type: img.type, b64: Buffer.from(img.bytes).toString('base64') });
         }
         if (!batch.length) break;
-        const r = await callBridge({ action: 'ideationBackupImages', images: batch }, Math.min(16000, left() - 1000));
+        const r = await callBridge({ action: 'ideationBackupImages', images: batch }, Math.min(20000, left() - 1000));
         (r.saved || batch.map(b => b.id)).forEach(id => done.add(id));
         out.images += batch.length;
       }

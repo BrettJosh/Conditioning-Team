@@ -332,11 +332,11 @@ Its own page at **`/ideas`** on this site (e.g. `conditioningteam.netlify.app/id
 ### Backups
 
 1. **Daily snapshots (automatic).** Once a day the whole thing is copied inside Netlify and kept for 30 days. **Backups → Restore** puts any day back (what's there now is saved first, so a restore can itself be undone).
-2. **Google Drive copy (off-site).** Every hour, if anything changed: a readable Google Sheet (*Ideation Machine (readable backup)*: a Video ideas tab and an Outliers tab with thumbnails and notes), `ideation-machine-latest.json` plus a dated copy per day (90 kept), and every image in an *Images* folder, all in a Drive folder called **Josh Brett Ideation Machine backups**. It goes through the same Apps Script bridge as the calendar and sponsorships, so it needs the updated script once:
+2. **Google Drive copy (off-site).** Every 15 minutes, if anything changed: a readable Google Sheet (*Ideation Machine (readable backup)*: a Video ideas tab and an Outliers tab with thumbnails and notes), `ideation-machine-latest.json` plus a dated copy per day (90 kept), and every image in an *Images* folder, all in a Drive folder called **Josh Brett Ideation Machine backups**. It goes through the same Apps Script bridge as the calendar and sponsorships, so it needs the updated script once:
    1. Open the **Studio bridge** Apps Script project and replace `Code.gs` with `google-apps-script/Code.gs` from this repo (bridge version 6).
    2. Choose **studioSelfTest**, press **Run**, then **Allow**. It now also asks for Google Drive access, which it uses only to create and update that one folder. The log should end with *Ideation Machine backups folder OK*.
    3. **Deploy → Manage deployments → ✎ → New version → Deploy.** The URL doesn't change, so nothing changes in Netlify.
-   4. On the site, **Backups → Back up now**. The Drive folder and sheet links appear there. Images copy across in small batches every hour (Back up now speeds it up).
+   4. On the site, **Backups → Back up now**. The Drive folder and sheet links appear there. Images copy across a few at a time every 15 minutes (Back up now speeds it up).
 3. **Download backup** saves everything as one JSON file whenever you want.
 
 ### The Discord import (one-time)

@@ -50,10 +50,10 @@ function events(){const metric=metrics(),list=[];
 }
 function doPost(e){try{const data=JSON.parse(e.postData.contents||'{}'),secret=PropertiesService.getScriptProperties().getProperty('STUDIO_CALENDAR_SECRET');
  if(!secret||data.secret!==secret)return json({ok:false,error:'Incorrect calendar secret.'});
+ if(String(data.action||'').indexOf('ideation')===0){const ulock=LockService.getUserLock();if(!ulock.tryLock(25000))return json({ok:false,error:'Another backup is still running. It will carry on next time.'});try{return json(ideationRequest(data))}finally{ulock.releaseLock()}} // Ideation Machine backups: own lock, so the calendar never waits on them
  const lock=LockService.getScriptLock();lock.waitLock(15000);
  try{const action=data.action;
   if(String(action||'').indexOf('sponsor')===0)return json(sponsorRequest(data)); // sponsorships, further down
-  if(String(action||'').indexOf('ideation')===0)return json(ideationRequest(data)); // Ideation Machine backups, at the end
   main();
   const done=()=>json({ok:true,events:events(),bridgeVersion:BRIDGE_VERSION,years:{first:FIRST_YEAR,last:LAST_YEAR}});
   if(action==='list')return done();
