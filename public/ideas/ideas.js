@@ -186,7 +186,7 @@ async function runMatch(todo) {
     await Promise.all([1, 2, 3].map(async () => {
       while (q.length) {
         const ids = q.splice(0, 2);
-        try { const { results } = await api('matchYouTube', { ids }); results.forEach(r => { if (r.item) S.outliers.set(r.item.id, r.item); if (r.matched) found++; else if (r.item) missed++; else failed++; }); }
+        try { const { results } = await api('matchYouTube', { ids }); results.forEach(r => { if (r.item) S.outliers.set(r.item.id, r.item); if (r.matched) found++; else if (r.failed || !r.item) failed++; else missed++; }); }
         catch (err) { failed += ids.length; console.warn('match', ids, err); }
         n += ids.length; status(); if (n % 10 < 2) renderOutliers();
       }

@@ -179,13 +179,15 @@ async function matchOutlier(o) {
   if (title.length < 8 || words < 2) return { matched: false, reason: 'no title' };
   const need = words < 5 ? 0.9 : 0.72; // a short or cut-off title needs a near-exact match
   const { results } = await searchYouTube(title);
+  if (!results.length) return { matched: false, unavailable: true, reason: 'YouTube search didn\'t answer; try again later' };
   let best = null;
   for (const r of results) {
     const t = likeness(title, r.title), c = o.channel ? likeness(o.channel, r.channel) : 0;
-    const score = t + (c >= 0.6 ? 0.15 : 0);
-    if (!best || score > best.score) best = { ...r, score, t, c };
+    const inside = words >= 3 && (' ' + norm(r.title) + ' ').includes(' ' + norm(title) + ' '); // a cut-off title that appears word for word
+    const score = t + (c >= 0.6 ? 0.15 : 0) + (inside ? 0.2 : 0);
+    if (!best || score > best.score) best = { ...r, score, t, c, inside };
   }
-  if (!best || !(best.t >= need || (best.t >= 0.55 && best.c >= 0.6 && words >= 5))) return { matched: false, reason: 'no close match', best: best && { title: best.title, score: Math.round(best.score * 100) / 100 } };
+  if (!best || !(best.t >= need || best.inside || (best.t >= 0.55 && best.c >= 0.6 && words >= 5))) return { matched: false, reason: 'no close match', best: best && { title: best.title, score: Math.round(best.score * 100) / 100 } };
   const stats = (await videoStats([best.videoId]))[best.videoId] || {};
   return { matched: true, videoId: best.videoId, title: stats.title || best.title, channel: stats.channel || best.channel, views: stats.views ?? null, subs: stats.subs ?? null, published: stats.published || '', score: best.score };
 }
@@ -288,6 +290,7 @@ async function act(input) {
       if (!o) { results.push({ id, matched: false, reason: 'gone' }); continue; }
       let m;
       try { m = await matchOutlier(o); } catch (err) { results.push({ id, matched: false, reason: err.message }); continue; }
+      if (m.unavailable) { results.push({ id, matched: false, failed: true, reason: m.reason, item: o }); continue; } // not a "no match": try again later
       const item = await updateItem('outliers', id, it => {
         it.ytCheckedAt = now;
         if (!m.matched) return;
