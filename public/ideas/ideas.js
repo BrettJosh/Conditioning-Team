@@ -300,22 +300,49 @@ function renderOutliers() {
   updateTidyBtn(); updateMatchBtn();
   const grid = $('#outlierGrid');
   if (!list.length) { grid.innerHTML = `<div class="empty-state">${S.outliers.size ? 'Nothing matches that.' : 'No outliers yet.'}<small>${S.outliers.size ? 'Try another filter or search.' : 'Paste a screenshot (⌘V) or a YouTube link, or press Add outlier.'}</small></div>`; return; }
+  // Notes half-typed into cards survive a redraw (a background refresh, a filter change).
+  const drafts = new Map([...grid.querySelectorAll('.card-note textarea')].filter(t => t.value.trim()).map(t => [t.form.dataset.cardNote, t.value]));
+  const active = document.activeElement?.closest?.('.card-note')?.dataset.cardNote;
+  const caret = active ? document.activeElement.selectionStart : 0;
   grid.innerHTML = list.slice(0, S.outLimit).map((o, i) => cardOutlier(o, S.outSort === 'ratio' && ratioOf(o) ? i + 1 : 0)).join('') + (list.length > S.outLimit ? `<button class="quiet-btn show-more" type="button" data-more-outliers>Show ${Math.min(96, list.length - S.outLimit)} more (${list.length - S.outLimit} left)</button>` : '');
+  for (const [id, v] of drafts) { const t = grid.querySelector(`[data-card-note="${CSS.escape(id)}"] textarea`); if (t) { t.value = v; growNote(t); t.form.classList.add('has-text'); } }
+  if (active) { const t = grid.querySelector(`[data-card-note="${CSS.escape(active)}"] textarea`); if (t) { t.focus({ preventScroll: true }); t.setSelectionRange(caret, caret); } }
 }
 function queryOk(o) { const q = S.outQuery.trim().toLowerCase(); if (!q) return true; const hay = [o.title, o.channel, o.why, o.steal, ...(o.tags || []), ...(o.notes || []).map(n => n.text)].join(' ').toLowerCase(); return q.split(/\s+/).every(w => hay.includes(w)); }
-/** The bottom of each card: why it works / the latest note, or an obvious nudge to add one. */
-function notesStrip(o) {
+/** The bottom of each card: what's been said so far, then a white box to type a new note straight in. */
+function notesBox(o) {
   const notes = o.notes || [], last = notes[notes.length - 1];
-  const count = notes.length + (o.why ? 1 : 0) + (o.steal ? 1 : 0);
-  if (!o.why && !o.steal && !notes.length) return `<span class="out-notes empty" data-focus="why">✎ Add a note: why does this work?</span>`;
-  const main = o.why ? `<b>Why it works:</b> ${esc(o.why)}` : o.steal ? `<b>Steal:</b> ${esc(o.steal)}` : `<b>${esc(last.by)}:</b> ${esc(last.text)}`;
-  return `<span class="out-notes" data-focus="notes"><p>${main}</p>${notes.length ? `<span class="count">✎ ${notes.length} note${notes.length === 1 ? '' : 's'}${o.why && last ? ` · latest from ${esc(last.by)}` : ''}</span>` : ''}</span>`;
+  const said = [];
+  if (o.why) said.push(`<p><b>Why it works:</b> ${esc(o.why)}</p>`);
+  else if (o.steal) said.push(`<p><b>Steal:</b> ${esc(o.steal)}</p>`);
+  if (last) said.push(`<p><b>${esc(last.by)}:</b> ${esc(last.text)}</p>`);
+  const more = notes.length > 1 ? `All ${notes.length} notes →` : '';
+  return `<form class="card-note" data-card-note="${esc(o.id)}">
+    ${said.length ? `<button class="card-note-said" type="button" data-open-outlier="${esc(o.id)}" data-focus="notes">${said.join('')}${more ? `<span class="more">${more}</span>` : ''}</button>` : ''}
+    <textarea rows="1" maxlength="6000" placeholder="${notes.length || o.why || o.steal ? 'Add a note…' : 'Why does this work?'}" aria-label="Add a note to this outlier"></textarea>
+    <div class="card-note-foot"><span>Press Enter to save</span><button class="card-note-save" type="submit">Save note</button></div>
+  </form>`;
 }
+/** Save a note typed into a card, then redraw just that card so nothing else moves. */
+async function cardNote(form) {
+  const id = form.dataset.cardNote, ta = form.querySelector('textarea'), text = ta.value.trim();
+  if (!text || form.classList.contains('saving')) return;
+  form.classList.add('saving'); ta.readOnly = true;
+  try {
+    await flush('outlier', id);
+    const { item } = await api('addNote', { kind: 'outlier', id, text });
+    S.outliers.set(id, item);
+    const card = form.closest('.out-card');
+    if (card) card.outerHTML = cardOutlier(item, Number(card.dataset.rank) || 0);
+    toast('Note saved ✓');
+  } catch (err) { toast(err.message, 5000); form.classList.remove('saving'); ta.readOnly = false; ta.focus(); }
+}
+function growNote(ta) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight + 2, 180) + 'px'; }
 const fmtRatio = r => (r >= 100 ? Math.round(r).toLocaleString('en-GB') : r >= 10 ? r.toFixed(0) : r.toFixed(1)) + '×';
 function cardOutlier(o, rank = 0) {
   const src = outThumb(o), r = ratioOf(o), notes = (o.notes || []).length;
   const usedIn = [...S.ideas.values()].filter(i => (i.outlierIds || []).includes(o.id)).length;
-  return `<button class="out-card" type="button" data-open-outlier="${esc(o.id)}">
+  return `<article class="out-card" data-card="${esc(o.id)}" data-rank="${rank || ''}"><button class="out-open" type="button" data-open-outlier="${esc(o.id)}">
     <div class="out-thumb">${src ? `<img loading="lazy" decoding="async" src="${esc(src)}" alt="">` : '<span class="no-img">No image</span>'}
       <div class="out-badges"><span>${rank ? `<span class="b rank" title="Rank by views ÷ subscribers">#${rank}</span>` : ''}</span><span>${o.multiplier ? `<span class="b avg" title="Outlier score: views compared with the channel's average">${o.multiplier >= 100 ? Math.round(o.multiplier) : o.multiplier}× avg</span> ` : ''}${o.starred ? '<span class="b star">★</span>' : ''}</span></div></div>
     <div class="out-info">
@@ -324,8 +351,8 @@ function cardOutlier(o, rank = 0) {
       ${o.views || o.subs ? `<div class="out-stats">${o.views ? `<span><b>${fmtNum(o.views)}</b> views</span>` : ''}${o.subs ? `<span><b>${fmtNum(o.subs)}</b> subs</span>` : ''}${r ? `<span class="ratio-chip" title="Views ÷ subscribers"><b>${fmtRatio(r)}</b> subs</span>` : ''}</div>` : ''}
       <div class="out-foot"><span class="tags">${o.genre ? `<span class="genre-pill g-${esc(o.genre)}">${esc(o.genre)}</span>` : ''}${(o.tags || []).slice(0, 2).map(t => `<span>${esc(t)}</span>`).join('')}</span>
       <span>${usedIn ? `✳ ${usedIn} idea${usedIn > 1 ? 's' : ''}` : ''}</span></div>
-    </div>
-    ${notesStrip(o)}</button>`;
+    </div></button>
+    ${notesBox(o)}</article>`;
 }
 
 /* ---------- rendering: ideas ---------- */
@@ -892,6 +919,14 @@ function bind() {
   ['dragover', 'dragenter'].forEach(t => grid.addEventListener(t, e => { if ([...e.dataTransfer.types].includes('Files')) { e.preventDefault(); grid.classList.add('drag-over'); } }));
   ['dragleave', 'drop'].forEach(t => grid.addEventListener(t, () => grid.classList.remove('drag-over')));
   grid.addEventListener('drop', e => { e.preventDefault(); quickAddFiles(e.dataTransfer.files); });
+  // notes typed straight into a card
+  grid.addEventListener('submit', e => { const f = e.target.closest('[data-card-note]'); if (f) { e.preventDefault(); cardNote(f); } });
+  grid.addEventListener('input', e => { if (e.target.matches('.card-note textarea')) { growNote(e.target); e.target.form.classList.toggle('has-text', Boolean(e.target.value.trim())); } });
+  grid.addEventListener('keydown', e => {
+    if (!e.target.matches('.card-note textarea')) return;
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); e.target.form.requestSubmit(); }
+    if (e.key === 'Escape') { e.stopPropagation(); e.target.blur(); }
+  });
 
   // overlays: close buttons and backdrops
   document.addEventListener('click', e => {

@@ -26,7 +26,7 @@ button.chip:hover{background:#fff2ba}
 .outlier-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px;align-items:start;min-height:120px;border-radius:18px;transition:background .15s}
 .outlier-grid.drag-over{background:rgba(143,223,194,.35);outline:3px dashed var(--ink);outline-offset:6px}
 .out-card{display:block;width:100%;text-align:left;padding:0;border:2.2px solid var(--ink);border-radius:15px;background:var(--white);box-shadow:var(--shadow-sm);overflow:hidden;transition:transform .12s,box-shadow .12s;color:var(--ink)}
-.out-card:hover{transform:translateY(-3px);box-shadow:4px 6px 0 var(--ink)}
+.out-card:has(.out-open:hover){transform:translateY(-3px);box-shadow:4px 6px 0 var(--ink)}
 .out-thumb{position:relative;aspect-ratio:16/9;background:#e9e3d7;border-bottom:2px solid var(--ink);overflow:hidden}
 .out-thumb img{display:block;width:100%;height:100%;object-fit:cover;object-position:top center}
 .out-thumb.tall img{object-fit:contain;background:#1b1b1b}
@@ -232,15 +232,26 @@ button.chip:hover{background:#fff2ba}
 .genre-pick button[aria-pressed="true"].g-Education{background:var(--blue)}
 .genre-pick button[aria-pressed="true"].g-Entertainment{background:var(--pink)}
 
-/* the notes strip at the bottom of every outlier card */
+/* the bottom of every outlier card: what's been said, then a white note box */
 .out-card{display:flex;flex-direction:column}
+.out-open{display:flex;flex-direction:column;flex:1;width:100%;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
 .out-info{flex:1}
-.out-notes{display:block;margin:0;padding:11px 13px 12px;border-top:2px solid var(--ink);background:#fff3c4;font-size:12px;line-height:1.45;color:#3a362f;text-align:left}
-.out-notes p{margin:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
-.out-notes b{font-weight:950;color:var(--ink)}
-.out-notes .count{display:block;margin-top:6px;font-size:10.5px;font-weight:900;color:#8a6a00}
-.out-notes.empty{background:repeating-linear-gradient(-45deg,#fffaf0,#fffaf0 8px,#fbf1d8 8px,#fbf1d8 16px);color:#8a6a00;font-weight:900}
-.out-card:hover .out-notes.empty{background:#fff2ba;color:var(--ink)}
+.card-note{display:grid;gap:8px;margin:0;padding:10px 11px 11px;border-top:2px solid var(--ink);background:#f6f2ea}
+.card-note-said{display:grid;gap:5px;width:100%;margin:0;padding:0;border:0;background:transparent;text-align:left;font:inherit;font-size:12px;line-height:1.45;color:#3a362f;cursor:pointer}
+.card-note-said p{margin:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.card-note-said b{font-weight:950;color:var(--ink)}
+.card-note-said .more{font-size:10.5px;font-weight:900;color:#6c675e}
+.card-note-said:hover p{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px}
+.card-note textarea{display:block;width:100%;box-sizing:border-box;min-height:42px;max-height:180px;resize:none;margin:0;padding:10px 12px;border:2px solid var(--ink);border-radius:10px;background:#fff;font:inherit;font-size:12.5px;line-height:1.4;color:var(--ink);box-shadow:inset 0 1px 0 rgba(0,0,0,.04);transition:box-shadow .12s,min-height .12s}
+.card-note textarea::placeholder{color:#8a8478;font-weight:700}
+.card-note textarea:hover{box-shadow:2px 2px 0 var(--ink)}
+.card-note textarea:focus{outline:0;min-height:72px;box-shadow:3px 3px 0 var(--ink)}
+.card-note-foot{display:none;align-items:center;justify-content:space-between;gap:8px;font-size:10.5px;font-weight:800;color:#6c675e}
+.card-note:has(textarea:focus) .card-note-foot,.card-note.has-text .card-note-foot{display:flex}
+.card-note-save{flex:none;border:2px solid var(--ink);border-radius:9px;background:var(--mint);padding:6px 11px;font-size:11.5px;font-weight:950;color:var(--ink);box-shadow:2px 2px 0 var(--ink);cursor:pointer}
+.card-note:not(.has-text) .card-note-save{opacity:.45;box-shadow:none;cursor:default}
+.card-note.saving{opacity:.6;pointer-events:none}
+@media(max-width:760px){.card-note{padding:9px}.card-note textarea{font-size:12px;padding:9px 10px}.card-note-foot span{display:none}.card-note-foot{justify-content:flex-end}}
 .drawer-section.thoughts{border-top:0;margin-top:14px;padding-top:0}
 .notes-first .notes-list{margin-top:6px}
 .out-foot .tags .genre-pill{border:1.4px solid var(--ink)}
