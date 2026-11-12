@@ -27,7 +27,6 @@ const fmtDate = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLoc
 const fmtWhen = iso => { const d = new Date(iso); if (isNaN(d)) return ''; const mins = (Date.now() - d) / 6e4; if (mins < 1) return 'just now'; if (mins < 60) return Math.round(mins) + ' min ago'; if (mins < 1440) return Math.round(mins / 60) + ' h ago'; return fmtDate(iso); };
 const ytId = s => { const m = String(s || '').match(/(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/i); return m ? m[1] : ''; };
 const ratioOf = o => (o.views && o.subs ? o.views / o.subs : 0);
-const scoreOf = o => o.multiplier || ratioOf(o);
 const statusClass = s => 'status-' + String(s || 'Rough').replace(/\s+/g, '-');
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 let toastTimer;
@@ -37,7 +36,7 @@ function toast(msg, ms = 3200) { const t = $('#toast'); t.textContent = msg; t.c
 const S = {
   code: '', who: store('localStorage', WHO_KEY), loaded: false, loadedAt: 0,
   outliers: new Map(), ideas: new Map(), imageKey: '', youtube: false, backup: null,
-  tab: 'outliers', outFilter: 'all', tagFilter: '', outSort: 'new', outQuery: '', outLimit: 96,
+  tab: 'outliers', outFilter: 'all', tagFilter: '', outSort: 'ratio', outQuery: '', outLimit: 96,
   ideaFilter: 'all', ideaSort: 'updated', ideaQuery: '',
   open: null // { kind: 'outlier'|'idea', id }
 };
@@ -163,10 +162,49 @@ async function tidyOutlier(o) {
   S.outliers.set(item.id, item);
   return { cropped: Boolean(r.cropped), title: Boolean(patch.title), item };
 }
+const needsMatch = o => Boolean(o.title) && !o.videoId && !o.ytCheckedAt && !o.archived;
+let matchRunning = false;
+function updateMatchBtn() { const n = [...S.outliers.values()].filter(needsMatch).length; const b = $('#matchBtn'); b.hidden = !n || matchRunning || !S.youtube; b.querySelector('span').textContent = `Find ${n} on YouTube`; }
+function openMatch() {
+  if (matchRunning) { $('#tidyOverlay').hidden = false; return; }
+  const todo = [...S.outliers.values()].filter(needsMatch);
+  $('#jobKicker').textContent = '/ FIND ON YOUTUBE';
+  $('#tidyTitle').innerHTML = 'Views, subs<br><span class="highlight-inline">and channel.</span>';
+  $('#tidyBody').innerHTML = `<p class="import-stats">Look up <b>${todo.length}</b> outlier${todo.length === 1 ? '' : 's'} on YouTube by title, to get the exact title, channel, views and subscriber count, and a link to the video.</p><p class="section-hint">Only close matches are used. Anything it gets wrong: open it and press "Not this video". Takes a few seconds each. Keep this tab open.</p><div class="progress"><span id="tidyBar"></span></div><p class="section-hint" id="tidyStatus"></p><div class="form-actions"><span></span><button class="primary-btn" type="button" id="matchGo">Find ${todo.length} ↗</button></div>`;
+  $('#tidyOverlay').hidden = false;
+  $('#matchGo').addEventListener('click', () => runMatch(todo));
+}
+async function runMatch(todo) {
+  if (matchRunning) return;
+  matchRunning = true; updateMatchBtn();
+  const go = $('#matchGo'); go.disabled = true; go.textContent = 'Searching…';
+  let n = 0, found = 0, missed = 0, failed = 0;
+  const status = () => { const bar = $('#tidyBar'); if (bar) bar.style.width = Math.round(n / todo.length * 100) + '%'; const st = $('#tidyStatus'); if (st) st.textContent = `${n} of ${todo.length} · ${found} found${missed ? ` · ${missed} no close match` : ''}${failed ? ` · ${failed} failed` : ''}`; };
+  status();
+  const q = todo.map(o => o.id);
+  try {
+    await Promise.all([1, 2, 3].map(async () => {
+      while (q.length) {
+        const ids = q.splice(0, 2);
+        try { const { results } = await api('matchYouTube', { ids }); results.forEach(r => { if (r.item) S.outliers.set(r.item.id, r.item); if (r.matched) found++; else if (r.item) missed++; else failed++; }); }
+        catch (err) { failed += ids.length; console.warn('match', ids, err); }
+        n += ids.length; status(); if (n % 10 < 2) renderOutliers();
+      }
+    }));
+    $('#tidyBody').innerHTML = `<p class="import-stats">Done ✓ Found <b>${found}</b> on YouTube, with exact views, subscribers and channel.${missed ? ` <b>${missed}</b> had no close match (cut-off or misread titles); paste their link in by hand if you know it.` : ''}${failed ? ` <b>${failed}</b> failed; press Find again later.` : ''}</p><p class="section-hint">The grid is ranked by views ÷ subscribers now.</p><div class="form-actions"><span></span><button class="primary-btn" type="button" data-close>Have a look ↗</button></div>`;
+  } finally { matchRunning = false; S.outSort = 'ratio'; $('#outlierSort').value = 'ratio'; renderLists(); }
+}
+/** After adding one: find it on YouTube in the background. */
+function autoMatch(item) {
+  if (!S.youtube || !item?.title || item.videoId) return;
+  api('matchYouTube', { ids: [item.id] }).then(({ results }) => { const r = results[0]; if (r?.item) { S.outliers.set(r.item.id, r.item); renderLists(); if (S.open?.id === r.item.id) renderOutlierDrawer(); } }).catch(() => {});
+}
 function updateTidyBtn() { const n = [...S.outliers.values()].filter(needsTidy).length; $('#tidyBtn').hidden = !n || tidyRunning; $('#tidyBtn span').textContent = `Tidy ${n} screenshot${n === 1 ? '' : 's'}`; }
 function openTidy() {
   if (tidyRunning) { $('#tidyOverlay').hidden = false; return; }
   const todo = [...S.outliers.values()].filter(needsTidy);
+  $('#jobKicker').textContent = '/ TIDY SCREENSHOTS';
+  $('#tidyTitle').innerHTML = 'Crop to the<br><span class="highlight-inline">thumbnail.</span>';
   $('#tidyBody').innerHTML = `<p class="import-stats"><b>${todo.length}</b> screenshot${todo.length === 1 ? '' : 's'} to tidy. Each one is cropped down to just the thumbnail, and the title, channel and views are read from the text beside it (only where those are still empty).</p><p class="section-hint">The original screenshot is kept: open any outlier and press "Use the whole screenshot" to undo. It takes a second or two each, so a few minutes in all. Keep this tab open.</p><div class="progress"><span id="tidyBar"></span></div><p class="section-hint" id="tidyStatus"></p><div class="form-actions"><span></span><button class="primary-btn" type="button" id="tidyGo">Tidy ${todo.length} ↗</button></div>`;
   $('#tidyOverlay').hidden = false;
   $('#tidyGo').addEventListener('click', () => runTidy(todo));
@@ -241,26 +279,30 @@ function renderOutliers() {
   $('#tagFilter').innerHTML = tagList.length ? tagList.map(([t, n]) => `<button class="chip" type="button" data-tag-filter="${esc(t)}" aria-pressed="${S.tagFilter === t}">${esc(t)} <span class="tab-count">${n}</span></button>`).join('') : '';
   // the matching: "Needs notes" uses hasThoughts
   let list = all.filter(o => (S.outFilter === 'nonotes' ? (!o.archived && !hasThoughts(o) && (!S.tagFilter || (o.tags || []).includes(S.tagFilter)) && queryOk(o)) : outlierMatches(o)));
-  const by = { new: (a, b) => String(b.createdAt).localeCompare(String(a.createdAt)), old: (a, b) => String(a.createdAt).localeCompare(String(b.createdAt)), views: (a, b) => (b.views || 0) - (a.views || 0), ratio: (a, b) => scoreOf(b) - scoreOf(a), notes: (a, b) => (b.notes || []).length - (a.notes || []).length };
+  const byRatio = (a, b) => (ratioOf(b) - ratioOf(a)) || ((b.views || 0) - (a.views || 0));
+  const by = { new: (a, b) => String(b.createdAt).localeCompare(String(a.createdAt)), old: (a, b) => String(a.createdAt).localeCompare(String(b.createdAt)), views: (a, b) => (b.views || 0) - (a.views || 0), ratio: byRatio, score: (a, b) => ((b.multiplier || 0) - (a.multiplier || 0)) || byRatio(a, b), notes: (a, b) => (b.notes || []).length - (a.notes || []).length };
   list.sort(by[S.outSort] || by.new);
   $('#outlierResults').textContent = list.length === live.length && !S.tagFilter && S.outFilter === 'all' ? `${live.length} outliers` : `Showing ${list.length} of ${live.length}`;
   $('#outlierTabCount').textContent = live.length || '';
-  updateTidyBtn();
+  updateTidyBtn(); updateMatchBtn();
   const grid = $('#outlierGrid');
   if (!list.length) { grid.innerHTML = `<div class="empty-state">${S.outliers.size ? 'Nothing matches that.' : 'No outliers yet.'}<small>${S.outliers.size ? 'Try another filter or search.' : 'Paste a screenshot (⌘V) or a YouTube link, or press Add outlier.'}</small></div>`; return; }
-  grid.innerHTML = list.slice(0, S.outLimit).map(cardOutlier).join('') + (list.length > S.outLimit ? `<button class="quiet-btn show-more" type="button" data-more-outliers>Show ${Math.min(96, list.length - S.outLimit)} more (${list.length - S.outLimit} left)</button>` : '');
+  grid.innerHTML = list.slice(0, S.outLimit).map((o, i) => cardOutlier(o, S.outSort === 'ratio' && ratioOf(o) ? i + 1 : 0)).join('') + (list.length > S.outLimit ? `<button class="quiet-btn show-more" type="button" data-more-outliers>Show ${Math.min(96, list.length - S.outLimit)} more (${list.length - S.outLimit} left)</button>` : '');
 }
 function queryOk(o) { const q = S.outQuery.trim().toLowerCase(); if (!q) return true; const hay = [o.title, o.channel, o.why, o.steal, ...(o.tags || []), ...(o.notes || []).map(n => n.text)].join(' ').toLowerCase(); return q.split(/\s+/).every(w => hay.includes(w)); }
-function cardOutlier(o) {
+const fmtRatio = r => (r >= 100 ? Math.round(r).toLocaleString('en-GB') : r >= 10 ? r.toFixed(0) : r.toFixed(1)) + '×';
+function cardOutlier(o, rank = 0) {
   const src = outThumb(o), r = ratioOf(o), notes = (o.notes || []).length;
   const usedIn = [...S.ideas.values()].filter(i => (i.outlierIds || []).includes(o.id)).length;
   return `<button class="out-card" type="button" data-open-outlier="${esc(o.id)}">
     <div class="out-thumb">${src ? `<img loading="lazy" decoding="async" src="${esc(src)}" alt="">` : '<span class="no-img">No image</span>'}
-      <div class="out-badges"><span ${o.views ? '' : 'hidden'}>${fmtNum(o.views)} views</span>${o.multiplier ? `<span class="ratio" title="Outlier score: views compared with the channel's average">${o.multiplier >= 100 ? Math.round(o.multiplier) : o.multiplier}× avg</span>` : r >= 1 ? `<span class="ratio" title="Views divided by the channel's subscribers">${r >= 10 ? Math.round(r) : r.toFixed(1)}× subs</span>` : ''}${o.starred ? '<span class="star">★</span>' : ''}</div></div>
+      <div class="out-badges"><span>${rank ? `<span class="b rank" title="Rank by views ÷ subscribers">#${rank}</span>` : ''}</span><span>${o.multiplier ? `<span class="b avg" title="Outlier score: views compared with the channel's average">${o.multiplier >= 100 ? Math.round(o.multiplier) : o.multiplier}× avg</span> ` : ''}${o.starred ? '<span class="b star">★</span>' : ''}</span></div></div>
     <div class="out-info">
-      <p class="out-title ${o.title ? '' : 'empty'}">${esc(o.title || o.channel || 'Untitled · ' + fmtDate(o.discord?.postedAt || o.createdAt))}</p>
+      <p class="out-title ${o.title ? '' : 'empty'}">${esc(o.title || 'Untitled · ' + fmtDate(o.discord?.postedAt || o.createdAt))}</p>
+      ${o.channel ? `<p class="out-channel" title="${esc(o.channel)}">${esc(o.channel)}${o.videoId ? ' <span title="Matched on YouTube">✓</span>' : ''}</p>` : ''}
+      ${o.views || o.subs ? `<div class="out-stats">${o.views ? `<span><b>${fmtNum(o.views)}</b> views</span>` : ''}${o.subs ? `<span><b>${fmtNum(o.subs)}</b> subs</span>` : ''}${r ? `<span class="ratio-chip" title="Views ÷ subscribers"><b>${fmtRatio(r)}</b> subs</span>` : ''}</div>` : ''}
       ${o.why ? `<p class="out-why">${esc(o.why)}</p>` : ''}
-      <div class="out-foot"><span class="tags">${(o.tags || []).slice(0, 3).map(t => `<span>${esc(t)}</span>`).join('')}${o.discord ? `<span>${esc(CHANNEL_LABEL[o.discord.channel] || '#' + o.discord.channel)}</span>` : ''}</span>
+      <div class="out-foot"><span class="tags">${(o.tags || []).slice(0, 3).map(t => `<span>${esc(t)}</span>`).join('')}</span>
       <span>${usedIn ? `✳ ${usedIn} idea${usedIn > 1 ? 's' : ''} · ` : ''}${notes ? `✎ ${notes}` : hasThoughts(o) ? '' : '<span class="needs-notes">needs notes</span>'}</span></div>
     </div></button>`;
 }
@@ -355,6 +397,8 @@ function renderOutlierDrawer() {
       <button class="quiet-btn small-btn" type="button" data-act="replace-image">⇪ ${full ? 'Replace' : 'Add'} image</button>
       ${o.image ? `<button class="quiet-btn small-btn" type="button" data-act="tidy" title="Crop the screenshot to just the thumbnail and read the title, channel and views from it">✂ Crop + read title</button>` : ''}
       ${o.originalImage ? `<button class="quiet-btn small-btn" type="button" data-act="untidy">↺ Use the whole screenshot</button>` : ''}
+      ${!o.videoId && o.title ? `<button class="quiet-btn small-btn" type="button" data-act="match" title="Find this video on YouTube by its title">⌕ Find on YouTube</button>` : ''}
+      ${o.ytMatch != null && o.videoId ? `<button class="quiet-btn small-btn" type="button" data-act="unmatch" title="Matched the wrong video? Go back to what the screenshot said">✕ Not this video</button>` : ''}
       <button class="primary-btn small-btn" type="button" data-act="new-idea">✳ Start an idea from this</button>
     </div>
     <input type="file" accept="image/*" hidden data-file>
@@ -367,6 +411,7 @@ function renderOutlierDrawer() {
     <div class="row3">
       <label class="field">Outlier score <span class="field-hint">× the channel's average</span><input type="number" min="0" step="0.1" data-f="multiplier" value="${o.multiplier ?? ''}" placeholder="e.g. 63.5"></label>
     </div>
+    <p class="source-line" style="margin-top:10px">${ratioOf(o) ? `Views ÷ subscribers: <b>${fmtRatio(ratioOf(o))}</b>${o.statsAt ? ` · numbers from YouTube, ${esc(fmtDate(o.statsAt))}` : ''}` : 'Add views and the channel\'s subscribers to rank this one.'}</p>
     <label class="field">YouTube link <span class="inline-field"><input type="url" maxlength="1500" data-f="url" value="${esc(o.url)}" placeholder="https://www.youtube.com/watch?v=..."><button class="quiet-btn small-btn" type="button" data-act="lookup">Look up</button></span></label>
     <label class="field">Why it works <span class="field-hint">The face, the contrast, the curiosity gap, the promise. What made people click?</span><textarea rows="5" maxlength="6000" data-f="why" placeholder="e.g. Two faces split down the middle, red vs blue, nobody knows who these people are so you have to click.">${esc(o.why)}</textarea></label>
     <label class="field">What we'd steal <textarea rows="3" maxlength="3000" data-f="steal" placeholder="The bit we could use on one of ours.">${esc(o.steal)}</textarea></label>
@@ -393,8 +438,18 @@ async function outlierAction(act, o, el) {
   if (act === 'replace-image') $('#outlierBody [data-file]').click();
   if (act === 'tidy') {
     el.disabled = true; saveState('Cropping…');
-    try { await flush('outlier', o.id); const r = await tidyOutlier(S.outliers.get(o.id)); renderOutlierDrawer(); renderLists(); saveState(r.cropped ? 'Cropped ✓' + (r.title ? ' and read the title' : '') : 'No thumbnail found in this one'); }
+    try { await flush('outlier', o.id); const r = await tidyOutlier(S.outliers.get(o.id)); autoMatch(r.item); renderOutlierDrawer(); renderLists(); saveState(r.cropped ? 'Cropped ✓' + (r.title ? ' and read the title' : '') : 'No thumbnail found in this one'); }
     catch (err) { el.disabled = false; saveState('Couldn\'t tidy it', true); toast(err.message, 5000); }
+  }
+  if (act === 'match') {
+    el.disabled = true; saveState('Searching YouTube…');
+    try { await flush('outlier', o.id); const { results } = await api('matchYouTube', { ids: [o.id] }); const r = results[0]; if (r?.item) S.outliers.set(o.id, r.item); renderOutlierDrawer(); renderLists(); saveState(r?.matched ? 'Found it on YouTube ✓' : 'Couldn\'t find a close match'); if (!r?.matched) toast('No close match on YouTube. Paste the video link into the YouTube link box instead.', 5000); }
+    catch (err) { el.disabled = false; saveState('Search failed', true); toast(err.message, 5000); }
+  }
+  if (act === 'unmatch') {
+    const was = o.ocr || {};
+    queueSave('outlier', o.id, { videoId: '', url: '', ytMatch: null, statsAt: '', ytCheckedAt: new Date().toISOString(), title: was.title ?? o.title, channel: was.channel ?? '', views: was.views ?? null, subs: was.subs ?? null }, 0);
+    renderOutlierDrawer(); renderLists(); toast('Unlinked. Paste the right video\'s link into the YouTube link box if you have it.');
   }
   if (act === 'untidy') { queueSave('outlier', o.id, { image: o.originalImage, imageSmall: o.originalSmall || '', originalImage: '', originalSmall: '' }, 0); renderOutlierDrawer(); renderLists(); }
   if (act === 'lookup') await lookupInto(o, $('#outlierBody [data-f="url"]').value);
@@ -595,6 +650,7 @@ async function saveAdd(e) {
     else if (addVideo) { try { patch.image = (await api('importImageUrl', { url: 'https://i.ytimg.com/vi/' + addVideo.videoId + '/hqdefault.jpg' })).id; } catch {} }
     const { item } = await api('saveOutlier', { patch });
     S.outliers.set(item.id, item);
+    autoMatch(item);
     $('#addOverlay').hidden = true;
     S.outFilter = 'all'; S.tagFilter = ''; renderLists();
     toast('Added. Open it any time to write down why it works.');
@@ -616,7 +672,7 @@ async function quickAddFiles(files) {
         if (r.title) patch.title = r.title; if (r.channel) patch.channel = r.channel; if (r.views != null) patch.views = r.views;
       } catch {}
       const up = await uploadBlob(blob, 'outlier'); Object.assign(patch, { image: up.id, imageSmall: up.small });
-      const { item } = await api('saveOutlier', { patch }); S.outliers.set(item.id, item); done++; toast(`Added ${done} of ${list.length}…`, 60000);
+      const { item } = await api('saveOutlier', { patch }); S.outliers.set(item.id, item); autoMatch(item); done++; toast(`Added ${done} of ${list.length}…`, 60000);
     }
     catch (err) { toast(err.message, 5000); }
   }
@@ -783,6 +839,7 @@ function bind() {
   $('#addFetch').addEventListener('click', addLookup);
   $('#addStatus').addEventListener('click', e => { if (!e.target.closest('[data-use-whole]') || !addOriginal) return; addTidyToken++; addBlob = addOriginal; addOriginal = null; showAddPreview(addBlob); $('#addStatus').textContent = 'Using the whole screenshot.'; });
   $('#tidyBtn').addEventListener('click', openTidy);
+  $('#matchBtn').addEventListener('click', openMatch);
   $('#addUrl').addEventListener('paste', () => setTimeout(() => { if (ytId($('#addUrl').value)) addLookup(); }, 30));
   const drop = $('#addDrop');
   drop.addEventListener('click', () => $('#addFile').click());

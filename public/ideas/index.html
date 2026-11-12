@@ -52,6 +52,7 @@
             <button class="quiet-btn" id="refreshBtn" type="button" title="Reload everything">↻ <span>Refresh</span></button>
             <button class="quiet-btn" id="statsBtn" type="button" title="Pull fresh view counts from YouTube for outliers with a link" hidden>▲ <span>Update views</span></button>
             <button class="quiet-btn" id="tidyBtn" type="button" title="Crop screenshots down to the thumbnail and read the title, channel and views from them" hidden>✂ <span>Tidy screenshots</span></button>
+            <button class="quiet-btn" id="matchBtn" type="button" title="Find each screenshot's video on YouTube by its title, for exact views, subscribers and channel" hidden>▶ <span>Find on YouTube</span></button>
             <button class="primary-btn" id="addOutlierBtn" type="button"><span>＋</span> Add outlier</button>
           </div>
         </div>
@@ -60,10 +61,11 @@
           <div class="project-tabs" id="outlierFilters" role="group" aria-label="Filter outliers"></div>
           <div class="tools-right">
             <select id="outlierSort" class="sort-select" aria-label="Sort outliers">
+              <option value="ratio">Views ÷ subscribers (biggest first)</option>
+              <option value="score">Outlier score (× channel average)</option>
+              <option value="views">Most views</option>
               <option value="new">Newest first</option>
               <option value="old">Oldest first</option>
-              <option value="views">Most views</option>
-              <option value="ratio">Biggest outlier score</option>
               <option value="notes">Most notes</option>
             </select>
             <label class="search-box" aria-label="Search outliers"><span>⌕</span><input id="outlierSearch" type="search" placeholder="Search titles, notes, tags..." autocomplete="off"></label>
@@ -215,8 +217,8 @@
   <div class="overlay centered-overlay" id="tidyOverlay" hidden>
     <div class="overlay-backdrop"></div>
     <section class="connection-dialog import-dialog" role="dialog" aria-modal="true" aria-labelledby="tidyTitle">
-      <div class="drawer-top"><span class="overline">/ TIDY SCREENSHOTS</span><button class="icon-close" type="button" data-close aria-label="Close">✕</button></div>
-      <h2 id="tidyTitle">Crop to the<br><span class="highlight-inline">thumbnail.</span></h2>
+      <div class="drawer-top"><span class="overline" id="jobKicker">/ TIDY SCREENSHOTS</span><button class="icon-close" type="button" data-close aria-label="Close">✕</button></div>
+      <h2 id="tidyTitle"></h2>
       <div id="tidyBody"></div>
     </section>
   </div>

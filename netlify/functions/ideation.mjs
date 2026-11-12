@@ -8,7 +8,7 @@
  * it uses the Studio's BOARD_ACCESS_CODE, and YOUTUBE_API_KEY (already set for the calendar) for view counts.
  */
 import { timingSafeEqual, createHash } from 'node:crypto';
-import { STATUSES, readDb, readAll, putItem, updateItem, deleteItem, newId, validId, imageKey, saveImage, readImage, youtubeId, youtubeThumb } from '../lib/ideation-store.mjs';
+import { STATUSES, readDb, readAll, getItem, putItem, updateItem, deleteItem, newId, validId, imageKey, saveImage, readImage, youtubeId, youtubeThumb } from '../lib/ideation-store.mjs';
 import { runBackup, backupStatus, listSnapshots, restoreSnapshot } from '../lib/ideation-backup.mjs';
 
 const send = (data, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
@@ -74,6 +74,8 @@ const OUTLIER_FIELDS = {
   originalImage: v => imgRef(v, 'Image'),
   originalSmall: v => imgRef(v, 'Image'),
   tidiedAt: v => str(v, 30, 'Tidied date'),
+  ytCheckedAt: v => str(v, 30, 'Checked date'),
+  ytMatch: v => { if (v === '' || v == null) return null; const n = Number(v); if (!Number.isFinite(n)) throw oops('Invalid match score.'); return n; },
   multiplier: v => { if (v === '' || v == null) return null; const n = Number(v); if (!Number.isFinite(n) || n < 0 || n > 100000) throw oops('Outlier score must be a number.'); return Math.round(n * 10) / 10; },
   starred: bool,
   archived: bool,
@@ -140,6 +142,54 @@ async function videoStats(ids) {
   Object.values(out).forEach(v => { v.subs = subs[v.channelId] ?? null; delete v.channelId; });
   return out;
 }
+/* ---------- finding a screenshot's video on YouTube ---------- */
+const norm = t => String(t || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/&amp;|&#39;|&quot;/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+/** How alike two titles are, 0 to 1. A screenshot's title is often cut short ("…"), so words it shares count most. */
+function likeness(a, b) {
+  const A = new Set(norm(a).split(' ').filter(Boolean)), B = new Set(norm(b).split(' ').filter(Boolean));
+  if (!A.size || !B.size) return 0;
+  let both = 0; A.forEach(w => { if (B.has(w)) both++; });
+  return both / Math.min(A.size, B.size) * 0.7 + both / Math.max(A.size, B.size) * 0.3;
+}
+function findVideos(node, out, depth = 0) {
+  if (!node || typeof node !== 'object' || depth > 40 || out.length >= 10) return;
+  if (node.videoRenderer?.videoId) {
+    const v = node.videoRenderer;
+    out.push({ videoId: v.videoId, title: (v.title?.runs || []).map(r => r.text).join('') || v.title?.simpleText || '', channel: v.ownerText?.runs?.[0]?.text || v.longBylineText?.runs?.[0]?.text || '' });
+    return;
+  }
+  for (const k in node) findVideos(node[k], out, depth + 1);
+}
+/** Search YouTube: the public results page first (no quota), then the Data API (100 quota units a search). */
+async function searchYouTube(q) {
+  try {
+    const res = await fetch('https://www.youtube.com/results?hl=en&gl=GB&sp=EgIQAQ%253D%253D&search_query=' + encodeURIComponent(q), { headers: { 'accept-language': 'en-GB,en;q=0.9', 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36', cookie: 'CONSENT=YES+cb; SOCS=CAI' }, signal: AbortSignal.timeout(8000) });
+    const html = await res.text();
+    const m = html.match(/var ytInitialData = (\{.*?\});<\/script>/s);
+    if (m) { const out = []; findVideos(JSON.parse(m[1]), out); if (out.length) return { via: 'page', results: out }; }
+  } catch {}
+  const d = await ytApi('/search', { part: 'snippet', q, type: 'video', maxResults: 8 }).catch(() => null);
+  const dec = t => String(t || '').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+  return { via: 'api', results: (d?.items || []).map(i => ({ videoId: i.id?.videoId, title: dec(i.snippet?.title), channel: dec(i.snippet?.channelTitle) })).filter(r => r.videoId) };
+}
+/** Find an outlier's video from its title (and channel, if read), then fetch exact views, subscribers and channel. */
+async function matchOutlier(o) {
+  const title = String(o.title || '').replace(/[…]|\.\.\.?$/g, '').trim();
+  const words = norm(title).split(' ').filter(w => w.length > 1).length;
+  if (title.length < 8 || words < 2) return { matched: false, reason: 'no title' };
+  const need = words < 5 ? 0.9 : 0.72; // a short or cut-off title needs a near-exact match
+  const { results } = await searchYouTube(title);
+  let best = null;
+  for (const r of results) {
+    const t = likeness(title, r.title), c = o.channel ? likeness(o.channel, r.channel) : 0;
+    const score = t + (c >= 0.6 ? 0.15 : 0);
+    if (!best || score > best.score) best = { ...r, score, t, c };
+  }
+  if (!best || !(best.t >= need || (best.t >= 0.55 && best.c >= 0.6 && words >= 5))) return { matched: false, reason: 'no close match', best: best && { title: best.title, score: Math.round(best.score * 100) / 100 } };
+  const stats = (await videoStats([best.videoId]))[best.videoId] || {};
+  return { matched: true, videoId: best.videoId, title: stats.title || best.title, channel: stats.channel || best.channel, views: stats.views ?? null, subs: stats.subs ?? null, published: stats.published || '', score: best.score };
+}
+
 async function lookupVideo(link) {
   const videoId = youtubeId(link);
   if (!videoId) throw oops('That doesn\'t look like a YouTube link.');
@@ -228,6 +278,29 @@ async function act(input) {
   }
 
   if (action === 'youtube') return { video: await lookupVideo(String(input.url || '')) };
+
+  /* Find screenshot outliers on YouTube by their title; fills in the link, exact title, channel, views and subscribers. */
+  if (action === 'matchYouTube') {
+    const ids = (Array.isArray(input.ids) ? input.ids : [input.id]).filter(validId).slice(0, 3);
+    const results = [];
+    for (const id of ids) {
+      const o = await getItem('outliers', id);
+      if (!o) { results.push({ id, matched: false, reason: 'gone' }); continue; }
+      let m;
+      try { m = await matchOutlier(o); } catch (err) { results.push({ id, matched: false, reason: err.message }); continue; }
+      const item = await updateItem('outliers', id, it => {
+        it.ytCheckedAt = now;
+        if (!m.matched) return;
+        if (!it.ocr) it.ocr = { title: it.title || '', channel: it.channel || '', views: it.views ?? null, subs: it.subs ?? null }; // what the screenshot said, for "Not this video"
+        Object.assign(it, { videoId: m.videoId, url: 'https://www.youtube.com/watch?v=' + m.videoId, channel: m.channel || it.channel, published: m.published || it.published || '', statsAt: now, ytMatch: Math.round(m.score * 100) / 100 });
+        if (m.views != null) it.views = m.views;
+        if (m.subs != null) it.subs = m.subs;
+        if (m.title && m.title !== it.title) { it.ocrTitle = it.ocrTitle || it.title; it.title = m.title; }
+      }, saved => saved.ytCheckedAt === now);
+      results.push({ id, matched: m.matched, reason: m.reason || '', best: m.best || null, item });
+    }
+    return { results };
+  }
 
   if (action === 'refreshStats') {
     if (!(process.env.YOUTUBE_API_KEY || '').trim()) throw oops('Add YOUTUBE_API_KEY in Netlify to pull view counts (it\'s the same key the content calendar uses).', 503);
