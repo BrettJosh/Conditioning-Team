@@ -298,7 +298,8 @@ export default async function handler(request) {
     if (!id || !same(k || '', imageKey())) return new Response('Not found', { status: 404 });
     const img = await readImage(id).catch(() => null);
     if (!img) return new Response('Not found', { status: 404 });
-    return new Response(img.bytes, { headers: { 'Content-Type': img.type, 'Cache-Control': 'private, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff' } });
+    // Image ids never change content, so browsers and Netlify's edge keep them for a year (fewer function runs).
+    return new Response(img.bytes, { headers: { 'Content-Type': img.type, 'Cache-Control': 'public, max-age=31536000, immutable', 'Netlify-CDN-Cache-Control': 'public, max-age=31536000, immutable, durable', 'Netlify-Vary': 'query=img|k', 'X-Content-Type-Options': 'nosniff' } });
   }
   if (request.method !== 'POST') return fail('POST only.', 405);
   if (!process.env.BOARD_ACCESS_CODE) return fail('BOARD_ACCESS_CODE is not set in Netlify.', 503);
